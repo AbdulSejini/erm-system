@@ -1,0 +1,386 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// المستخدمين
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  fullName      String
+  fullNameEn    String?
+  role          String    @default("employee") // admin, riskManager, riskAnalyst, riskChampion, executive, employee
+  status        String    @default("active") // active, inactive, suspended
+  avatar        String?
+  phone         String?
+  departmentId  String?
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // العلاقات
+  department            Department?       @relation("DepartmentUsers", fields: [departmentId], references: [id])
+  managedDepartments    Department[]      @relation("DepartmentManager")
+  championDepartments   Department[]      @relation("DepartmentChampion")
+  ownedRisks            Risk[]            @relation("RiskOwner")
+  createdRisks          Risk[]            @relation("RiskCreator")
+  championRisks         Risk[]            @relation("RiskChampion")
+  assessments           RiskAssessment[]  @relation("Assessor")
+  responsibleTreatments TreatmentPlan[]   @relation("TreatmentResponsible")
+  createdTreatments     TreatmentPlan[]   @relation("TreatmentCreator")
+  assignedTasks         TreatmentTask[]   @relation("TaskAssignee")
+  reportedIncidents     Incident[]        @relation("IncidentReporter")
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+}
+
+// الإدارات / الوظائف (Functions)
+model Department {
+  id              String    @id @default(cuid())
+  nameAr          String
+  nameEn          String
+  code            String    @unique
+  type            String    @default("department") // department, function, process
+  managerId       String?
+  riskChampionId  String?
+  parentId        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // العلاقات
+  manager       User?         @relation("DepartmentManager", fields: [managerId], references: [id])
+  riskChampion  User?         @relation("DepartmentChampion", fields: [riskChampionId], references: [id])
+  parent        Department?   @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children      Department[]  @relation("DepartmentHierarchy")
+  users         User[]        @relation("DepartmentUsers")
+  risks         Risk[]
+  incidents     Incident[]
+  processes     Process[]
+}
+
+// العمليات (Processes)
+model Process {
+  id            String    @id @default(cuid())
+  nameAr        String
+  nameEn        String
+  code          String    @unique
+  departmentId  String
+  parentId      String?   // للعمليات الفرعية (Sub Process)
+  isActive      Boolean   @default(true)
+  order         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // العلاقات
+  department  Department  @relation(fields: [departmentId], references: [id])
+  parent      Process?    @relation("ProcessHierarchy", fields: [parentId], references: [id])
+  children    Process[]   @relation("ProcessHierarchy")
+  risks       Risk[]
+}
+
+// المخاطر - محدث ليتوافق مع سجل المخاطر الفعلي
+model Risk {
+  id                   String    @id @default(cuid())
+  riskNumber           String    @unique // مثل FIN-R-001, OPS-R-001
+  issuedBy             String?   // الجهة المصدرة (KPMG, Internal, etc.)
+
+  // المعلومات الأساسية
+  titleAr              String
+  titleEn              String
+  descriptionAr        String    // وصف الخطر بالعربي
+  descriptionEn        String    // وصف الخطر بالإنجليزي
+
+  // التصنيف
+  categoryId           String?   // فئة الخطر (مالي، تشغيلي، إلخ)
+  departmentId         String    // الوظيفة/الإدارة
+  processId            String?   // العملية
+
+  // تفاصيل الخطر
+  potentialCauseAr     String?   // السبب المحتمل بالعربي
+  potentialCauseEn     String?   // السبب المحتمل بالإنجليزي
+  potentialImpactAr    String?   // التأثير المحتمل بالعربي
+  potentialImpactEn    String?   // التأثير المحتمل بالإنجليزي
+
+  // تقييم المخاطر الأصلية (Inherent Risk)
+  inherentLikelihood   Int       @default(3) // 1-5
+  inherentImpact       Int       @default(3) // 1-5
+  inherentScore        Int       @default(9) // محسوب تلقائياً
+  inherentRating       String    @default("Minor") // Critical, Major, Moderate, Minor, Negligible
+
+  // تقييم المخاطر المتبقية (Residual Risk)
+  residualLikelihood   Int?
+  residualImpact       Int?
+  residualScore        Int?
+  residualRating       String?
+
+  // طبقات الحماية والضوابط
+  layersOfProtectionAr String?   // طبقات الحماية بالعربي
+  layersOfProtectionEn String?   // طبقات الحماية بالإنجليزي
+
+  // مؤشرات المخاطر الرئيسية (KRIs)
+  krisAr               String?   // مؤشرات المخاطر بالعربي
+  krisEn               String?   // مؤشرات المخاطر بالإنجليزي
+
+  // إجراءات التخفيف
+  mitigationActionsAr  String?   // إجراءات التخفيف بالعربي
+  mitigationActionsEn  String?   // إجراءات التخفيف بالإنجليزي
+
+  // الامتثال
+  complianceRequired   Boolean   @default(false)
+  complianceNoteAr     String?
+  complianceNoteEn     String?
+  iaRef                String?   // مرجع التدقيق الداخلي
+
+  // الحالة والمتابعة
+  status               String    @default("open") // open, inProgress, mitigated, closed, accepted
+  followUpDate         DateTime?
+
+  // المسؤولين
+  ownerId              String    // مالك الخطر
+  championId           String?   // رائد المخاطر
+
+  // التواريخ
+  identifiedDate       DateTime  @default(now())
+  lastReviewDate       DateTime?
+  nextReviewDate       DateTime?
+
+  // الإنشاء والتحديث
+  createdById          String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // العلاقات
+  category      RiskCategory?     @relation(fields: [categoryId], references: [id])
+  department    Department        @relation(fields: [departmentId], references: [id])
+  process       Process?          @relation(fields: [processId], references: [id])
+  owner         User              @relation("RiskOwner", fields: [ownerId], references: [id])
+  champion      User?             @relation("RiskChampion", fields: [championId], references: [id])
+  createdBy     User              @relation("RiskCreator", fields: [createdById], references: [id])
+  assessments   RiskAssessment[]
+  treatments    TreatmentPlan[]
+  incidents     Incident[]
+
+  @@index([categoryId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([inherentRating])
+}
+
+// تقييمات المخاطر (سجل التاريخ)
+model RiskAssessment {
+  id              String    @id @default(cuid())
+  riskId          String
+  assessmentType  String    // inherent, residual
+  likelihood      Int       // 1-5
+  impact          Int       // 1-5
+  score           Int       // محسوب تلقائياً
+  rating          String    // Critical, Major, Moderate, Minor, Negligible
+  notesAr         String?
+  notesEn         String?
+  assessedById    String
+  assessmentDate  DateTime
+  createdAt       DateTime  @default(now())
+
+  // العلاقات
+  risk        Risk  @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  assessedBy  User  @relation("Assessor", fields: [assessedById], references: [id])
+}
+
+// خطط المعالجة
+model TreatmentPlan {
+  id              String    @id @default(cuid())
+  riskId          String
+  titleAr         String
+  titleEn         String
+  descriptionAr   String
+  descriptionEn   String
+  strategy        String    // avoid, reduce, transfer, accept
+  status          String    @default("notStarted") // notStarted, inProgress, completed, overdue, cancelled
+  responsibleId   String
+  startDate       DateTime
+  dueDate         DateTime
+  completionDate  DateTime?
+  progress        Int       @default(0)
+  cost            Float?
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // العلاقات
+  risk        Risk            @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  responsible User            @relation("TreatmentResponsible", fields: [responsibleId], references: [id])
+  createdBy   User            @relation("TreatmentCreator", fields: [createdById], references: [id])
+  tasks       TreatmentTask[]
+}
+
+// مهام المعالجة
+model TreatmentTask {
+  id                String    @id @default(cuid())
+  treatmentPlanId   String
+  titleAr           String
+  titleEn           String
+  descriptionAr     String?
+  descriptionEn     String?
+  status            String    @default("notStarted") // notStarted, inProgress, completed, overdue, cancelled
+  assignedToId      String?
+  dueDate           DateTime?
+  completionDate    DateTime?
+  order             Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // العلاقات
+  treatmentPlan TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+  assignedTo    User?         @relation("TaskAssignee", fields: [assignedToId], references: [id])
+}
+
+// الحوادث
+model Incident {
+  id                   String    @id @default(cuid())
+  incidentNumber       String    @unique
+  titleAr              String
+  titleEn              String
+  descriptionAr        String
+  descriptionEn        String
+  incidentDate         DateTime
+  reportedDate         DateTime
+  severity             String    // critical, major, moderate, minor
+  status               String    @default("reported") // reported, investigating, resolved, closed
+  departmentId         String
+  reportedById         String
+  relatedRiskId        String?
+  rootCauseAr          String?
+  rootCauseEn          String?
+  correctiveActionsAr  String?
+  correctiveActionsEn  String?
+  lessonsLearnedAr     String?
+  lessonsLearnedEn     String?
+  resolvedDate         DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // العلاقات
+  department   Department @relation(fields: [departmentId], references: [id])
+  reportedBy   User       @relation("IncidentReporter", fields: [reportedById], references: [id])
+  relatedRisk  Risk?      @relation(fields: [relatedRiskId], references: [id])
+}
+
+// الإشعارات
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  type       String    // newRisk, riskUpdated, treatmentDue, incidentReported, reviewReminder
+  titleAr    String
+  titleEn    String
+  messageAr  String
+  messageEn  String
+  link       String?
+  isRead     Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+
+  // العلاقات
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// سجل التدقيق
+model AuditLog {
+  id         String    @id @default(cuid())
+  userId     String
+  action     String    // create, update, delete, login, logout, export, import
+  entity     String
+  entityId   String?
+  oldValues  String?   // JSON string
+  newValues  String?   // JSON string
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+
+  // العلاقات
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+// إعدادات النظام
+model SystemSettings {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  value     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// تصنيفات المخاطر
+model RiskCategory {
+  id            String    @id @default(cuid())
+  code          String    @unique // FIN, OPS, COMP, HSE, HR, TECH, REP
+  nameAr        String
+  nameEn        String
+  descriptionAr String?
+  descriptionEn String?
+  examplesAr    String?   // أمثلة على المخاطر
+  examplesEn    String?
+  color         String?
+  icon          String?
+  isActive      Boolean   @default(true)
+  order         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // العلاقات
+  risks         Risk[]
+}
+
+// معايير الاحتمالية
+model LikelihoodCriteria {
+  id            String    @id @default(cuid())
+  level         Int       @unique // 1-5
+  nameAr        String    // نادر، غير محتمل، إلخ
+  nameEn        String    // Rare, Unlikely, etc.
+  descriptionAr String    // وصف تفصيلي
+  descriptionEn String
+  percentage    String?   // مثل "أقل من 5%"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// معايير التأثير
+model ImpactCriteria {
+  id            String    @id @default(cuid())
+  level         Int       @unique // 1-5
+  nameAr        String    // ضئيل، طفيف، إلخ
+  nameEn        String    // Negligible, Minor, etc.
+  descriptionAr String
+  descriptionEn String
+  // التأثير حسب الفئة
+  financialAr   String?   // التأثير المالي
+  financialEn   String?
+  operationalAr String?   // التأثير التشغيلي
+  operationalEn String?
+  reputationalAr String?  // التأثير على السمعة
+  reputationalEn String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// تصنيف مستوى الخطر
+model RiskRatingCriteria {
+  id            String    @id @default(cuid())
+  minScore      Int       // الحد الأدنى للنتيجة
+  maxScore      Int       // الحد الأقصى للنتيجة
+  nameAr        String    // حرج، عالي، إلخ
+  nameEn        String    // Critical, High, etc.
+  descriptionAr String    // الإجراء المطلوب
+  descriptionEn String
+  color         String    // لون العرض
+  actionRequiredAr String? // الإجراء المطلوب
+  actionRequiredEn String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
