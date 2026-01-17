@@ -119,7 +119,15 @@ export default function SettingsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [importedRisks, setImportedRisks] = useState<typeof hrRisks>([]);
   const [showImportSuccess, setShowImportSuccess] = useState(false);
-  const [importStats, setImportStats] = useState({ total: 0, imported: 0, errors: 0 });
+  const [importStats, setImportStats] = useState({ total: 0, added: 0, updated: 0, skipped: 0, errors: 0 });
+  const [importMode, setImportMode] = useState<'addOnly' | 'updateOnly' | 'addAndUpdate'>('addAndUpdate');
+  const [showImportResultModal, setShowImportResultModal] = useState(false);
+  const [importResults, setImportResults] = useState<{
+    added: string[];
+    updated: string[];
+    skipped: string[];
+    errors: { riskId: string; error: string }[];
+  }>({ added: [], updated: [], skipped: [], errors: [] });
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
   const [showEditDeptModal, setShowEditDeptModal] = useState(false);
@@ -361,27 +369,144 @@ export default function SettingsPage() {
   // File input ref for CSV/Excel import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Existing risk IDs for duplicate detection (simulated)
+  const existingRiskIds = ['HR-001', 'HR-002', 'FIN-001', 'OPS-001', 'IT-001'];
+
+  // Download import template
+  const handleDownloadTemplate = () => {
+    // CSV with BOM for Arabic support
+    const BOM = '\uFEFF';
+    const headers = [
+      'Risk_ID',
+      'Title_AR',
+      'Title_EN',
+      'Description_AR',
+      'Description_EN',
+      'Category',
+      'Department',
+      'Likelihood',
+      'Impact',
+      'Risk_Rating',
+      'Status',
+      'Owner_AR',
+      'Owner_EN',
+      'Treatment_Plan_AR',
+      'Treatment_Plan_EN',
+      'Due_Date',
+      'Review_Date',
+      'Comments'
+    ];
+
+    // Instructions row
+    const instructions = [
+      'رمز فريد (مطلوب)',
+      'العنوان بالعربي',
+      'العنوان بالإنجليزي',
+      'الوصف بالعربي',
+      'الوصف بالإنجليزي',
+      'OPR/FIN/STR/LEG/TEC/REP',
+      'RM/FIN/OPS/IT/SC/HSE',
+      '1-5 (1=نادر، 5=شبه مؤكد)',
+      '1-5 (1=ضئيل، 5=كارثي)',
+      'Critical/Major/Moderate/Minor/Negligible',
+      'Open/In Progress/Resolved/Closed',
+      'اسم المسؤول بالعربي',
+      'اسم المسؤول بالإنجليزي',
+      'خطة المعالجة بالعربي',
+      'خطة المعالجة بالإنجليزي',
+      'YYYY-MM-DD',
+      'YYYY-MM-DD',
+      'ملاحظات إضافية'
+    ];
+
+    // Example rows
+    const examples = [
+      ['HR-001', 'استقالة الموظفين الرئيسيين', 'Key Employee Turnover', 'خطر فقدان الموظفين ذوي الخبرة العالية', 'Risk of losing highly experienced employees', 'OPR', 'RM', '3', '4', 'Major', 'Open', 'أحمد محمد', 'Ahmed Mohammed', 'تطوير خطط الاحتفاظ بالموظفين', 'Develop employee retention plans', '2026-03-31', '2026-02-28', 'يتطلب متابعة شهرية'],
+      ['FIN-002', 'تقلبات أسعار الصرف', 'Currency Exchange Fluctuations', 'التعرض لمخاطر تقلب العملات الأجنبية', 'Exposure to foreign currency volatility', 'FIN', 'FIN', '4', '3', 'Major', 'In Progress', 'سارة علي', 'Sarah Ali', 'التحوط ضد مخاطر العملات', 'Currency hedging strategies', '2026-04-15', '2026-03-15', ''],
+      ['IT-003', 'اختراق أمني', 'Security Breach', 'احتمال حدوث اختراق للأنظمة', 'Potential system security breach', 'TEC', 'IT', '2', '5', 'Major', 'Open', 'خالد أحمد', 'Khalid Ahmed', 'تعزيز الأمن السيبراني', 'Enhance cybersecurity measures', '2026-02-28', '2026-01-31', 'أولوية قصوى'],
+    ];
+
+    const csvContent = BOM + [
+      headers.join(','),
+      instructions.map(i => `"${i}"`).join(','),
+      '',
+      ...examples.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'risk-import-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Handle file selection for import
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Simulate file processing
       const fileName = file.name;
       const fileExtension = fileName.split('.').pop()?.toLowerCase();
 
       if (fileExtension === 'csv' || fileExtension === 'xlsx' || fileExtension === 'xls') {
-        // Simulate successful import
-        setTimeout(() => {
-          setImportStats({
-            total: 15,
-            imported: 15,
-            errors: 0
+        // Simulate parsing and processing the file
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          // Simulate parsing CSV - in real app, use a CSV parser library
+          const lines = content.split('\n').filter(line => line.trim());
+
+          // Skip header and instruction rows
+          const dataRows = lines.slice(3);
+
+          const results = {
+            added: [] as string[],
+            updated: [] as string[],
+            skipped: [] as string[],
+            errors: [] as { riskId: string; error: string }[]
+          };
+
+          dataRows.forEach((row, index) => {
+            // Simple CSV parsing (in real app, use proper parser)
+            const cells = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+            const riskId = cells[0]?.replace(/"/g, '').trim();
+
+            if (!riskId) {
+              results.errors.push({ riskId: `Row ${index + 4}`, error: isAr ? 'رمز الخطر مفقود' : 'Missing Risk ID' });
+              return;
+            }
+
+            const isExisting = existingRiskIds.includes(riskId);
+
+            if (isExisting) {
+              if (importMode === 'addOnly') {
+                results.skipped.push(riskId);
+              } else {
+                results.updated.push(riskId);
+              }
+            } else {
+              if (importMode === 'updateOnly') {
+                results.skipped.push(riskId);
+              } else {
+                results.added.push(riskId);
+              }
+            }
           });
-          setShowImportSuccess(true);
-          alert(isAr
-            ? `تم استيراد الملف "${fileName}" بنجاح!`
-            : `File "${fileName}" imported successfully!`);
-        }, 500);
+
+          setImportResults(results);
+          setImportStats({
+            total: dataRows.length,
+            added: results.added.length,
+            updated: results.updated.length,
+            skipped: results.skipped.length,
+            errors: results.errors.length
+          });
+          setShowImportResultModal(true);
+        };
+        reader.readAsText(file);
       } else {
         alert(isAr
           ? 'صيغة الملف غير مدعومة. يرجى استخدام CSV أو Excel.'
@@ -395,6 +520,14 @@ export default function SettingsPage() {
   // Handle choose file button click
   const handleChooseFile = () => {
     fileInputRef.current?.click();
+  };
+
+  // Confirm import
+  const confirmImport = () => {
+    // In real app, this would save to database
+    setImportedRisks(prev => [...prev, ...hrRisks.slice(0, importStats.added)]);
+    setShowImportSuccess(true);
+    setShowImportResultModal(false);
   };
 
   // Handle export risk register
@@ -747,6 +880,39 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Download Template */}
+      <Card>
+        <CardHeader className="p-3 sm:p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
+            <Download className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)]" />
+            {isAr ? 'تحميل نموذج الاستيراد' : 'Download Import Template'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+          <p className="text-xs sm:text-sm text-[var(--foreground-secondary)] mb-4">
+            {isAr
+              ? 'قم بتحميل النموذج وتعبئته بالبيانات ثم ارفعه للاستيراد. النموذج يحتوي على جميع الحقول المطلوبة مع أمثلة توضيحية.'
+              : 'Download the template, fill it with your data, then upload it for import. The template contains all required fields with examples.'}
+          </p>
+          <div className="rounded-lg border border-[var(--border)] p-4 bg-[var(--background-secondary)]">
+            <div className="flex flex-wrap gap-2 text-[10px] sm:text-xs mb-4">
+              <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">Risk_ID</span>
+              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">Title</span>
+              <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">Description</span>
+              <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">Category</span>
+              <span className="px-2 py-1 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded">Department</span>
+              <span className="px-2 py-1 bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 rounded">Likelihood</span>
+              <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded">Impact</span>
+              <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">Status</span>
+              <span className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded">+10 more</span>
+            </div>
+            <Button onClick={handleDownloadTemplate} leftIcon={<Download className="h-4 w-4" />}>
+              {isAr ? 'تحميل النموذج (CSV)' : 'Download Template (CSV)'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* CSV/Excel Import */}
       <Card>
         <CardHeader className="p-3 sm:p-4 md:p-6">
@@ -755,7 +921,82 @@ export default function SettingsPage() {
             {t('settings.importData')}
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-0 space-y-4">
+          {/* Import Mode Selection */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+              {isAr ? 'وضع الاستيراد' : 'Import Mode'}
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                onClick={() => setImportMode('addOnly')}
+                className={`p-3 rounded-lg border-2 text-start transition-all ${
+                  importMode === 'addOnly'
+                    ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                    : 'border-[var(--border)] hover:border-[var(--border-hover)]'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Plus className="h-4 w-4 text-green-600" />
+                  <span className="font-medium text-sm">{isAr ? 'إضافة فقط' : 'Add Only'}</span>
+                </div>
+                <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
+                  {isAr ? 'إضافة مخاطر جديدة وتجاهل المكررات' : 'Add new risks, skip duplicates'}
+                </p>
+              </button>
+              <button
+                onClick={() => setImportMode('updateOnly')}
+                className={`p-3 rounded-lg border-2 text-start transition-all ${
+                  importMode === 'updateOnly'
+                    ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                    : 'border-[var(--border)] hover:border-[var(--border-hover)]'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Edit className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-sm">{isAr ? 'تحديث فقط' : 'Update Only'}</span>
+                </div>
+                <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
+                  {isAr ? 'تحديث المخاطر الموجودة فقط' : 'Only update existing risks'}
+                </p>
+              </button>
+              <button
+                onClick={() => setImportMode('addAndUpdate')}
+                className={`p-3 rounded-lg border-2 text-start transition-all ${
+                  importMode === 'addAndUpdate'
+                    ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                    : 'border-[var(--border)] hover:border-[var(--border-hover)]'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <CheckCircle className="h-4 w-4 text-purple-600" />
+                  <span className="font-medium text-sm">{isAr ? 'إضافة وتحديث' : 'Add & Update'}</span>
+                </div>
+                <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
+                  {isAr ? 'إضافة الجديد وتحديث الموجود' : 'Add new & update existing'}
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Duplicate Detection Info */}
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-200">
+                  {isAr ? 'كشف التكرار' : 'Duplicate Detection'}
+                </p>
+                <p className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  {isAr
+                    ? 'يتم كشف المخاطر المكررة عن طريق رمز الخطر (Risk_ID). إذا كان الرمز موجوداً مسبقاً، سيتم التعامل معه حسب وضع الاستيراد المحدد.'
+                    : 'Duplicates are detected by Risk_ID. If the ID already exists, it will be handled based on the selected import mode.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* File Upload Area */}
           <input
             type="file"
             ref={fileInputRef}
@@ -780,14 +1021,14 @@ export default function SettingsPage() {
               }
             }}
           >
-            <FileSpreadsheet className="mx-auto h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-[var(--foreground-muted)]" />
+            <Upload className="mx-auto h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-[var(--foreground-muted)]" />
             <p className="mt-2 sm:mt-3 md:mt-4 text-xs sm:text-sm text-[var(--foreground-secondary)]">
               {isAr
                 ? 'اسحب وأفلت ملف Excel أو CSV هنا'
                 : 'Drag and drop Excel or CSV file here'}
             </p>
             <p className="mt-1 text-[10px] sm:text-xs text-[var(--foreground-muted)]">
-              {isAr ? 'الأعمدة المطلوبة: Risk_ID, Function, Risk Description, Likelihood, Impact, Status' : 'Required columns: Risk_ID, Function, Risk Description, Likelihood, Impact, Status'}
+              {isAr ? 'استخدم النموذج أعلاه للحصول على التنسيق الصحيح' : 'Use the template above to get the correct format'}
             </p>
             <Button variant="outline" className="mt-2 sm:mt-3 md:mt-4 text-xs sm:text-sm" onClick={(e) => { e.stopPropagation(); handleChooseFile(); }}>
               {isAr ? 'اختر ملف' : 'Choose File'}
@@ -1384,6 +1625,127 @@ export default function SettingsPage() {
           <Button variant="danger" onClick={confirmDeleteCategory}>
             <Trash2 className="me-2 h-4 w-4" />
             {t('common.delete')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Import Result Modal */}
+      <Modal
+        isOpen={showImportResultModal}
+        onClose={() => setShowImportResultModal(false)}
+        title={isAr ? 'نتائج الاستيراد' : 'Import Results'}
+        size="lg"
+      >
+        <div className="space-y-4">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-3 text-center">
+              <p className="text-2xl font-bold text-green-600">{importStats.added}</p>
+              <p className="text-xs text-green-700 dark:text-green-300">{isAr ? 'سيتم إضافتها' : 'To be Added'}</p>
+            </div>
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 text-center">
+              <p className="text-2xl font-bold text-blue-600">{importStats.updated}</p>
+              <p className="text-xs text-blue-700 dark:text-blue-300">{isAr ? 'سيتم تحديثها' : 'To be Updated'}</p>
+            </div>
+            <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 p-3 text-center">
+              <p className="text-2xl font-bold text-yellow-600">{importStats.skipped}</p>
+              <p className="text-xs text-yellow-700 dark:text-yellow-300">{isAr ? 'سيتم تجاهلها' : 'To be Skipped'}</p>
+            </div>
+            <div className="rounded-lg bg-red-50 dark:bg-red-900/20 p-3 text-center">
+              <p className="text-2xl font-bold text-red-600">{importStats.errors}</p>
+              <p className="text-xs text-red-700 dark:text-red-300">{isAr ? 'أخطاء' : 'Errors'}</p>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="max-h-[300px] overflow-y-auto space-y-3">
+            {importResults.added.length > 0 && (
+              <div className="rounded-lg border border-green-200 dark:border-green-800 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Plus className="h-4 w-4 text-green-600" />
+                  <span className="font-medium text-sm text-green-700 dark:text-green-300">
+                    {isAr ? 'مخاطر جديدة ستتم إضافتها' : 'New risks to be added'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {importResults.added.map(id => (
+                    <code key={id} className="text-xs bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded text-green-700 dark:text-green-300">{id}</code>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {importResults.updated.length > 0 && (
+              <div className="rounded-lg border border-blue-200 dark:border-blue-800 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Edit className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-sm text-blue-700 dark:text-blue-300">
+                    {isAr ? 'مخاطر موجودة سيتم تحديثها' : 'Existing risks to be updated'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {importResults.updated.map(id => (
+                    <code key={id} className="text-xs bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded text-blue-700 dark:text-blue-300">{id}</code>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {importResults.skipped.length > 0 && (
+              <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <span className="font-medium text-sm text-yellow-700 dark:text-yellow-300">
+                    {isAr ? 'مخاطر سيتم تجاهلها (حسب وضع الاستيراد)' : 'Risks to be skipped (per import mode)'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {importResults.skipped.map(id => (
+                    <code key={id} className="text-xs bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded text-yellow-700 dark:text-yellow-300">{id}</code>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {importResults.errors.length > 0 && (
+              <div className="rounded-lg border border-red-200 dark:border-red-800 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <X className="h-4 w-4 text-red-600" />
+                  <span className="font-medium text-sm text-red-700 dark:text-red-300">
+                    {isAr ? 'أخطاء' : 'Errors'}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {importResults.errors.map((err, idx) => (
+                    <div key={idx} className="text-xs text-red-700 dark:text-red-300">
+                      <code className="bg-red-100 dark:bg-red-900/30 px-1 rounded">{err.riskId}</code>: {err.error}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Import Mode Reminder */}
+          <div className="rounded-lg bg-[var(--background-secondary)] p-3">
+            <p className="text-xs text-[var(--foreground-secondary)]">
+              {isAr ? 'وضع الاستيراد المحدد: ' : 'Selected import mode: '}
+              <span className="font-medium text-[var(--foreground)]">
+                {importMode === 'addOnly' && (isAr ? 'إضافة فقط' : 'Add Only')}
+                {importMode === 'updateOnly' && (isAr ? 'تحديث فقط' : 'Update Only')}
+                {importMode === 'addAndUpdate' && (isAr ? 'إضافة وتحديث' : 'Add & Update')}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowImportResultModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={confirmImport} disabled={importStats.added === 0 && importStats.updated === 0}>
+            <CheckCircle className="me-2 h-4 w-4" />
+            {isAr ? 'تأكيد الاستيراد' : 'Confirm Import'}
           </Button>
         </ModalFooter>
       </Modal>
