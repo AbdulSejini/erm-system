@@ -101,6 +101,7 @@ export default function SettingsPage() {
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
   const [showEditDeptModal, setShowEditDeptModal] = useState(false);
+  const [showAddDeptModal, setShowAddDeptModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<typeof mockUsers[0] | null>(null);
   const [selectedDept, setSelectedDept] = useState<typeof mockDepartments[0] | null>(null);
   const [users, setUsers] = useState(mockUsers);
@@ -126,6 +127,13 @@ export default function SettingsPage() {
 
   // Form states for editing department
   const [editDeptForm, setEditDeptForm] = useState({
+    nameAr: '',
+    nameEn: '',
+    code: '',
+  });
+
+  // Form states for adding new department
+  const [newDeptForm, setNewDeptForm] = useState({
     nameAr: '',
     nameEn: '',
     code: '',
@@ -181,6 +189,22 @@ export default function SettingsPage() {
       setUsers(prev => [...prev, newUser]);
       setNewUserForm({ fullNameAr: '', fullNameEn: '', email: '', role: '', departmentId: '' });
       setShowAddModal(false);
+    }
+  };
+
+  // Add New Department
+  const addNewDept = () => {
+    if (newDeptForm.nameAr && newDeptForm.code) {
+      const newDept = {
+        id: String(Date.now()),
+        nameAr: newDeptForm.nameAr,
+        nameEn: newDeptForm.nameEn,
+        code: newDeptForm.code,
+        risksCount: 0,
+      };
+      setDepartments(prev => [...prev, newDept]);
+      setNewDeptForm({ nameAr: '', nameEn: '', code: '' });
+      setShowAddDeptModal(false);
     }
   };
 
@@ -345,7 +369,7 @@ export default function SettingsPage() {
   const renderDepartmentsTab = () => (
     <div className="space-y-3 sm:space-y-4">
       <div className="flex justify-end">
-        <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} className="text-xs sm:text-sm">
+        <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} className="text-xs sm:text-sm" onClick={() => setShowAddDeptModal(true)}>
           {t('departments.addDepartment')}
         </Button>
       </div>
@@ -905,6 +929,43 @@ export default function SettingsPage() {
             {t('common.cancel')}
           </Button>
           <Button onClick={saveEditDept}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Add Department Modal */}
+      <Modal
+        isOpen={showAddDeptModal}
+        onClose={() => setShowAddDeptModal(false)}
+        title={t('departments.addDepartment')}
+        size="md"
+      >
+        <form className="space-y-4">
+          <Input
+            label={isAr ? 'اسم الإدارة (عربي)' : 'Department Name (Arabic)'}
+            value={newDeptForm.nameAr}
+            onChange={(e) => setNewDeptForm(prev => ({ ...prev, nameAr: e.target.value }))}
+            required
+          />
+          <Input
+            label={isAr ? 'اسم الإدارة (إنجليزي)' : 'Department Name (English)'}
+            value={newDeptForm.nameEn}
+            onChange={(e) => setNewDeptForm(prev => ({ ...prev, nameEn: e.target.value }))}
+            required
+          />
+          <Input
+            label={isAr ? 'رمز الإدارة' : 'Department Code'}
+            value={newDeptForm.code}
+            onChange={(e) => setNewDeptForm(prev => ({ ...prev, code: e.target.value }))}
+            required
+          />
+        </form>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowAddDeptModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={addNewDept}>
             {t('common.save')}
           </Button>
         </ModalFooter>
