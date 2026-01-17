@@ -89,6 +89,28 @@ const mockDepartments = [
   { id: '6', nameAr: 'السلامة والبيئة', nameEn: 'HSE', code: 'HSE', risksCount: 4 },
 ];
 
+const mockCategories = [
+  { id: '1', nameAr: 'مخاطر تشغيلية', nameEn: 'Operational Risks', code: 'OPR', color: 'bg-blue-500', risksCount: 15 },
+  { id: '2', nameAr: 'مخاطر مالية', nameEn: 'Financial Risks', code: 'FIN', color: 'bg-green-500', risksCount: 8 },
+  { id: '3', nameAr: 'مخاطر استراتيجية', nameEn: 'Strategic Risks', code: 'STR', color: 'bg-purple-500', risksCount: 5 },
+  { id: '4', nameAr: 'مخاطر قانونية', nameEn: 'Legal/Compliance Risks', code: 'LEG', color: 'bg-orange-500', risksCount: 7 },
+  { id: '5', nameAr: 'مخاطر تقنية', nameEn: 'Technology Risks', code: 'TEC', color: 'bg-cyan-500', risksCount: 10 },
+  { id: '6', nameAr: 'مخاطر السمعة', nameEn: 'Reputational Risks', code: 'REP', color: 'bg-pink-500', risksCount: 3 },
+];
+
+const categoryColors = [
+  { value: 'bg-blue-500', label: 'أزرق / Blue' },
+  { value: 'bg-green-500', label: 'أخضر / Green' },
+  { value: 'bg-purple-500', label: 'بنفسجي / Purple' },
+  { value: 'bg-orange-500', label: 'برتقالي / Orange' },
+  { value: 'bg-cyan-500', label: 'سماوي / Cyan' },
+  { value: 'bg-pink-500', label: 'وردي / Pink' },
+  { value: 'bg-red-500', label: 'أحمر / Red' },
+  { value: 'bg-yellow-500', label: 'أصفر / Yellow' },
+  { value: 'bg-indigo-500', label: 'نيلي / Indigo' },
+  { value: 'bg-teal-500', label: 'أزرق مخضر / Teal' },
+];
+
 export default function SettingsPage() {
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
@@ -102,10 +124,15 @@ export default function SettingsPage() {
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
   const [showEditDeptModal, setShowEditDeptModal] = useState(false);
   const [showAddDeptModal, setShowAddDeptModal] = useState(false);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<typeof mockUsers[0] | null>(null);
   const [selectedDept, setSelectedDept] = useState<typeof mockDepartments[0] | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<typeof mockCategories[0] | null>(null);
   const [users, setUsers] = useState(mockUsers);
   const [departments, setDepartments] = useState(mockDepartments);
+  const [categories, setCategories] = useState(mockCategories);
 
   // Form states for editing
   const [editUserForm, setEditUserForm] = useState({
@@ -137,6 +164,22 @@ export default function SettingsPage() {
     nameAr: '',
     nameEn: '',
     code: '',
+  });
+
+  // Form states for adding new category
+  const [newCategoryForm, setNewCategoryForm] = useState({
+    nameAr: '',
+    nameEn: '',
+    code: '',
+    color: 'bg-blue-500',
+  });
+
+  // Form states for editing category
+  const [editCategoryForm, setEditCategoryForm] = useState({
+    nameAr: '',
+    nameEn: '',
+    code: '',
+    color: '',
   });
 
   // Handle Edit User
@@ -249,6 +292,69 @@ export default function SettingsPage() {
       ));
       setShowEditDeptModal(false);
       setSelectedDept(null);
+    }
+  };
+
+  // Add New Category
+  const addNewCategory = () => {
+    if (newCategoryForm.nameAr && newCategoryForm.code) {
+      const newCategory = {
+        id: String(Date.now()),
+        nameAr: newCategoryForm.nameAr,
+        nameEn: newCategoryForm.nameEn,
+        code: newCategoryForm.code,
+        color: newCategoryForm.color,
+        risksCount: 0,
+      };
+      setCategories(prev => [...prev, newCategory]);
+      setNewCategoryForm({ nameAr: '', nameEn: '', code: '', color: 'bg-blue-500' });
+      setShowAddCategoryModal(false);
+    }
+  };
+
+  // Handle Edit Category
+  const handleEditCategory = (category: typeof mockCategories[0]) => {
+    setSelectedCategory(category);
+    setEditCategoryForm({
+      nameAr: category.nameAr,
+      nameEn: category.nameEn,
+      code: category.code,
+      color: category.color,
+    });
+    setShowEditCategoryModal(true);
+  };
+
+  // Save Edit Category
+  const saveEditCategory = () => {
+    if (selectedCategory) {
+      setCategories(prev => prev.map(c =>
+        c.id === selectedCategory.id
+          ? {
+              ...c,
+              nameAr: editCategoryForm.nameAr,
+              nameEn: editCategoryForm.nameEn,
+              code: editCategoryForm.code,
+              color: editCategoryForm.color,
+            }
+          : c
+      ));
+      setShowEditCategoryModal(false);
+      setSelectedCategory(null);
+    }
+  };
+
+  // Handle Delete Category
+  const handleDeleteCategory = (category: typeof mockCategories[0]) => {
+    setSelectedCategory(category);
+    setShowDeleteCategoryModal(true);
+  };
+
+  // Confirm Delete Category
+  const confirmDeleteCategory = () => {
+    if (selectedCategory) {
+      setCategories(prev => prev.filter(c => c.id !== selectedCategory.id));
+      setShowDeleteCategoryModal(false);
+      setSelectedCategory(null);
     }
   };
 
@@ -713,14 +819,49 @@ export default function SettingsPage() {
       {activeTab === 'notifications' && renderNotificationsTab()}
       {activeTab === 'dataManagement' && renderDataManagementTab()}
       {activeTab === 'categories' && (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Tag className="mx-auto h-12 w-12 text-[var(--foreground-muted)]" />
-            <p className="mt-4 text-[var(--foreground-secondary)]">
-              {isAr ? 'إدارة تصنيفات المخاطر' : 'Manage risk categories'}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex justify-end">
+            <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} className="text-xs sm:text-sm" onClick={() => setShowAddCategoryModal(true)}>
+              {isAr ? 'إضافة تصنيف' : 'Add Category'}
+            </Button>
+          </div>
+
+          <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 lg:grid-cols-3">
+            {categories.map((category) => (
+              <Card key={category.id} hover>
+                <CardContent className="p-2 sm:p-3 md:p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className={`flex h-9 w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 items-center justify-center rounded-lg ${category.color} shrink-0`}>
+                        <Tag className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-[var(--foreground)] text-xs sm:text-sm md:text-base truncate">
+                          {isAr ? category.nameAr : category.nameEn}
+                        </h3>
+                        <p className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">{category.code}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8" onClick={() => handleEditCategory(category)} title={isAr ? 'تعديل' : 'Edit'}>
+                        <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8 text-[var(--status-error)]" onClick={() => handleDeleteCategory(category)} title={isAr ? 'حذف' : 'Delete'}>
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 sm:mt-4 flex items-center justify-between border-t border-[var(--border)] pt-2 sm:pt-3 md:pt-4">
+                    <span className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                      {isAr ? 'عدد المخاطر' : 'Risks Count'}
+                    </span>
+                    <Badge variant="primary" className="text-[10px] sm:text-xs">{category.risksCount}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Add User Modal */}
@@ -967,6 +1108,169 @@ export default function SettingsPage() {
           </Button>
           <Button onClick={addNewDept}>
             {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Add Category Modal */}
+      <Modal
+        isOpen={showAddCategoryModal}
+        onClose={() => setShowAddCategoryModal(false)}
+        title={isAr ? 'إضافة تصنيف جديد' : 'Add New Category'}
+        size="md"
+      >
+        <form className="space-y-4">
+          <Input
+            label={isAr ? 'اسم التصنيف (عربي)' : 'Category Name (Arabic)'}
+            value={newCategoryForm.nameAr}
+            onChange={(e) => setNewCategoryForm(prev => ({ ...prev, nameAr: e.target.value }))}
+            required
+          />
+          <Input
+            label={isAr ? 'اسم التصنيف (إنجليزي)' : 'Category Name (English)'}
+            value={newCategoryForm.nameEn}
+            onChange={(e) => setNewCategoryForm(prev => ({ ...prev, nameEn: e.target.value }))}
+            required
+          />
+          <Input
+            label={isAr ? 'رمز التصنيف' : 'Category Code'}
+            value={newCategoryForm.code}
+            onChange={(e) => setNewCategoryForm(prev => ({ ...prev, code: e.target.value }))}
+            required
+          />
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              {isAr ? 'اللون' : 'Color'}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {categoryColors.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  onClick={() => setNewCategoryForm(prev => ({ ...prev, color: color.value }))}
+                  className={`h-8 w-8 rounded-full ${color.value} transition-all ${
+                    newCategoryForm.color === color.value
+                      ? 'ring-2 ring-offset-2 ring-[var(--primary)]'
+                      : 'hover:scale-110'
+                  }`}
+                  title={color.label}
+                />
+              ))}
+            </div>
+          </div>
+        </form>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowAddCategoryModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={addNewCategory}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Category Modal */}
+      <Modal
+        isOpen={showEditCategoryModal}
+        onClose={() => {
+          setShowEditCategoryModal(false);
+          setSelectedCategory(null);
+        }}
+        title={isAr ? 'تعديل التصنيف' : 'Edit Category'}
+        size="md"
+      >
+        {selectedCategory && (
+          <form className="space-y-4">
+            <Input
+              label={isAr ? 'اسم التصنيف (عربي)' : 'Category Name (Arabic)'}
+              value={editCategoryForm.nameAr}
+              onChange={(e) => setEditCategoryForm(prev => ({ ...prev, nameAr: e.target.value }))}
+            />
+            <Input
+              label={isAr ? 'اسم التصنيف (إنجليزي)' : 'Category Name (English)'}
+              value={editCategoryForm.nameEn}
+              onChange={(e) => setEditCategoryForm(prev => ({ ...prev, nameEn: e.target.value }))}
+            />
+            <Input
+              label={isAr ? 'رمز التصنيف' : 'Category Code'}
+              value={editCategoryForm.code}
+              onChange={(e) => setEditCategoryForm(prev => ({ ...prev, code: e.target.value }))}
+            />
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                {isAr ? 'اللون' : 'Color'}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {categoryColors.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    onClick={() => setEditCategoryForm(prev => ({ ...prev, color: color.value }))}
+                    className={`h-8 w-8 rounded-full ${color.value} transition-all ${
+                      editCategoryForm.color === color.value
+                        ? 'ring-2 ring-offset-2 ring-[var(--primary)]'
+                        : 'hover:scale-110'
+                    }`}
+                    title={color.label}
+                  />
+                ))}
+              </div>
+            </div>
+          </form>
+        )}
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowEditCategoryModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={saveEditCategory}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Delete Category Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteCategoryModal}
+        onClose={() => {
+          setShowDeleteCategoryModal(false);
+          setSelectedCategory(null);
+        }}
+        title={isAr ? 'تأكيد الحذف' : 'Confirm Delete'}
+        size="sm"
+      >
+        {selectedCategory && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+              <Trash2 className="h-6 w-6 text-red-500" />
+              <div>
+                <p className="font-medium text-[var(--foreground)]">
+                  {isAr ? 'هل أنت متأكد من حذف هذا التصنيف؟' : 'Are you sure you want to delete this category?'}
+                </p>
+                <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+                  {isAr ? 'لا يمكن التراجع عن هذا الإجراء' : 'This action cannot be undone'}
+                </p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--border)] p-4">
+              <div className="flex items-center gap-3">
+                <div className={`h-8 w-8 rounded-full ${selectedCategory.color}`}></div>
+                <div>
+                  <p className="font-medium text-[var(--foreground)]">
+                    {isAr ? selectedCategory.nameAr : selectedCategory.nameEn}
+                  </p>
+                  <p className="text-sm text-[var(--foreground-secondary)]">{selectedCategory.code}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowDeleteCategoryModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteCategory}>
+            <Trash2 className="me-2 h-4 w-4" />
+            {t('common.delete')}
           </Button>
         </ModalFooter>
       </Modal>
