@@ -106,10 +106,82 @@ export default function SettingsPage() {
   const [users, setUsers] = useState(mockUsers);
   const [departments, setDepartments] = useState(mockDepartments);
 
+  // Form states for editing
+  const [editUserForm, setEditUserForm] = useState({
+    fullNameAr: '',
+    fullNameEn: '',
+    email: '',
+    role: '',
+    status: '',
+  });
+
+  // Form states for adding new user
+  const [newUserForm, setNewUserForm] = useState({
+    fullNameAr: '',
+    fullNameEn: '',
+    email: '',
+    role: '',
+    departmentId: '',
+  });
+
+  // Form states for editing department
+  const [editDeptForm, setEditDeptForm] = useState({
+    nameAr: '',
+    nameEn: '',
+    code: '',
+  });
+
   // Handle Edit User
   const handleEditUser = (user: typeof mockUsers[0]) => {
     setSelectedUser(user);
+    setEditUserForm({
+      fullNameAr: user.fullNameAr,
+      fullNameEn: user.fullNameEn,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+    });
     setShowEditUserModal(true);
+  };
+
+  // Save Edit User
+  const saveEditUser = () => {
+    if (selectedUser) {
+      setUsers(prev => prev.map(u =>
+        u.id === selectedUser.id
+          ? {
+              ...u,
+              fullNameAr: editUserForm.fullNameAr,
+              fullNameEn: editUserForm.fullNameEn,
+              email: editUserForm.email,
+              role: editUserForm.role,
+              status: editUserForm.status,
+            }
+          : u
+      ));
+      setShowEditUserModal(false);
+      setSelectedUser(null);
+    }
+  };
+
+  // Add New User
+  const addNewUser = () => {
+    if (newUserForm.fullNameAr && newUserForm.email) {
+      const dept = mockDepartments.find(d => d.id === newUserForm.departmentId);
+      const newUser = {
+        id: String(Date.now()),
+        fullNameAr: newUserForm.fullNameAr,
+        fullNameEn: newUserForm.fullNameEn,
+        email: newUserForm.email,
+        role: newUserForm.role || 'employee',
+        departmentAr: dept?.nameAr || '',
+        departmentEn: dept?.nameEn || '',
+        status: 'active',
+      };
+      setUsers(prev => [...prev, newUser]);
+      setNewUserForm({ fullNameAr: '', fullNameEn: '', email: '', role: '', departmentId: '' });
+      setShowAddModal(false);
+    }
   };
 
   // Handle Delete User
@@ -130,7 +202,30 @@ export default function SettingsPage() {
   // Handle Edit Department
   const handleEditDept = (dept: typeof mockDepartments[0]) => {
     setSelectedDept(dept);
+    setEditDeptForm({
+      nameAr: dept.nameAr,
+      nameEn: dept.nameEn,
+      code: dept.code,
+    });
     setShowEditDeptModal(true);
+  };
+
+  // Save Edit Department
+  const saveEditDept = () => {
+    if (selectedDept) {
+      setDepartments(prev => prev.map(d =>
+        d.id === selectedDept.id
+          ? {
+              ...d,
+              nameAr: editDeptForm.nameAr,
+              nameEn: editDeptForm.nameEn,
+              code: editDeptForm.code,
+            }
+          : d
+      ));
+      setShowEditDeptModal(false);
+      setSelectedDept(null);
+    }
   };
 
   const getRoleColor = (role: string): 'primary' | 'success' | 'warning' | 'info' | 'default' => {
@@ -613,10 +708,26 @@ export default function SettingsPage() {
       >
         <form className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label={isAr ? 'الاسم الكامل (عربي)' : 'Full Name (Arabic)'} required />
-            <Input label={isAr ? 'الاسم الكامل (إنجليزي)' : 'Full Name (English)'} required />
+            <Input
+              label={isAr ? 'الاسم الكامل (عربي)' : 'Full Name (Arabic)'}
+              value={newUserForm.fullNameAr}
+              onChange={(e) => setNewUserForm(prev => ({ ...prev, fullNameAr: e.target.value }))}
+              required
+            />
+            <Input
+              label={isAr ? 'الاسم الكامل (إنجليزي)' : 'Full Name (English)'}
+              value={newUserForm.fullNameEn}
+              onChange={(e) => setNewUserForm(prev => ({ ...prev, fullNameEn: e.target.value }))}
+              required
+            />
           </div>
-          <Input type="email" label={t('users.email')} required />
+          <Input
+            type="email"
+            label={t('users.email')}
+            value={newUserForm.email}
+            onChange={(e) => setNewUserForm(prev => ({ ...prev, email: e.target.value }))}
+            required
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Select
               label={t('users.role')}
@@ -627,6 +738,8 @@ export default function SettingsPage() {
                 { value: 'riskChampion', label: t('users.roles.riskChampion') },
                 { value: 'employee', label: t('users.roles.employee') },
               ]}
+              value={newUserForm.role}
+              onChange={(value) => setNewUserForm(prev => ({ ...prev, role: value }))}
               placeholder={isAr ? 'اختر الدور' : 'Select Role'}
             />
             <Select
@@ -635,6 +748,8 @@ export default function SettingsPage() {
                 value: d.id,
                 label: isAr ? d.nameAr : d.nameEn,
               }))}
+              value={newUserForm.departmentId}
+              onChange={(value) => setNewUserForm(prev => ({ ...prev, departmentId: value }))}
               placeholder={isAr ? 'اختر الإدارة' : 'Select Department'}
             />
           </div>
@@ -643,7 +758,7 @@ export default function SettingsPage() {
           <Button variant="outline" onClick={() => setShowAddModal(false)}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={() => setShowAddModal(false)}>
+          <Button onClick={addNewUser}>
             {t('common.save')}
           </Button>
         </ModalFooter>
@@ -664,14 +779,21 @@ export default function SettingsPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 label={isAr ? 'الاسم الكامل (عربي)' : 'Full Name (Arabic)'}
-                defaultValue={selectedUser.fullNameAr}
+                value={editUserForm.fullNameAr}
+                onChange={(e) => setEditUserForm(prev => ({ ...prev, fullNameAr: e.target.value }))}
               />
               <Input
                 label={isAr ? 'الاسم الكامل (إنجليزي)' : 'Full Name (English)'}
-                defaultValue={selectedUser.fullNameEn}
+                value={editUserForm.fullNameEn}
+                onChange={(e) => setEditUserForm(prev => ({ ...prev, fullNameEn: e.target.value }))}
               />
             </div>
-            <Input type="email" label={t('users.email')} defaultValue={selectedUser.email} />
+            <Input
+              type="email"
+              label={t('users.email')}
+              value={editUserForm.email}
+              onChange={(e) => setEditUserForm(prev => ({ ...prev, email: e.target.value }))}
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <Select
                 label={t('users.role')}
@@ -682,7 +804,8 @@ export default function SettingsPage() {
                   { value: 'riskChampion', label: t('users.roles.riskChampion') },
                   { value: 'employee', label: t('users.roles.employee') },
                 ]}
-                value={selectedUser.role}
+                value={editUserForm.role}
+                onChange={(value) => setEditUserForm(prev => ({ ...prev, role: value }))}
               />
               <Select
                 label={t('users.status')}
@@ -690,7 +813,8 @@ export default function SettingsPage() {
                   { value: 'active', label: t('users.statuses.active') },
                   { value: 'inactive', label: t('users.statuses.inactive') },
                 ]}
-                value={selectedUser.status}
+                value={editUserForm.status}
+                onChange={(value) => setEditUserForm(prev => ({ ...prev, status: value }))}
               />
             </div>
           </form>
@@ -699,10 +823,7 @@ export default function SettingsPage() {
           <Button variant="outline" onClick={() => setShowEditUserModal(false)}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={() => {
-            setShowEditUserModal(false);
-            setSelectedUser(null);
-          }}>
+          <Button onClick={saveEditUser}>
             {t('common.save')}
           </Button>
         </ModalFooter>
@@ -764,15 +885,18 @@ export default function SettingsPage() {
           <form className="space-y-4">
             <Input
               label={isAr ? 'اسم الإدارة (عربي)' : 'Department Name (Arabic)'}
-              defaultValue={selectedDept.nameAr}
+              value={editDeptForm.nameAr}
+              onChange={(e) => setEditDeptForm(prev => ({ ...prev, nameAr: e.target.value }))}
             />
             <Input
               label={isAr ? 'اسم الإدارة (إنجليزي)' : 'Department Name (English)'}
-              defaultValue={selectedDept.nameEn}
+              value={editDeptForm.nameEn}
+              onChange={(e) => setEditDeptForm(prev => ({ ...prev, nameEn: e.target.value }))}
             />
             <Input
               label={isAr ? 'رمز الإدارة' : 'Department Code'}
-              defaultValue={selectedDept.code}
+              value={editDeptForm.code}
+              onChange={(e) => setEditDeptForm(prev => ({ ...prev, code: e.target.value }))}
             />
           </form>
         )}
@@ -780,10 +904,7 @@ export default function SettingsPage() {
           <Button variant="outline" onClick={() => setShowEditDeptModal(false)}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={() => {
-            setShowEditDeptModal(false);
-            setSelectedDept(null);
-          }}>
+          <Button onClick={saveEditDept}>
             {t('common.save')}
           </Button>
         </ModalFooter>
