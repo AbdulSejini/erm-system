@@ -766,7 +766,9 @@ export default function SettingsPage() {
     setImportedRisks(hrRisks);
     setImportStats({
       total: hrRisks.length,
-      imported: hrRisks.length,
+      added: hrRisks.length,
+      updated: 0,
+      skipped: 0,
       errors: 0
     });
     setShowImportSuccess(true);
@@ -785,8 +787,8 @@ export default function SettingsPage() {
               </h3>
               <p className="mt-1 text-xs sm:text-sm text-green-700 dark:text-green-300">
                 {isAr
-                  ? `تم استيراد ${importStats.imported} خطر من أصل ${importStats.total}`
-                  : `Imported ${importStats.imported} risks out of ${importStats.total}`}
+                  ? `تم استيراد ${importStats.added + importStats.updated} خطر من أصل ${importStats.total} (${importStats.added} جديد، ${importStats.updated} محدث)`
+                  : `Imported ${importStats.added + importStats.updated} risks out of ${importStats.total} (${importStats.added} new, ${importStats.updated} updated)`}
               </p>
             </div>
             <button
