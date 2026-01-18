@@ -39,8 +39,19 @@ import {
   type RiskStatus,
   calculateRiskScore,
   getRiskRating,
-  DEFAULT_RISK_CATEGORIES,
 } from '@/types';
+
+// Interface for API category data
+interface APICategory {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr?: string | null;
+  descriptionEn?: string | null;
+  color?: string | null;
+  isActive: boolean;
+}
 import { hrRisks } from '@/data/hrRisks';
 
 // Convert HR risks to match the page structure
@@ -328,6 +339,7 @@ export default function RisksPage() {
   const [risks, setRisks] = useState(allRisks);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [categories, setCategories] = useState<APICategory[]>([]);
 
   // Normalize rating to valid values
   const normalizeRating = (rating: string | null | undefined): RiskRating => {
@@ -400,10 +412,24 @@ export default function RisksPage() {
     }
   }, []);
 
-  // Fetch risks on component mount
+  // Fetch categories from API
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await fetch('/api/categories');
+      const result = await response.json();
+      if (result.success && result.data.length > 0) {
+        setCategories(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  }, []);
+
+  // Fetch risks and categories on component mount
   useEffect(() => {
     fetchRisks();
-  }, [fetchRisks]);
+    fetchCategories();
+  }, [fetchRisks, fetchCategories]);
 
   // Handle refresh button click
   const handleRefresh = () => {
@@ -420,13 +446,13 @@ export default function RisksPage() {
     { value: 'Negligible', label: t('risks.ratings.Negligible') },
   ];
 
-  const categoryOptions = [
+  const categoryOptions = useMemo(() => [
     { value: '', label: isAr ? 'جميع الفئات' : 'All Categories' },
-    ...DEFAULT_RISK_CATEGORIES.map(cat => ({
+    ...categories.filter(cat => cat.isActive).map(cat => ({
       value: cat.code,
       label: isAr ? cat.nameAr : cat.nameEn,
     })),
-  ];
+  ], [categories, isAr]);
 
   const statusOptions = [
     { value: '', label: isAr ? 'جميع الحالات' : 'All Statuses' },

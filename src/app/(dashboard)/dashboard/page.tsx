@@ -293,14 +293,14 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header - Orange Theme */}
-      <div className="rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 p-4 sm:p-6 text-white shadow-lg">
+      {/* Page Header - Clean Light Theme */}
+      <div className="rounded-2xl bg-white p-4 sm:p-6 shadow-sm border border-[var(--border)]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[var(--foreground)]">
               {t('dashboard.title')}
             </h1>
-            <p className="mt-1 text-sm sm:text-base text-orange-100">
+            <p className="mt-1 text-sm sm:text-base text-[var(--foreground-secondary)]">
               {t('dashboard.welcome')}، {isAr ? 'عبدالإله سجيني' : 'Abdulelah Sejini'}
             </p>
           </div>
@@ -310,7 +310,7 @@ export default function DashboardPage() {
               size="sm"
               leftIcon={<FileText className="h-4 w-4" />}
               onClick={handleMonthlyReport}
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              className="rounded-xl"
             >
               {isAr ? 'تقرير شهري' : 'Monthly Report'}
             </Button>
@@ -319,10 +319,10 @@ export default function DashboardPage() {
               size="sm"
               leftIcon={<Bell className="h-4 w-4" />}
               onClick={handleAlerts}
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20 relative"
+              className="rounded-xl relative"
             >
               {isAr ? 'التنبيهات' : 'Alerts'}
-              <span className="absolute -top-2 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white font-bold">
+              <span className="absolute -top-2 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--status-error)] text-xs text-white font-bold">
                 3
               </span>
             </Button>
@@ -331,99 +331,99 @@ export default function DashboardPage() {
 
         {/* Quick Stats in Header */}
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-            <p className="text-orange-100 text-xs sm:text-sm">{isAr ? 'إجمالي المخاطر' : 'Total Risks'}</p>
-            <p className="text-2xl sm:text-3xl font-bold">{stats.totalRisks}</p>
+          <div className="bg-[var(--background-tertiary)] rounded-xl p-4">
+            <p className="text-[var(--foreground-secondary)] text-xs sm:text-sm">{isAr ? 'إجمالي المخاطر' : 'Total Risks'}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-[var(--foreground)]">{stats.totalRisks}</p>
           </div>
-          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-            <p className="text-orange-100 text-xs sm:text-sm">{isAr ? 'المخاطر الحرجة' : 'Critical Risks'}</p>
-            <p className="text-2xl sm:text-3xl font-bold">{stats.ratingBreakdown.Critical}</p>
+          <div className="bg-[var(--risk-critical-bg)] rounded-xl p-4">
+            <p className="text-[var(--foreground-secondary)] text-xs sm:text-sm">{isAr ? 'المخاطر الحرجة' : 'Critical Risks'}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-[var(--risk-critical)]">{stats.ratingBreakdown.Critical}</p>
           </div>
-          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-            <p className="text-orange-100 text-xs sm:text-sm">{isAr ? 'معدل الحل' : 'Resolution Rate'}</p>
-            <p className="text-2xl sm:text-3xl font-bold">{stats.avgResolutionRate}%</p>
+          <div className="bg-[var(--status-success-bg)] rounded-xl p-4">
+            <p className="text-[var(--foreground-secondary)] text-xs sm:text-sm">{isAr ? 'معدل الحل' : 'Resolution Rate'}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-[var(--status-success)]">{stats.avgResolutionRate}%</p>
           </div>
-          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm flex items-center gap-2">
+          <div className="bg-[var(--status-success-bg)] rounded-xl p-4 flex items-center gap-2">
             <div>
-              <p className="text-orange-100 text-xs sm:text-sm">{isAr ? 'الاتجاه' : 'Trend'}</p>
-              <p className="text-2xl sm:text-3xl font-bold">{stats.riskTrend}%</p>
+              <p className="text-[var(--foreground-secondary)] text-xs sm:text-sm">{isAr ? 'الاتجاه' : 'Trend'}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-[var(--status-success)]">{stats.riskTrend}%</p>
             </div>
-            <TrendingDown className="h-6 w-6 text-green-300" />
+            <TrendingDown className="h-6 w-6 text-[var(--status-success)]" />
           </div>
         </div>
       </div>
 
-      {/* Risk Rating Cards - Consistent Design */}
-      <div className="grid gap-4 grid-cols-5">
+      {/* Risk Rating Cards - Clean Light Design */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-5">
         {/* Critical - Red */}
-        <Card className="overflow-hidden border-0 shadow-md">
-          <div className="bg-red-600 p-3 text-center">
-            <p className="text-white text-sm font-medium">{isAr ? 'حرج' : 'Critical'}</p>
+        <Card className="overflow-hidden border border-red-100 shadow-sm rounded-2xl">
+          <div className="bg-gradient-to-r from-red-500 to-red-600 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'حرج' : 'Critical'}</p>
           </div>
-          <div className="p-4 text-center bg-red-50 dark:bg-red-900/20">
-            <p className="text-4xl font-bold text-red-600 dark:text-red-400">
+          <div className="p-3 sm:p-4 text-center bg-red-50">
+            <p className="text-3xl sm:text-4xl font-bold text-red-600">
               {stats.ratingBreakdown.Critical}
             </p>
-            <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">20-25</p>
+            <p className="text-[10px] sm:text-xs text-red-400 mt-1 font-medium">20-25</p>
           </div>
         </Card>
 
         {/* Major - Orange */}
-        <Card className="overflow-hidden border-0 shadow-md">
-          <div className="bg-orange-500 p-3 text-center">
-            <p className="text-white text-sm font-medium">{isAr ? 'رئيسي' : 'Major'}</p>
+        <Card className="overflow-hidden border border-orange-100 shadow-sm rounded-2xl">
+          <div className="bg-gradient-to-r from-orange-400 to-orange-500 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'رئيسي' : 'Major'}</p>
           </div>
-          <div className="p-4 text-center bg-orange-50 dark:bg-orange-900/20">
-            <p className="text-4xl font-bold text-orange-600 dark:text-orange-400">
+          <div className="p-3 sm:p-4 text-center bg-orange-50">
+            <p className="text-3xl sm:text-4xl font-bold text-orange-500">
               {stats.ratingBreakdown.Major}
             </p>
-            <p className="text-xs text-orange-600/70 dark:text-orange-400/70 mt-1">15-19</p>
+            <p className="text-[10px] sm:text-xs text-orange-400 mt-1 font-medium">15-19</p>
           </div>
         </Card>
 
         {/* Moderate - Yellow */}
-        <Card className="overflow-hidden border-0 shadow-md">
-          <div className="bg-yellow-500 p-3 text-center">
-            <p className="text-white text-sm font-medium">{isAr ? 'متوسط' : 'Moderate'}</p>
+        <Card className="overflow-hidden border border-yellow-100 shadow-sm rounded-2xl">
+          <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'متوسط' : 'Moderate'}</p>
           </div>
-          <div className="p-4 text-center bg-yellow-50 dark:bg-yellow-900/20">
-            <p className="text-4xl font-bold text-yellow-600 dark:text-yellow-400">
+          <div className="p-3 sm:p-4 text-center bg-yellow-50">
+            <p className="text-3xl sm:text-4xl font-bold text-yellow-500">
               {stats.ratingBreakdown.Moderate}
             </p>
-            <p className="text-xs text-yellow-600/70 dark:text-yellow-400/70 mt-1">10-14</p>
+            <p className="text-[10px] sm:text-xs text-yellow-500 mt-1 font-medium">10-14</p>
           </div>
         </Card>
 
         {/* Minor - Green */}
-        <Card className="overflow-hidden border-0 shadow-md">
-          <div className="bg-green-500 p-3 text-center">
-            <p className="text-white text-sm font-medium">{isAr ? 'ثانوي' : 'Minor'}</p>
+        <Card className="overflow-hidden border border-green-100 shadow-sm rounded-2xl">
+          <div className="bg-gradient-to-r from-green-400 to-green-500 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'ثانوي' : 'Minor'}</p>
           </div>
-          <div className="p-4 text-center bg-green-50 dark:bg-green-900/20">
-            <p className="text-4xl font-bold text-green-600 dark:text-green-400">
+          <div className="p-3 sm:p-4 text-center bg-green-50">
+            <p className="text-3xl sm:text-4xl font-bold text-green-500">
               {stats.ratingBreakdown.Minor}
             </p>
-            <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">5-9</p>
+            <p className="text-[10px] sm:text-xs text-green-400 mt-1 font-medium">5-9</p>
           </div>
         </Card>
 
         {/* Negligible - Blue */}
-        <Card className="overflow-hidden border-0 shadow-md">
-          <div className="bg-blue-500 p-3 text-center">
-            <p className="text-white text-sm font-medium">{isAr ? 'ضئيل' : 'Negligible'}</p>
+        <Card className="overflow-hidden border border-blue-100 shadow-sm rounded-2xl">
+          <div className="bg-gradient-to-r from-blue-400 to-blue-500 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'ضئيل' : 'Negligible'}</p>
           </div>
-          <div className="p-4 text-center bg-blue-50 dark:bg-blue-900/20">
-            <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">
+          <div className="p-3 sm:p-4 text-center bg-blue-50">
+            <p className="text-3xl sm:text-4xl font-bold text-blue-500">
               {stats.ratingBreakdown.Negligible}
             </p>
-            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">1-4</p>
+            <p className="text-[10px] sm:text-xs text-blue-400 mt-1 font-medium">1-4</p>
           </div>
         </Card>
       </div>
 
-      {/* Secondary Stats - Consistent Cards */}
+      {/* Secondary Stats - Clean Light Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="p-5 border-0 shadow-md bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[var(--foreground-secondary)]">
@@ -437,13 +437,13 @@ export default function DashboardPage() {
                 </p>
               )}
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/30">
-              <Wrench className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100">
+              <Wrench className="h-6 w-6 text-orange-600" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-5 border-0 shadow-md bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[var(--foreground-secondary)]">
@@ -451,13 +451,13 @@ export default function DashboardPage() {
               </p>
               <p className="text-3xl font-bold text-[var(--foreground)] mt-1">{stats.completedTreatments}</p>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
-              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100">
+              <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-5 border-0 shadow-md bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[var(--foreground-secondary)]">
@@ -465,13 +465,13 @@ export default function DashboardPage() {
               </p>
               <p className="text-3xl font-bold text-[var(--foreground)] mt-1">{stats.activeChampions}</p>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 dark:bg-purple-900/30">
-              <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100">
+              <Users className="h-6 w-6 text-purple-600" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-5 border-0 shadow-md bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[var(--foreground-secondary)]">
@@ -479,8 +479,8 @@ export default function DashboardPage() {
               </p>
               <p className="text-3xl font-bold text-[var(--foreground)] mt-1">{stats.openIncidents}</p>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/30">
-              <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
           </div>
         </Card>
@@ -489,12 +489,12 @@ export default function DashboardPage() {
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Risk Matrix */}
-        <Card className="lg:col-span-2 border-0 shadow-md overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4">
+        <Card className="lg:col-span-2 border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+          <div className="border-b border-[var(--border)] p-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">{t('dashboard.riskMatrix')}</h3>
+              <h3 className="text-lg font-semibold text-[var(--foreground)]">{t('dashboard.riskMatrix')}</h3>
               <Link href="/assessment">
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" rightIcon={<ChevronRight className="h-4 w-4" />}>
+                <Button variant="ghost" size="sm" className="text-[var(--primary)] hover:bg-[var(--primary-light)]" rightIcon={<ChevronRight className="h-4 w-4" />}>
                   {isAr ? 'عرض التفاصيل' : 'View Details'}
                 </Button>
               </Link>
@@ -508,15 +508,15 @@ export default function DashboardPage() {
         </Card>
 
         {/* Upcoming Deadlines */}
-        <Card className="border-0 shadow-md overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4">
+        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+          <div className="border-b border-[var(--border)] p-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
+              <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-[var(--primary)]" />
                 {t('dashboard.upcomingDeadlines')}
               </h3>
               <Link href="/treatment">
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" className="text-[var(--primary)] hover:bg-[var(--primary-light)]">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </Link>
@@ -533,12 +533,12 @@ export default function DashboardPage() {
                 upcomingDeadlines.map((deadline) => (
                   <div
                     key={deadline.id}
-                    className={`rounded-lg border p-3 transition-all hover:shadow-sm ${
+                    className={`rounded-xl border p-3 transition-all hover:shadow-sm ${
                       deadline.daysLeft <= 3
-                        ? 'border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-900/10'
+                        ? 'border-red-200 bg-red-50'
                         : deadline.daysLeft <= 7
-                        ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-900/30 dark:bg-yellow-900/10'
-                        : 'border-[var(--border)] bg-[var(--background-secondary)]'
+                        ? 'border-yellow-200 bg-yellow-50'
+                        : 'border-[var(--border)] bg-[var(--background-tertiary)]'
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -573,12 +573,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Risks Table */}
-      <Card className="border-0 shadow-md overflow-hidden">
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4">
+      <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+        <div className="border-b border-[var(--border)] p-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">{t('dashboard.recentRisks')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">{t('dashboard.recentRisks')}</h3>
             <Link href="/risks">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" rightIcon={<ArrowUpRight className="h-4 w-4" />}>
+              <Button variant="ghost" size="sm" className="text-[var(--primary)] hover:bg-[var(--primary-light)]" rightIcon={<ArrowUpRight className="h-4 w-4" />}>
                 {isAr ? 'عرض الكل' : 'View All'}
               </Button>
             </Link>
@@ -655,10 +655,10 @@ export default function DashboardPage() {
       {/* Bottom Grid: Recent Activity & Champion Performance */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent Activity */}
-        <Card className="border-0 shadow-md overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Zap className="h-5 w-5" />
+        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+          <div className="border-b border-[var(--border)] p-4">
+            <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+              <Zap className="h-5 w-5 text-[var(--primary)]" />
               {isAr ? 'النشاطات الأخيرة' : 'Recent Activity'}
             </h3>
           </div>
@@ -691,15 +691,15 @@ export default function DashboardPage() {
         </Card>
 
         {/* Champion Performance */}
-        <Card className="border-0 shadow-md overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4">
+        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+          <div className="border-b border-[var(--border)] p-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Users className="h-5 w-5" />
+              <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <Users className="h-5 w-5 text-[var(--primary)]" />
                 {isAr ? 'أداء الرواد' : 'Champion Performance'}
               </h3>
               <Link href="/champions">
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" rightIcon={<ChevronRight className="h-4 w-4" />}>
+                <Button variant="ghost" size="sm" className="text-[var(--primary)] hover:bg-[var(--primary-light)]" rightIcon={<ChevronRight className="h-4 w-4" />}>
                   {isAr ? 'عرض الكل' : 'View All'}
                 </Button>
               </Link>

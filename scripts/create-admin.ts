@@ -4,8 +4,8 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = 'abdul.sejini@gmail.com';
-  const password = 'Admin@123'; // كلمة المرور الأولية - يجب تغييرها بعد أول تسجيل دخول
+  const email = 'admin@saudicable.com';
+  const password = 'Welcome@123'; // كلمة المرور الأولية - يجب تغييرها بعد أول تسجيل دخول
   const hashedPassword = await bcrypt.hash(password, 12);
 
   // Check if admin already exists
@@ -41,7 +41,7 @@ async function main() {
 
   console.log('');
   console.log('📧 Email:', email);
-  console.log('🔑 Password: Admin@123');
+  console.log('🔑 Password: Welcome@123');
   console.log('');
   console.log('⚠️  يرجى تغيير كلمة المرور بعد أول تسجيل دخول!');
 }

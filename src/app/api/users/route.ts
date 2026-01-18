@@ -13,14 +13,34 @@ export async function GET() {
         email: true,
         role: true,
         status: true,
+        phone: true,
         departmentId: true,
         department: {
           select: {
             id: true,
+            code: true,
             nameAr: true,
             nameEn: true,
           },
         },
+        accessibleDepartments: {
+          select: {
+            id: true,
+            departmentId: true,
+            canView: true,
+            canEdit: true,
+            department: {
+              select: {
+                id: true,
+                code: true,
+                nameAr: true,
+                nameEn: true,
+              },
+            },
+          },
+        },
+        createdAt: true,
+        lastLogin: true,
       },
       orderBy: { fullName: 'asc' },
     });
@@ -43,6 +63,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // التحقق من البيانات المطلوبة
+    if (!body.email || !body.fullName) {
+      return NextResponse.json(
+        { success: false, error: 'البريد الإلكتروني والاسم مطلوبان' },
+        { status: 400 }
+      );
+    }
+
     // التحقق من عدم وجود البريد الإلكتروني مسبقاً
     const existingUser = await prisma.user.findUnique({
       where: { email: body.email },
@@ -59,16 +87,19 @@ export async function POST(request: NextRequest) {
     const defaultPassword = body.password || 'Welcome@123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
+    // تحويل departmentId الفارغ إلى null
+    const departmentId = body.departmentId && body.departmentId.trim() !== '' ? body.departmentId : null;
+
     const user = await prisma.user.create({
       data: {
-        email: body.email,
+        email: body.email.trim(),
         password: hashedPassword,
-        fullName: body.fullName,
-        fullNameEn: body.fullNameEn || null,
+        fullName: body.fullName.trim(),
+        fullNameEn: body.fullNameEn?.trim() || null,
         role: body.role || 'employee',
         status: body.status || 'active',
-        departmentId: body.departmentId || null,
-        phone: body.phone || null,
+        departmentId: departmentId,
+        phone: body.phone?.trim() || null,
       },
       select: {
         id: true,
@@ -77,6 +108,14 @@ export async function POST(request: NextRequest) {
         email: true,
         role: true,
         status: true,
+        departmentId: true,
+        department: {
+          select: {
+            id: true,
+            nameAr: true,
+            nameEn: true,
+          },
+        },
       },
     });
 
@@ -86,8 +125,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating user:', error);
+    const errorMessage = error instanceof Error ? error.message : 'فشل في إنشاء المستخدم';
     return NextResponse.json(
-      { success: false, error: 'فشل في إنشاء المستخدم' },
+      { success: false, error: errorMessage },
       { status: 500 }
     );
   }

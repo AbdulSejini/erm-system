@@ -56,7 +56,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--border)] bg-white px-4 lg:px-6 shadow-sm">
       {/* Left Section */}
       <div className="flex items-center gap-4">
         <MobileMenuButton onClick={onMobileMenuClick} />
@@ -68,13 +68,14 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       </div>
 
       {/* Right Section */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {/* Language Toggle */}
         <Button
           variant="ghost"
           size="icon"
           onClick={toggleLanguage}
           title={language === 'ar' ? 'Switch to English' : 'التبديل للعربية'}
+          className="rounded-xl text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--background-tertiary)]"
         >
           <Languages className="h-5 w-5" />
         </Button>
@@ -85,6 +86,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           size="icon"
           onClick={toggleTheme}
           title={theme === 'dark' ? t('common.lightMode') : t('common.darkMode')}
+          className="rounded-xl text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--background-tertiary)]"
         >
           {theme === 'dark' ? (
             <Sun className="h-5 w-5" />
@@ -99,10 +101,10 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
             variant="ghost"
             size="icon"
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative"
+            className="relative rounded-xl text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--background-tertiary)]"
           >
             <Bell className="h-5 w-5" />
-            <span className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--status-error)]" />
+            <span className="absolute end-2 top-2 h-2 w-2 rounded-full bg-[var(--status-error)] ring-2 ring-white" />
           </Button>
 
           {showNotifications && (
@@ -112,19 +114,19 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                 onClick={() => setShowNotifications(false)}
               />
               <div className={cn(
-                'absolute top-full z-50 mt-2 w-80 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-lg',
+                'absolute top-full z-50 mt-2 w-80 rounded-2xl border border-[var(--border)] bg-white p-4 shadow-xl',
                 isRTL ? 'left-0' : 'right-0'
               )}>
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="font-semibold text-[var(--foreground)]">
                     {t('notifications.title')}
                   </h3>
-                  <button className="text-sm text-[var(--primary)] hover:underline">
+                  <button className="text-sm text-[var(--primary)] hover:underline font-medium">
                     {t('notifications.markAllRead')}
                   </button>
                 </div>
-                <div className="space-y-3">
-                  <div className="rounded-lg bg-[var(--background-secondary)] p-3">
+                <div className="space-y-2">
+                  <div className="rounded-xl bg-[var(--background-tertiary)] p-3 hover:bg-[var(--border)] transition-colors cursor-pointer">
                     <p className="text-sm font-medium text-[var(--foreground)]">
                       {t('notifications.newRisk')}
                     </p>
@@ -132,7 +134,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                       {language === 'ar' ? 'منذ 5 دقائق' : '5 minutes ago'}
                     </p>
                   </div>
-                  <div className="rounded-lg bg-[var(--background-secondary)] p-3">
+                  <div className="rounded-xl bg-[var(--background-tertiary)] p-3 hover:bg-[var(--border)] transition-colors cursor-pointer">
                     <p className="text-sm font-medium text-[var(--foreground)]">
                       {t('notifications.treatmentDue')}
                     </p>
@@ -147,17 +149,17 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
         </div>
 
         {/* User Menu */}
-        <div className="relative">
+        <div className="relative ms-2">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-[var(--background-secondary)]"
+            className="flex items-center gap-2 rounded-xl p-2 transition-colors hover:bg-[var(--background-tertiary)]"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary)] text-sm font-medium text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] text-sm font-semibold text-white shadow-sm">
               {user.avatar ? (
                 <img
                   src={user.avatar}
                   alt={user.name}
-                  className="h-full w-full rounded-full object-cover"
+                  className="h-full w-full rounded-xl object-cover"
                 />
               ) : (
                 user.name.charAt(0)
@@ -181,11 +183,11 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                 onClick={() => setShowUserMenu(false)}
               />
               <div className={cn(
-                'absolute top-full z-50 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--card)] py-2 shadow-lg',
+                'absolute top-full z-50 mt-2 w-56 rounded-2xl border border-[var(--border)] bg-white py-2 shadow-xl',
                 isRTL ? 'left-0' : 'right-0'
               )}>
                 <div className="border-b border-[var(--border)] px-4 py-3">
-                  <p className="text-sm font-medium text-[var(--foreground)]">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
                     {user.name}
                   </p>
                   <p className="text-xs text-[var(--foreground-secondary)]">
@@ -193,19 +195,19 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                   </p>
                 </div>
                 <div className="py-1">
-                  <button className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-secondary)]">
-                    <User className="h-4 w-4" />
+                  <button className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-tertiary)]">
+                    <User className="h-4 w-4 text-[var(--foreground-secondary)]" />
                     {t('navigation.profile')}
                   </button>
-                  <button className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-secondary)]">
-                    <Settings className="h-4 w-4" />
+                  <button className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-tertiary)]">
+                    <Settings className="h-4 w-4 text-[var(--foreground-secondary)]" />
                     {t('navigation.settings')}
                   </button>
                 </div>
                 <div className="border-t border-[var(--border)] py-1">
                   <button
                     onClick={handleSignOut}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[var(--status-error)] transition-colors hover:bg-[var(--background-secondary)]"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--status-error)] transition-colors hover:bg-[var(--status-error-bg)]"
                   >
                     <LogOut className="h-4 w-4" />
                     {t('auth.logout')}

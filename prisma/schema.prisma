@@ -28,19 +28,36 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // العلاقات
-  department            Department?       @relation("DepartmentUsers", fields: [departmentId], references: [id])
-  managedDepartments    Department[]      @relation("DepartmentManager")
-  championDepartments   Department[]      @relation("DepartmentChampion")
-  ownedRisks            Risk[]            @relation("RiskOwner")
-  createdRisks          Risk[]            @relation("RiskCreator")
-  championRisks         Risk[]            @relation("RiskChampion")
-  assessments           RiskAssessment[]  @relation("Assessor")
-  responsibleTreatments TreatmentPlan[]   @relation("TreatmentResponsible")
-  createdTreatments     TreatmentPlan[]   @relation("TreatmentCreator")
-  assignedTasks         TreatmentTask[]   @relation("TaskAssignee")
-  reportedIncidents     Incident[]        @relation("IncidentReporter")
+  department            Department?            @relation("DepartmentUsers", fields: [departmentId], references: [id])
+  managedDepartments    Department[]           @relation("DepartmentManager")
+  championDepartments   Department[]           @relation("DepartmentChampion")
+  accessibleDepartments UserDepartmentAccess[] // الإدارات التي يمكن للمستخدم الاطلاع عليها
+  ownedRisks            Risk[]                 @relation("RiskOwner")
+  createdRisks          Risk[]                 @relation("RiskCreator")
+  championRisks         Risk[]                 @relation("RiskChampion")
+  assessments           RiskAssessment[]       @relation("Assessor")
+  responsibleTreatments TreatmentPlan[]        @relation("TreatmentResponsible")
+  createdTreatments     TreatmentPlan[]        @relation("TreatmentCreator")
+  assignedTasks         TreatmentTask[]        @relation("TaskAssignee")
+  reportedIncidents     Incident[]             @relation("IncidentReporter")
   notifications         Notification[]
   auditLogs             AuditLog[]
+}
+
+// صلاحيات اطلاع المستخدم على الإدارات
+model UserDepartmentAccess {
+  id           String   @id @default(cuid())
+  userId       String
+  departmentId String
+  canView      Boolean  @default(true)  // يمكن الاطلاع
+  canEdit      Boolean  @default(false) // يمكن التعديل
+  createdAt    DateTime @default(now())
+
+  // العلاقات
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId])
 }
 
 // الإدارات / الوظائف (Functions)
@@ -57,14 +74,15 @@ model Department {
   updatedAt       DateTime  @updatedAt
 
   // العلاقات
-  manager       User?         @relation("DepartmentManager", fields: [managerId], references: [id])
-  riskChampion  User?         @relation("DepartmentChampion", fields: [riskChampionId], references: [id])
-  parent        Department?   @relation("DepartmentHierarchy", fields: [parentId], references: [id])
-  children      Department[]  @relation("DepartmentHierarchy")
-  users         User[]        @relation("DepartmentUsers")
-  risks         Risk[]
-  incidents     Incident[]
-  processes     Process[]
+  manager        User?                  @relation("DepartmentManager", fields: [managerId], references: [id])
+  riskChampion   User?                  @relation("DepartmentChampion", fields: [riskChampionId], references: [id])
+  parent         Department?            @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children       Department[]           @relation("DepartmentHierarchy")
+  users          User[]                 @relation("DepartmentUsers")
+  userAccess     UserDepartmentAccess[] // المستخدمون الذين لديهم صلاحية الاطلاع
+  risks          Risk[]
+  incidents      Incident[]
+  processes      Process[]
 }
 
 // العمليات (Processes)

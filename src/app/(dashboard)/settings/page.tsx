@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -28,12 +29,18 @@ import {
   X,
   Table2,
   Activity,
+  Key,
+  Lock,
+  Eye,
+  EyeOff,
+  ShieldAlert,
 } from 'lucide-react';
 import { hrRisks, hrRisksSummary } from '@/data/hrRisks';
 import RiskEditor from '@/components/RiskEditor';
 import AuditLogTab from '@/components/AuditLogTab';
 
-const settingsTabs = [
+// Define all settings tabs
+const allSettingsTabs = [
   { id: 'users', icon: Users },
   { id: 'departments', icon: Building2 },
   { id: 'categories', icon: Tag },
@@ -42,6 +49,22 @@ const settingsTabs = [
   { id: 'auditLog', icon: Activity },
   { id: 'riskEditor', icon: Table2 },
 ];
+
+// Define which tabs each role can access
+// admin: full access to all tabs
+// riskManager: same as admin
+// riskAnalyst: only notifications (no users, departments, categories, dataManagement, auditLog, riskEditor)
+// riskChampion: only notifications
+// executive: only notifications
+// employee: only notifications
+const roleTabAccess: Record<string, string[]> = {
+  admin: ['users', 'departments', 'categories', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
+  riskManager: ['users', 'departments', 'categories', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
+  riskAnalyst: ['notifications'],
+  riskChampion: ['notifications'],
+  executive: ['notifications'],
+  employee: ['notifications'],
+};
 
 const mockUsers = [
   {
@@ -117,10 +140,79 @@ const categoryColors = [
   { value: 'bg-teal-500', label: 'أزرق مخضر / Teal' },
 ];
 
+// Interfaces for API data
+interface APICategory {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr?: string | null;
+  descriptionEn?: string | null;
+  color?: string | null;
+  isActive: boolean;
+  _count?: { risks: number };
+}
+
+interface APIDepartment {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  _count?: { risks: number };
+}
+
+interface DepartmentAccess {
+  id: string;
+  departmentId: string;
+  canView: boolean;
+  canEdit: boolean;
+  department: {
+    id: string;
+    code: string;
+    nameAr: string;
+    nameEn: string;
+  };
+}
+
+interface APIUser {
+  id: string;
+  fullName: string;
+  fullNameEn?: string | null;
+  email: string;
+  role: string;
+  status: string;
+  departmentId?: string | null;
+  department?: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+  } | null;
+  accessibleDepartments?: DepartmentAccess[];
+}
+
 export default function SettingsPage() {
+  const { data: session } = useSession();
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
-  const [activeTab, setActiveTab] = useState('users');
+
+  // Get user role from session, default to 'employee' if not found
+  const userRole = (session?.user as { role?: string })?.role || 'employee';
+
+  // Get accessible tabs based on user role
+  const accessibleTabs = useMemo(() => {
+    const allowedTabIds = roleTabAccess[userRole] || roleTabAccess.employee;
+    return allSettingsTabs.filter(tab => allowedTabIds.includes(tab.id));
+  }, [userRole]);
+
+  // Check if user can access a specific tab
+  const canAccessTab = (tabId: string) => {
+    const allowedTabIds = roleTabAccess[userRole] || roleTabAccess.employee;
+    return allowedTabIds.includes(tabId);
+  };
+
+  // Set default tab to first accessible tab
+  const defaultTab = accessibleTabs.length > 0 ? accessibleTabs[0].id : 'notifications';
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [importedRisks, setImportedRisks] = useState<typeof hrRisks>([]);
@@ -141,16 +233,61 @@ export default function SettingsPage() {
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
+  const [showDepartmentAccessModal, setShowDepartmentAccessModal] = useState(false);
+  const [selectedUserForAccess, setSelectedUserForAccess] = useState<APIUser | null>(null);
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<string[]>([]);
+  const [savingAccess, setSavingAccess] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [changePasswordForm, setChangePasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
   const [selectedUser, setSelectedUser] = useState<typeof mockUsers[0] | null>(null);
-  const [selectedDept, setSelectedDept] = useState<typeof mockDepartments[0] | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<typeof mockCategories[0] | null>(null);
-  const [users, setUsers] = useState(mockUsers);
-  const [departments, setDepartments] = useState(mockDepartments);
-  const [categories, setCategories] = useState(mockCategories);
+  const [selectedDept, setSelectedDept] = useState<APIDepartment | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<APICategory | null>(null);
+  const [users, setUsers] = useState<APIUser[]>([]);
+  const [departments, setDepartments] = useState<APIDepartment[]>([]);
+  const [categories, setCategories] = useState<APICategory[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
 
   // Parsed risks data for import
   const [parsedRisksData, setParsedRisksData] = useState<Array<Record<string, string>>>([]);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Fetch data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoadingData(true);
+      try {
+        const [usersRes, deptsRes, catsRes] = await Promise.all([
+          fetch('/api/users'),
+          fetch('/api/departments'),
+          fetch('/api/categories'),
+        ]);
+
+        const [usersData, deptsData, catsData] = await Promise.all([
+          usersRes.json(),
+          deptsRes.json(),
+          catsRes.json(),
+        ]);
+
+        if (usersData.success) setUsers(usersData.data);
+        if (deptsData.success) setDepartments(deptsData.data);
+        if (catsData.success) setCategories(catsData.data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Form states for editing
   const [editUserForm, setEditUserForm] = useState({
@@ -201,11 +338,11 @@ export default function SettingsPage() {
   });
 
   // Handle Edit User
-  const handleEditUser = (user: typeof mockUsers[0]) => {
-    setSelectedUser(user);
+  const handleEditUser = (user: APIUser) => {
+    setSelectedUser(user as unknown as typeof mockUsers[0]);
     setEditUserForm({
-      fullNameAr: user.fullNameAr,
-      fullNameEn: user.fullNameEn,
+      fullNameAr: user.fullName,
+      fullNameEn: user.fullNameEn || '',
       email: user.email,
       role: user.role,
       status: user.status,
@@ -213,79 +350,286 @@ export default function SettingsPage() {
     setShowEditUserModal(true);
   };
 
+  // Handle Department Access Modal
+  const handleDepartmentAccess = (user: APIUser) => {
+    setSelectedUserForAccess(user);
+    // Set currently accessible department IDs
+    const accessibleIds = user.accessibleDepartments?.map(a => a.departmentId) || [];
+    setSelectedDepartmentIds(accessibleIds);
+    setShowDepartmentAccessModal(true);
+  };
+
+  // Save Department Access
+  const saveDepartmentAccess = async () => {
+    if (!selectedUserForAccess) return;
+
+    setSavingAccess(true);
+    try {
+      const response = await fetch(`/api/users/${selectedUserForAccess.id}/department-access`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          departmentIds: selectedDepartmentIds,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Refetch users to get the updated list
+        const usersRes = await fetch('/api/users');
+        const usersData = await usersRes.json();
+        if (usersData.success) setUsers(usersData.data);
+
+        setShowDepartmentAccessModal(false);
+        setSelectedUserForAccess(null);
+        setSelectedDepartmentIds([]);
+        alert(isAr ? 'تم تحديث صلاحيات الوصول بنجاح!' : 'Access permissions updated successfully!');
+      } else {
+        alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating department access:', error);
+      alert(isAr ? 'حدث خطأ أثناء تحديث الصلاحيات' : 'An error occurred while updating permissions');
+    } finally {
+      setSavingAccess(false);
+    }
+  };
+
+  // Toggle department selection
+  const toggleDepartmentSelection = (departmentId: string) => {
+    setSelectedDepartmentIds(prev => {
+      if (prev.includes(departmentId)) {
+        return prev.filter(id => id !== departmentId);
+      } else {
+        return [...prev, departmentId];
+      }
+    });
+  };
+
   // Save Edit User
-  const saveEditUser = () => {
+  const saveEditUser = async () => {
     if (selectedUser) {
-      setUsers(prev => prev.map(u =>
-        u.id === selectedUser.id
-          ? {
-              ...u,
-              fullNameAr: editUserForm.fullNameAr,
-              fullNameEn: editUserForm.fullNameEn,
-              email: editUserForm.email,
-              role: editUserForm.role,
-              status: editUserForm.status,
-            }
-          : u
-      ));
-      setShowEditUserModal(false);
-      setSelectedUser(null);
+      try {
+        const response = await fetch(`/api/users/${selectedUser.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: editUserForm.fullNameAr,
+            fullNameEn: editUserForm.fullNameEn || null,
+            email: editUserForm.email,
+            role: editUserForm.role,
+            status: editUserForm.status,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // Refetch users to get the updated list
+          const usersRes = await fetch('/api/users');
+          const usersData = await usersRes.json();
+          if (usersData.success) setUsers(usersData.data);
+
+          setShowEditUserModal(false);
+          setSelectedUser(null);
+          alert(isAr ? 'تم تحديث المستخدم بنجاح!' : 'User updated successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error updating user:', error);
+        alert(isAr ? 'حدث خطأ أثناء تحديث المستخدم' : 'An error occurred while updating user');
+      }
+    }
+  };
+
+  // Reset Password (Admin function)
+  const handleResetPassword = async (userId: string) => {
+    setResetPasswordUserId(userId);
+    setShowResetPasswordModal(true);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!resetPasswordUserId) return;
+
+    try {
+      const response = await fetch(`/api/users/${resetPasswordUserId}/reset-password`, {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(isAr
+          ? `تم إعادة تعيين كلمة المرور بنجاح!\nكلمة المرور الجديدة: ${result.defaultPassword}`
+          : `Password reset successfully!\nNew password: ${result.defaultPassword}`);
+        setShowResetPasswordModal(false);
+        setResetPasswordUserId(null);
+      } else {
+        alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Reset password error:', error);
+      alert(isAr ? 'حدث خطأ أثناء إعادة تعيين كلمة المرور' : 'An error occurred while resetting password');
+    }
+  };
+
+  // Change Password (User function)
+  const handleChangePassword = async () => {
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!changePasswordForm.currentPassword || !changePasswordForm.newPassword) {
+      setPasswordError(isAr ? 'يرجى ملء جميع الحقول' : 'Please fill all fields');
+      return;
+    }
+
+    if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
+      setPasswordError(isAr ? 'كلمات المرور غير متطابقة' : 'Passwords do not match');
+      return;
+    }
+
+    if (changePasswordForm.newPassword.length < 6) {
+      setPasswordError(isAr ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: changePasswordForm.currentPassword,
+          newPassword: changePasswordForm.newPassword,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setPasswordSuccess(isAr ? 'تم تغيير كلمة المرور بنجاح!' : 'Password changed successfully!');
+        setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setTimeout(() => {
+          setShowChangePasswordModal(false);
+          setPasswordSuccess('');
+        }, 2000);
+      } else {
+        setPasswordError(isAr ? result.error : result.error);
+      }
+    } catch (error) {
+      console.error('Change password error:', error);
+      setPasswordError(isAr ? 'حدث خطأ أثناء تغيير كلمة المرور' : 'An error occurred while changing password');
     }
   };
 
   // Add New User
-  const addNewUser = () => {
+  const addNewUser = async () => {
     if (newUserForm.fullNameAr && newUserForm.email) {
-      const dept = mockDepartments.find(d => d.id === newUserForm.departmentId);
-      const newUser = {
-        id: String(Date.now()),
-        fullNameAr: newUserForm.fullNameAr,
-        fullNameEn: newUserForm.fullNameEn,
-        email: newUserForm.email,
-        role: newUserForm.role || 'employee',
-        departmentAr: dept?.nameAr || '',
-        departmentEn: dept?.nameEn || '',
-        status: 'active',
-      };
-      setUsers(prev => [...prev, newUser]);
-      setNewUserForm({ fullNameAr: '', fullNameEn: '', email: '', role: '', departmentId: '' });
-      setShowAddModal(false);
+      try {
+        // تحويل departmentId الفارغ إلى null
+        const deptId = newUserForm.departmentId && newUserForm.departmentId.trim() !== ''
+          ? newUserForm.departmentId
+          : null;
+
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: newUserForm.fullNameAr.trim(),
+            fullNameEn: newUserForm.fullNameEn?.trim() || null,
+            email: newUserForm.email.trim(),
+            role: newUserForm.role || 'employee',
+            departmentId: deptId,
+            status: 'active',
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // Refetch users to get the updated list with proper structure
+          const usersRes = await fetch('/api/users');
+          const usersData = await usersRes.json();
+          if (usersData.success) setUsers(usersData.data);
+
+          setNewUserForm({ fullNameAr: '', fullNameEn: '', email: '', role: '', departmentId: '' });
+          setShowAddModal(false);
+          alert(isAr ? 'تم إضافة المستخدم بنجاح!' : 'User added successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error adding user:', error);
+        alert(isAr ? 'حدث خطأ أثناء إضافة المستخدم' : 'An error occurred while adding user');
+      }
     }
   };
 
   // Add New Department
-  const addNewDept = () => {
+  const addNewDept = async () => {
     if (newDeptForm.nameAr && newDeptForm.code) {
-      const newDept = {
-        id: String(Date.now()),
-        nameAr: newDeptForm.nameAr,
-        nameEn: newDeptForm.nameEn,
-        code: newDeptForm.code,
-        risksCount: 0,
-      };
-      setDepartments(prev => [...prev, newDept]);
-      setNewDeptForm({ nameAr: '', nameEn: '', code: '' });
-      setShowAddDeptModal(false);
+      try {
+        const response = await fetch('/api/departments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: newDeptForm.code,
+            nameAr: newDeptForm.nameAr,
+            nameEn: newDeptForm.nameEn,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setDepartments(prev => [...prev, result.data]);
+          setNewDeptForm({ nameAr: '', nameEn: '', code: '' });
+          setShowAddDeptModal(false);
+          alert(isAr ? 'تم إضافة الإدارة بنجاح!' : 'Department added successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error adding department:', error);
+        alert(isAr ? 'حدث خطأ أثناء إضافة الإدارة' : 'An error occurred while adding department');
+      }
     }
   };
 
   // Handle Delete User
-  const handleDeleteUser = (user: typeof mockUsers[0]) => {
-    setSelectedUser(user);
+  const handleDeleteUser = (user: APIUser) => {
+    setSelectedUser(user as unknown as typeof mockUsers[0]);
     setShowDeleteUserModal(true);
   };
 
   // Confirm Delete User
-  const confirmDeleteUser = () => {
+  const confirmDeleteUser = async () => {
     if (selectedUser) {
-      setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
-      setShowDeleteUserModal(false);
-      setSelectedUser(null);
+      try {
+        const response = await fetch(`/api/users/${selectedUser.id}`, {
+          method: 'DELETE',
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
+          setShowDeleteUserModal(false);
+          setSelectedUser(null);
+          alert(isAr ? 'تم حذف المستخدم بنجاح!' : 'User deleted successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert(isAr ? 'حدث خطأ أثناء حذف المستخدم' : 'An error occurred while deleting user');
+      }
     }
   };
 
   // Handle Edit Department
-  const handleEditDept = (dept: typeof mockDepartments[0]) => {
+  const handleEditDept = (dept: APIDepartment) => {
     setSelectedDept(dept);
     setEditDeptForm({
       nameAr: dept.nameAr,
@@ -296,83 +640,144 @@ export default function SettingsPage() {
   };
 
   // Save Edit Department
-  const saveEditDept = () => {
+  const saveEditDept = async () => {
     if (selectedDept) {
-      setDepartments(prev => prev.map(d =>
-        d.id === selectedDept.id
-          ? {
-              ...d,
-              nameAr: editDeptForm.nameAr,
-              nameEn: editDeptForm.nameEn,
-              code: editDeptForm.code,
-            }
-          : d
-      ));
-      setShowEditDeptModal(false);
-      setSelectedDept(null);
+      try {
+        const response = await fetch(`/api/departments/${selectedDept.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: editDeptForm.code,
+            nameAr: editDeptForm.nameAr,
+            nameEn: editDeptForm.nameEn,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setDepartments(prev => prev.map(d =>
+            d.id === selectedDept.id ? result.data : d
+          ));
+          setShowEditDeptModal(false);
+          setSelectedDept(null);
+          alert(isAr ? 'تم تحديث الإدارة بنجاح!' : 'Department updated successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error updating department:', error);
+        alert(isAr ? 'حدث خطأ أثناء تحديث الإدارة' : 'An error occurred while updating department');
+      }
     }
   };
 
   // Add New Category
-  const addNewCategory = () => {
+  const addNewCategory = async () => {
     if (newCategoryForm.nameAr && newCategoryForm.code) {
-      const newCategory = {
-        id: String(Date.now()),
-        nameAr: newCategoryForm.nameAr,
-        nameEn: newCategoryForm.nameEn,
-        code: newCategoryForm.code,
-        color: newCategoryForm.color,
-        risksCount: 0,
-      };
-      setCategories(prev => [...prev, newCategory]);
-      setNewCategoryForm({ nameAr: '', nameEn: '', code: '', color: 'bg-blue-500' });
-      setShowAddCategoryModal(false);
+      try {
+        const response = await fetch('/api/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: newCategoryForm.code,
+            nameAr: newCategoryForm.nameAr,
+            nameEn: newCategoryForm.nameEn,
+            color: newCategoryForm.color,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setCategories(prev => [...prev, result.data]);
+          setNewCategoryForm({ nameAr: '', nameEn: '', code: '', color: 'bg-blue-500' });
+          setShowAddCategoryModal(false);
+          alert(isAr ? 'تم إضافة التصنيف بنجاح!' : 'Category added successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error adding category:', error);
+        alert(isAr ? 'حدث خطأ أثناء إضافة التصنيف' : 'An error occurred while adding category');
+      }
     }
   };
 
   // Handle Edit Category
-  const handleEditCategory = (category: typeof mockCategories[0]) => {
+  const handleEditCategory = (category: APICategory) => {
     setSelectedCategory(category);
     setEditCategoryForm({
       nameAr: category.nameAr,
       nameEn: category.nameEn,
       code: category.code,
-      color: category.color,
+      color: category.color || 'bg-blue-500',
     });
     setShowEditCategoryModal(true);
   };
 
   // Save Edit Category
-  const saveEditCategory = () => {
+  const saveEditCategory = async () => {
     if (selectedCategory) {
-      setCategories(prev => prev.map(c =>
-        c.id === selectedCategory.id
-          ? {
-              ...c,
-              nameAr: editCategoryForm.nameAr,
-              nameEn: editCategoryForm.nameEn,
-              code: editCategoryForm.code,
-              color: editCategoryForm.color,
-            }
-          : c
-      ));
-      setShowEditCategoryModal(false);
-      setSelectedCategory(null);
+      try {
+        const response = await fetch(`/api/categories/${selectedCategory.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: editCategoryForm.code,
+            nameAr: editCategoryForm.nameAr,
+            nameEn: editCategoryForm.nameEn,
+            color: editCategoryForm.color,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setCategories(prev => prev.map(c =>
+            c.id === selectedCategory.id ? result.data : c
+          ));
+          setShowEditCategoryModal(false);
+          setSelectedCategory(null);
+          alert(isAr ? 'تم تحديث التصنيف بنجاح!' : 'Category updated successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error updating category:', error);
+        alert(isAr ? 'حدث خطأ أثناء تحديث التصنيف' : 'An error occurred while updating category');
+      }
     }
   };
 
   // Handle Delete Category
-  const handleDeleteCategory = (category: typeof mockCategories[0]) => {
+  const handleDeleteCategory = (category: APICategory) => {
     setSelectedCategory(category);
     setShowDeleteCategoryModal(true);
   };
 
   // Confirm Delete Category
-  const confirmDeleteCategory = () => {
+  const confirmDeleteCategory = async () => {
     if (selectedCategory) {
-      setCategories(prev => prev.filter(c => c.id !== selectedCategory.id));
-      setShowDeleteCategoryModal(false);
-      setSelectedCategory(null);
+      try {
+        const response = await fetch(`/api/categories/${selectedCategory.id}`, {
+          method: 'DELETE',
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setCategories(prev => prev.filter(c => c.id !== selectedCategory.id));
+          setShowDeleteCategoryModal(false);
+          setSelectedCategory(null);
+          alert(isAr ? 'تم حذف التصنيف بنجاح!' : 'Category deleted successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        alert(isAr ? 'حدث خطأ أثناء حذف التصنيف' : 'An error occurred while deleting category');
+      }
     }
   };
 
@@ -392,8 +797,8 @@ export default function SettingsPage() {
       'Title_EN',
       'Description_AR',
       'Description_EN',
-      'Category',
-      'Department',
+      'Category_Code',
+      'Department_Code',
       'Likelihood',
       'Impact',
       'Risk_Rating',
@@ -411,15 +816,19 @@ export default function SettingsPage() {
       'Comments'
     ];
 
-    // Instructions row
+    // Build category and department codes from database
+    const categoryCodes = categories.map(c => c.code).join('/') || 'OPR/FIN/STR/LEG/TEC/REP';
+    const departmentCodes = departments.map(d => d.code).join('/') || 'RM/FIN/OPS/IT/SC/HSE';
+
+    // Instructions row with dynamic codes
     const instructions = [
       'رمز فريد (مطلوب)',
       'العنوان بالعربي',
       'العنوان بالإنجليزي',
       'الوصف بالعربي',
       'الوصف بالإنجليزي',
-      'OPR/FIN/STR/LEG/TEC/REP',
-      'RM/FIN/OPS/IT/SC/HSE',
+      categoryCodes,
+      departmentCodes,
       '1-5 (1=نادر، 5=شبه مؤكد)',
       '1-5 (1=ضئيل، 5=كارثي)',
       'Critical/Major/Moderate/Minor/Negligible',
@@ -630,55 +1039,156 @@ export default function SettingsPage() {
     }
   };
 
-  // Handle export risk register
-  const handleExportRiskRegister = () => {
-    // Create sample data for export
-    const exportData = {
-      exportDate: new Date().toISOString(),
-      totalRisks: 48,
-      data: 'Risk register data would be exported here'
-    };
+  // Handle export risk register (JSON format)
+  const handleExportRiskRegister = async () => {
+    try {
+      // Fetch all risks from API
+      const response = await fetch('/api/risks');
+      const result = await response.json();
 
-    // Create blob and download
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `risk-register-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      if (!result.success || !result.data) {
+        alert(isAr ? 'فشل في جلب البيانات' : 'Failed to fetch data');
+        return;
+      }
 
-    alert(isAr
-      ? 'تم تصدير سجل المخاطر بنجاح!'
-      : 'Risk register exported successfully!');
+      const risks = result.data;
+
+      // Create export data structure
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        exportedBy: 'ERM System',
+        totalRisks: risks.length,
+        risks: risks.map((risk: Record<string, unknown>) => ({
+          riskNumber: risk.riskNumber,
+          titleAr: risk.titleAr,
+          titleEn: risk.titleEn,
+          descriptionAr: risk.descriptionAr,
+          descriptionEn: risk.descriptionEn,
+          inherentLikelihood: risk.inherentLikelihood,
+          inherentImpact: risk.inherentImpact,
+          inherentScore: risk.inherentScore,
+          inherentRating: risk.inherentRating,
+          residualLikelihood: risk.residualLikelihood,
+          residualImpact: risk.residualImpact,
+          residualScore: risk.residualScore,
+          residualRating: risk.residualRating,
+          status: risk.status,
+          category: (risk.category as Record<string, unknown>)?.nameEn || '',
+          department: (risk.department as Record<string, unknown>)?.nameEn || '',
+          owner: (risk.owner as Record<string, unknown>)?.fullName || '',
+          createdAt: risk.createdAt,
+          updatedAt: risk.updatedAt,
+        }))
+      };
+
+      // Create blob and download
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `risk-register-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert(isAr
+        ? `تم تصدير ${risks.length} خطر بنجاح!`
+        : `Successfully exported ${risks.length} risks!`);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert(isAr ? 'حدث خطأ أثناء التصدير' : 'An error occurred during export');
+    }
   };
 
-  // Handle export as Excel
-  const handleExportExcel = () => {
-    // Create CSV content (Excel compatible)
-    const headers = ['Risk ID', 'Description', 'Likelihood', 'Impact', 'Rating', 'Status'];
-    const csvContent = [
-      headers.join(','),
-      'HR-001,"Employee turnover risk",3,4,Major,Open',
-      'HR-002,"Skills gap in critical roles",2,3,Moderate,In Progress',
-      'HR-003,"Compliance training delays",2,2,Minor,Resolved',
-    ].join('\n');
+  // Handle export as Excel (CSV format)
+  const handleExportExcel = async () => {
+    try {
+      // Fetch all risks from API
+      const response = await fetch('/api/risks');
+      const result = await response.json();
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `risk-register-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      if (!result.success || !result.data) {
+        alert(isAr ? 'فشل في جلب البيانات' : 'Failed to fetch data');
+        return;
+      }
 
-    alert(isAr
-      ? 'تم تصدير البيانات كملف Excel بنجاح!'
-      : 'Data exported as Excel successfully!');
+      const risks = result.data;
+
+      // Create CSV content with BOM for Excel Arabic support
+      const BOM = '\uFEFF';
+      const headers = [
+        'Risk ID',
+        'Title (Arabic)',
+        'Title (English)',
+        'Description (Arabic)',
+        'Description (English)',
+        'Inherent Likelihood',
+        'Inherent Impact',
+        'Inherent Score',
+        'Inherent Rating',
+        'Residual Likelihood',
+        'Residual Impact',
+        'Residual Score',
+        'Residual Rating',
+        'Status',
+        'Category',
+        'Department',
+        'Owner',
+        'Created At',
+        'Updated At'
+      ];
+
+      const escapeCSV = (value: unknown): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const rows = risks.map((risk: Record<string, unknown>) => [
+        risk.riskNumber,
+        risk.titleAr,
+        risk.titleEn,
+        risk.descriptionAr,
+        risk.descriptionEn,
+        risk.inherentLikelihood,
+        risk.inherentImpact,
+        risk.inherentScore,
+        risk.inherentRating,
+        risk.residualLikelihood || '',
+        risk.residualImpact || '',
+        risk.residualScore || '',
+        risk.residualRating || '',
+        risk.status,
+        (risk.category as Record<string, unknown>)?.nameEn || '',
+        (risk.department as Record<string, unknown>)?.nameEn || '',
+        (risk.owner as Record<string, unknown>)?.fullName || '',
+        risk.createdAt ? new Date(risk.createdAt as string).toLocaleDateString() : '',
+        risk.updatedAt ? new Date(risk.updatedAt as string).toLocaleDateString() : '',
+      ].map(escapeCSV).join(','));
+
+      const csvContent = BOM + [headers.join(','), ...rows].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `risk-register-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert(isAr
+        ? `تم تصدير ${risks.length} خطر كملف Excel بنجاح!`
+        : `Successfully exported ${risks.length} risks as Excel!`);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert(isAr ? 'حدث خطأ أثناء التصدير' : 'An error occurred during export');
+    }
   };
 
   const getRoleColor = (role: string): 'primary' | 'success' | 'warning' | 'info' | 'default' => {
@@ -706,9 +1216,19 @@ export default function SettingsPage() {
           leftIcon={<Search className="h-4 w-4 sm:h-5 sm:w-5" />}
           className="sm:max-w-xs text-xs sm:text-sm"
         />
-        <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} onClick={() => setShowAddModal(true)} className="text-xs sm:text-sm shrink-0">
-          {t('users.addUser')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            leftIcon={<Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+            onClick={() => setShowChangePasswordModal(true)}
+            className="text-xs sm:text-sm shrink-0"
+          >
+            {isAr ? 'تغيير كلمة المرور' : 'Change Password'}
+          </Button>
+          <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} onClick={() => setShowAddModal(true)} className="text-xs sm:text-sm shrink-0">
+            {t('users.addUser')}
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -732,6 +1252,9 @@ export default function SettingsPage() {
                   <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] hidden sm:table-cell">
                     {t('users.status')}
                   </th>
+                  <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] hidden md:table-cell">
+                    {isAr ? 'الإدارات المتاحة' : 'Accessible Depts'}
+                  </th>
                   <th className="p-2 sm:p-3 md:p-4 text-center text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)]">
                     {t('common.actions')}
                   </th>
@@ -746,10 +1269,10 @@ export default function SettingsPage() {
                     <td className="p-2 sm:p-3 md:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="flex h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] sm:text-xs md:text-sm font-medium text-white shrink-0">
-                          {(isAr ? user.fullNameAr : user.fullNameEn).charAt(0)}
+                          {(isAr ? user.fullName : (user.fullNameEn || user.fullName)).charAt(0)}
                         </div>
                         <span className="font-medium text-[var(--foreground)] text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">
-                          {isAr ? user.fullNameAr : user.fullNameEn}
+                          {isAr ? user.fullName : (user.fullNameEn || user.fullName)}
                         </span>
                       </div>
                     </td>
@@ -762,17 +1285,55 @@ export default function SettingsPage() {
                       </Badge>
                     </td>
                     <td className="p-2 sm:p-3 md:p-4 text-xs sm:text-sm text-[var(--foreground-secondary)] hidden md:table-cell">
-                      {isAr ? user.departmentAr : user.departmentEn}
+                      {isAr ? user.department?.nameAr : user.department?.nameEn}
                     </td>
                     <td className="p-2 sm:p-3 md:p-4 hidden sm:table-cell">
                       <Badge variant={user.status === 'active' ? 'success' : 'default'} className="text-[10px] sm:text-xs">
                         {t(`users.statuses.${user.status}`)}
                       </Badge>
                     </td>
+                    <td className="p-2 sm:p-3 md:p-4 hidden md:table-cell">
+                      {user.accessibleDepartments && user.accessibleDepartments.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {user.accessibleDepartments.slice(0, 3).map((access) => (
+                            <Badge key={access.id} variant="default" className="text-[9px] sm:text-[10px]">
+                              {access.department.code}
+                            </Badge>
+                          ))}
+                          {user.accessibleDepartments.length > 3 && (
+                            <Badge variant="default" className="text-[9px] sm:text-[10px]">
+                              +{user.accessibleDepartments.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] sm:text-xs text-[var(--foreground-tertiary)]">
+                          {isAr ? 'لا يوجد' : 'None'}
+                        </span>
+                      )}
+                    </td>
                     <td className="p-2 sm:p-3 md:p-4">
                       <div className="flex items-center justify-center gap-0.5 sm:gap-1">
                         <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8" onClick={() => handleEditUser(user)} title={isAr ? 'تعديل' : 'Edit'}>
                           <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-[var(--secondary)] h-6 w-6 sm:h-8 sm:w-8"
+                          onClick={() => handleDepartmentAccess(user)}
+                          title={isAr ? 'صلاحيات الإدارات' : 'Department Access'}
+                        >
+                          <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-[var(--primary)] h-6 w-6 sm:h-8 sm:w-8"
+                          onClick={() => handleResetPassword(user.id)}
+                          title={isAr ? 'إعادة تعيين كلمة المرور' : 'Reset Password'}
+                        >
+                          <Key className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -827,7 +1388,7 @@ export default function SettingsPage() {
                 <span className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
                   {t('departments.totalRisks')}
                 </span>
-                <Badge variant="primary" className="text-[10px] sm:text-xs">{dept.risksCount}</Badge>
+                <Badge variant="primary" className="text-[10px] sm:text-xs">{dept._count?.risks || 0}</Badge>
               </div>
             </CardContent>
           </Card>
@@ -1248,9 +1809,28 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* Limited Access Notice for non-admin users */}
+      {accessibleTabs.length <= 1 && (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20 p-4">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                {isAr ? 'صلاحيات محدودة' : 'Limited Access'}
+              </p>
+              <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                {isAr
+                  ? 'لديك صلاحيات محدودة في هذه الصفحة. يمكنك فقط إدارة إعدادات الإشعارات الخاصة بك.'
+                  : 'You have limited access to this page. You can only manage your notification settings.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex flex-wrap gap-1.5 sm:gap-2 border-b border-[var(--border)] pb-3 sm:pb-4">
-        {settingsTabs.map((tab) => {
+        {accessibleTabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
@@ -1269,13 +1849,13 @@ export default function SettingsPage() {
         })}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === 'users' && renderUsersTab()}
-      {activeTab === 'departments' && renderDepartmentsTab()}
-      {activeTab === 'notifications' && renderNotificationsTab()}
-      {activeTab === 'dataManagement' && renderDataManagementTab()}
-      {activeTab === 'auditLog' && <AuditLogTab />}
-      {activeTab === 'riskEditor' && (
+      {/* Tab Content - Only render if user has access */}
+      {activeTab === 'users' && canAccessTab('users') && renderUsersTab()}
+      {activeTab === 'departments' && canAccessTab('departments') && renderDepartmentsTab()}
+      {activeTab === 'notifications' && canAccessTab('notifications') && renderNotificationsTab()}
+      {activeTab === 'dataManagement' && canAccessTab('dataManagement') && renderDataManagementTab()}
+      {activeTab === 'auditLog' && canAccessTab('auditLog') && <AuditLogTab />}
+      {activeTab === 'riskEditor' && canAccessTab('riskEditor') && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -1290,7 +1870,7 @@ export default function SettingsPage() {
           <RiskEditor />
         </div>
       )}
-      {activeTab === 'categories' && (
+      {activeTab === 'categories' && canAccessTab('categories') && (
         <div className="space-y-3 sm:space-y-4">
           <div className="flex justify-end">
             <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} className="text-xs sm:text-sm" onClick={() => setShowAddCategoryModal(true)}>
@@ -1327,7 +1907,7 @@ export default function SettingsPage() {
                     <span className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
                       {isAr ? 'عدد المخاطر' : 'Risks Count'}
                     </span>
-                    <Badge variant="primary" className="text-[10px] sm:text-xs">{category.risksCount}</Badge>
+                    <Badge variant="primary" className="text-[10px] sm:text-xs">{category._count?.risks || 0}</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -1381,10 +1961,13 @@ export default function SettingsPage() {
             />
             <Select
               label={t('users.department')}
-              options={mockDepartments.map((d) => ({
-                value: d.id,
-                label: isAr ? d.nameAr : d.nameEn,
-              }))}
+              options={[
+                { value: '', label: isAr ? 'بدون إدارة' : 'No Department' },
+                ...departments.map((d) => ({
+                  value: d.id,
+                  label: isAr ? d.nameAr : d.nameEn,
+                })),
+              ]}
               value={newUserForm.departmentId}
               onChange={(value) => setNewUserForm(prev => ({ ...prev, departmentId: value }))}
               placeholder={isAr ? 'اختر الإدارة' : 'Select Department'}
@@ -1491,7 +2074,7 @@ export default function SettingsPage() {
             </div>
             <div className="rounded-lg border border-[var(--border)] p-4">
               <p className="font-medium text-[var(--foreground)]">
-                {isAr ? selectedUser.fullNameAr : selectedUser.fullNameEn}
+                {isAr ? (selectedUser as unknown as APIUser).fullName : ((selectedUser as unknown as APIUser).fullNameEn || (selectedUser as unknown as APIUser).fullName)}
               </p>
               <p className="text-sm text-[var(--foreground-secondary)]">{selectedUser.email}</p>
             </div>
@@ -1871,6 +2454,232 @@ export default function SettingsPage() {
               <>
                 <CheckCircle className="me-2 h-4 w-4" />
                 {isAr ? 'تأكيد الاستيراد' : 'Confirm Import'}
+              </>
+            )}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Reset Password Confirmation Modal */}
+      <Modal
+        isOpen={showResetPasswordModal}
+        onClose={() => {
+          setShowResetPasswordModal(false);
+          setResetPasswordUserId(null);
+        }}
+        title={isAr ? 'إعادة تعيين كلمة المرور' : 'Reset Password'}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
+            <Key className="h-6 w-6 text-yellow-500" />
+            <div>
+              <p className="font-medium text-[var(--foreground)]">
+                {isAr ? 'هل أنت متأكد من إعادة تعيين كلمة المرور؟' : 'Are you sure you want to reset the password?'}
+              </p>
+              <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+                {isAr ? 'سيتم تعيين كلمة المرور إلى: Welcome@123' : 'Password will be reset to: Welcome@123'}
+              </p>
+            </div>
+          </div>
+        </div>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowResetPasswordModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={confirmResetPassword}>
+            <Key className="me-2 h-4 w-4" />
+            {isAr ? 'إعادة تعيين' : 'Reset Password'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        isOpen={showChangePasswordModal}
+        onClose={() => {
+          setShowChangePasswordModal(false);
+          setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+          setPasswordError('');
+          setPasswordSuccess('');
+        }}
+        title={isAr ? 'تغيير كلمة المرور' : 'Change Password'}
+        size="md"
+      >
+        <div className="space-y-4">
+          {passwordError && (
+            <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>
+            </div>
+          )}
+          {passwordSuccess && (
+            <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <p className="text-sm text-green-600 dark:text-green-400">{passwordSuccess}</p>
+            </div>
+          )}
+          <Input
+            type="password"
+            label={isAr ? 'كلمة المرور الحالية' : 'Current Password'}
+            value={changePasswordForm.currentPassword}
+            onChange={(e) => setChangePasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+            leftIcon={<Lock className="h-4 w-4" />}
+          />
+          <Input
+            type="password"
+            label={isAr ? 'كلمة المرور الجديدة' : 'New Password'}
+            value={changePasswordForm.newPassword}
+            onChange={(e) => setChangePasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+            leftIcon={<Lock className="h-4 w-4" />}
+          />
+          <Input
+            type="password"
+            label={isAr ? 'تأكيد كلمة المرور الجديدة' : 'Confirm New Password'}
+            value={changePasswordForm.confirmPassword}
+            onChange={(e) => setChangePasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+            leftIcon={<Lock className="h-4 w-4" />}
+          />
+        </div>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowChangePasswordModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleChangePassword}>
+            <Lock className="me-2 h-4 w-4" />
+            {isAr ? 'تغيير كلمة المرور' : 'Change Password'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Department Access Modal */}
+      <Modal
+        isOpen={showDepartmentAccessModal}
+        onClose={() => {
+          setShowDepartmentAccessModal(false);
+          setSelectedUserForAccess(null);
+          setSelectedDepartmentIds([]);
+        }}
+        title={isAr ? 'صلاحيات الوصول للإدارات' : 'Department Access Permissions'}
+        size="lg"
+      >
+        {selectedUserForAccess && (
+          <div className="space-y-4">
+            {/* User Info */}
+            <div className="rounded-lg bg-[var(--background-secondary)] p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--primary)] text-white">
+                  {selectedUserForAccess.fullName.charAt(0)}
+                </div>
+                <div>
+                  <p className="font-medium text-[var(--foreground)]">
+                    {selectedUserForAccess.fullName}
+                  </p>
+                  <p className="text-sm text-[var(--foreground-secondary)]">
+                    {selectedUserForAccess.email}
+                  </p>
+                </div>
+                <Badge variant="default" className="ms-auto">
+                  {t(`users.roles.${selectedUserForAccess.role}`)}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="text-sm text-[var(--foreground-secondary)]">
+              {isAr
+                ? 'اختر الإدارات التي يمكن لهذا المستخدم الاطلاع على مخاطرها:'
+                : 'Select departments this user can access risks for:'}
+            </div>
+
+            {/* Department Selection */}
+            <div className="max-h-[300px] overflow-y-auto rounded-lg border border-[var(--border)]">
+              {departments.length === 0 ? (
+                <div className="p-4 text-center text-[var(--foreground-secondary)]">
+                  {isAr ? 'لا توجد إدارات' : 'No departments found'}
+                </div>
+              ) : (
+                <div className="divide-y divide-[var(--border)]">
+                  {departments.map((dept) => (
+                    <label
+                      key={dept.id}
+                      className="flex cursor-pointer items-center gap-3 p-3 hover:bg-[var(--background-secondary)] transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDepartmentIds.includes(dept.id)}
+                        onChange={() => toggleDepartmentSelection(dept.id)}
+                        className="h-4 w-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-[var(--foreground)]">
+                          {isAr ? dept.nameAr : dept.nameEn}
+                        </p>
+                        <p className="text-xs text-[var(--foreground-secondary)]">
+                          {dept.code}
+                        </p>
+                      </div>
+                      <Badge variant="default" className="text-[10px]">
+                        {dept._count?.risks || 0} {isAr ? 'مخاطر' : 'risks'}
+                      </Badge>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selection Summary */}
+            <div className="flex items-center justify-between rounded-lg bg-[var(--background-secondary)] p-3">
+              <span className="text-sm text-[var(--foreground-secondary)]">
+                {isAr ? 'الإدارات المحددة:' : 'Selected departments:'}
+              </span>
+              <Badge variant={selectedDepartmentIds.length > 0 ? 'success' : 'default'}>
+                {selectedDepartmentIds.length}
+              </Badge>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedDepartmentIds(departments.map(d => d.id))}
+                className="text-xs"
+              >
+                {isAr ? 'تحديد الكل' : 'Select All'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedDepartmentIds([])}
+                className="text-xs"
+              >
+                {isAr ? 'إلغاء الكل' : 'Clear All'}
+              </Button>
+            </div>
+          </div>
+        )}
+        <ModalFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowDepartmentAccessModal(false);
+              setSelectedUserForAccess(null);
+              setSelectedDepartmentIds([]);
+            }}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={saveDepartmentAccess} disabled={savingAccess}>
+            {savingAccess ? (
+              <>
+                <span className="me-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                {isAr ? 'جاري الحفظ...' : 'Saving...'}
+              </>
+            ) : (
+              <>
+                <CheckCircle className="me-2 h-4 w-4" />
+                {t('common.save')}
               </>
             )}
           </Button>
