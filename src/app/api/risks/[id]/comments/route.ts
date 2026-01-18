@@ -64,10 +64,11 @@ export async function GET(
     // تحديد ما إذا كان المستخدم من إدارة المخاطر (يمكنه رؤية التعليقات الداخلية)
     const canViewInternal = ['admin', 'riskManager', 'riskAnalyst'].includes(user.role);
 
-    // الحصول على التعليقات
+    // الحصول على التعليقات الرئيسية فقط
     const comments = await prisma.riskComment.findMany({
       where: {
         riskId,
+        parentId: null, // فقط التعليقات الرئيسية
         // إخفاء التعليقات الداخلية من غير إدارة المخاطر
         ...(canViewInternal ? {} : { isInternal: false }),
       },
@@ -82,6 +83,7 @@ export async function GET(
           },
         },
         replies: {
+          where: canViewInternal ? {} : { isInternal: false },
           include: {
             author: {
               select: {
@@ -95,11 +97,6 @@ export async function GET(
           },
           orderBy: { createdAt: 'asc' },
         },
-      },
-      where: {
-        riskId,
-        parentId: null, // فقط التعليقات الرئيسية
-        ...(canViewInternal ? {} : { isInternal: false }),
       },
       orderBy: { createdAt: 'desc' },
     });
