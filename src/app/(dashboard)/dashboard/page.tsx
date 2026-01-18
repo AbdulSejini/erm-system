@@ -353,27 +353,27 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Risk Rating Cards - Clean Light Design */}
+      {/* Risk Rating Cards - Light Gradient Design */}
       <div className="grid gap-3 sm:gap-4 grid-cols-5">
-        {/* Critical - Red */}
-        <Card className="overflow-hidden border border-red-100 shadow-sm rounded-2xl">
-          <div className="bg-gradient-to-r from-red-500 to-red-600 p-2.5 sm:p-3 text-center">
-            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'حرج' : 'Critical'}</p>
+        {/* Critical - Soft Red Gradient */}
+        <Card className="overflow-hidden border border-red-200 shadow-sm rounded-2xl bg-gradient-to-b from-red-50 to-white">
+          <div className="bg-gradient-to-r from-red-400 to-rose-400 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold drop-shadow-sm">{isAr ? 'حرج' : 'Critical'}</p>
           </div>
-          <div className="p-3 sm:p-4 text-center bg-red-50">
-            <p className="text-3xl sm:text-4xl font-bold text-red-600">
+          <div className="p-3 sm:p-4 text-center">
+            <p className="text-3xl sm:text-4xl font-bold text-red-500">
               {stats.ratingBreakdown.Critical}
             </p>
             <p className="text-[10px] sm:text-xs text-red-400 mt-1 font-medium">20-25</p>
           </div>
         </Card>
 
-        {/* Major - Orange */}
-        <Card className="overflow-hidden border border-orange-100 shadow-sm rounded-2xl">
-          <div className="bg-gradient-to-r from-orange-400 to-orange-500 p-2.5 sm:p-3 text-center">
-            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'رئيسي' : 'Major'}</p>
+        {/* Major - Soft Orange Gradient */}
+        <Card className="overflow-hidden border border-orange-200 shadow-sm rounded-2xl bg-gradient-to-b from-orange-50 to-white">
+          <div className="bg-gradient-to-r from-orange-400 to-amber-400 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold drop-shadow-sm">{isAr ? 'رئيسي' : 'Major'}</p>
           </div>
-          <div className="p-3 sm:p-4 text-center bg-orange-50">
+          <div className="p-3 sm:p-4 text-center">
             <p className="text-3xl sm:text-4xl font-bold text-orange-500">
               {stats.ratingBreakdown.Major}
             </p>
@@ -381,42 +381,42 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        {/* Moderate - Yellow */}
-        <Card className="overflow-hidden border border-yellow-100 shadow-sm rounded-2xl">
-          <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 p-2.5 sm:p-3 text-center">
-            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'متوسط' : 'Moderate'}</p>
+        {/* Moderate - Soft Yellow Gradient */}
+        <Card className="overflow-hidden border border-yellow-200 shadow-sm rounded-2xl bg-gradient-to-b from-yellow-50 to-white">
+          <div className="bg-gradient-to-r from-yellow-400 to-amber-300 p-2.5 sm:p-3 text-center">
+            <p className="text-yellow-900 text-xs sm:text-sm font-semibold">{isAr ? 'متوسط' : 'Moderate'}</p>
           </div>
-          <div className="p-3 sm:p-4 text-center bg-yellow-50">
-            <p className="text-3xl sm:text-4xl font-bold text-yellow-500">
+          <div className="p-3 sm:p-4 text-center">
+            <p className="text-3xl sm:text-4xl font-bold text-yellow-600">
               {stats.ratingBreakdown.Moderate}
             </p>
             <p className="text-[10px] sm:text-xs text-yellow-500 mt-1 font-medium">10-14</p>
           </div>
         </Card>
 
-        {/* Minor - Green */}
-        <Card className="overflow-hidden border border-green-100 shadow-sm rounded-2xl">
-          <div className="bg-gradient-to-r from-green-400 to-green-500 p-2.5 sm:p-3 text-center">
-            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'ثانوي' : 'Minor'}</p>
+        {/* Minor - Soft Green Gradient */}
+        <Card className="overflow-hidden border border-emerald-200 shadow-sm rounded-2xl bg-gradient-to-b from-emerald-50 to-white">
+          <div className="bg-gradient-to-r from-emerald-400 to-teal-400 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold drop-shadow-sm">{isAr ? 'ثانوي' : 'Minor'}</p>
           </div>
-          <div className="p-3 sm:p-4 text-center bg-green-50">
-            <p className="text-3xl sm:text-4xl font-bold text-green-500">
+          <div className="p-3 sm:p-4 text-center">
+            <p className="text-3xl sm:text-4xl font-bold text-emerald-500">
               {stats.ratingBreakdown.Minor}
             </p>
-            <p className="text-[10px] sm:text-xs text-green-400 mt-1 font-medium">5-9</p>
+            <p className="text-[10px] sm:text-xs text-emerald-400 mt-1 font-medium">5-9</p>
           </div>
         </Card>
 
-        {/* Negligible - Blue */}
-        <Card className="overflow-hidden border border-blue-100 shadow-sm rounded-2xl">
-          <div className="bg-gradient-to-r from-blue-400 to-blue-500 p-2.5 sm:p-3 text-center">
-            <p className="text-white text-xs sm:text-sm font-semibold">{isAr ? 'ضئيل' : 'Negligible'}</p>
+        {/* Negligible - Soft Blue Gradient */}
+        <Card className="overflow-hidden border border-sky-200 shadow-sm rounded-2xl bg-gradient-to-b from-sky-50 to-white">
+          <div className="bg-gradient-to-r from-sky-400 to-blue-400 p-2.5 sm:p-3 text-center">
+            <p className="text-white text-xs sm:text-sm font-semibold drop-shadow-sm">{isAr ? 'ضئيل' : 'Negligible'}</p>
           </div>
-          <div className="p-3 sm:p-4 text-center bg-blue-50">
-            <p className="text-3xl sm:text-4xl font-bold text-blue-500">
+          <div className="p-3 sm:p-4 text-center">
+            <p className="text-3xl sm:text-4xl font-bold text-sky-500">
               {stats.ratingBreakdown.Negligible}
             </p>
-            <p className="text-[10px] sm:text-xs text-blue-400 mt-1 font-medium">1-4</p>
+            <p className="text-[10px] sm:text-xs text-sky-400 mt-1 font-medium">1-4</p>
           </div>
         </Card>
       </div>
