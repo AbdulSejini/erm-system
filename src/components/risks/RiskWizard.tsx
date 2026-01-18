@@ -137,6 +137,74 @@ const mockProcesses: Record<string, Array<{ id: string; nameAr: string; nameEn: 
   ],
 };
 
+// العمليات الفرعية حسب العملية
+const mockSubProcesses: Record<string, Array<{ id: string; nameAr: string; nameEn: string; code: string }>> = {
+  'p1': [ // المحاسبة
+    { id: 'sp1', nameAr: 'الحسابات الدائنة', nameEn: 'Accounts Payable', code: 'AP' },
+    { id: 'sp2', nameAr: 'الحسابات المدينة', nameEn: 'Accounts Receivable', code: 'AR' },
+  ],
+  'p2': [ // الخزينة
+    { id: 'sp3', nameAr: 'إدارة النقد', nameEn: 'Cash Management', code: 'CM' },
+    { id: 'sp4', nameAr: 'التحويلات', nameEn: 'Transfers', code: 'TRF' },
+  ],
+  'p3': [ // التقارير المالية
+    { id: 'sp5', nameAr: 'التقارير الشهرية', nameEn: 'Monthly Reports', code: 'MR' },
+    { id: 'sp6', nameAr: 'التقارير السنوية', nameEn: 'Annual Reports', code: 'AR' },
+  ],
+  'p4': [ // الإنتاج
+    { id: 'sp7', nameAr: 'تخطيط الإنتاج', nameEn: 'Production Planning', code: 'PP' },
+    { id: 'sp8', nameAr: 'مراقبة الإنتاج', nameEn: 'Production Control', code: 'PC' },
+  ],
+  'p5': [ // الصيانة
+    { id: 'sp9', nameAr: 'الصيانة الوقائية', nameEn: 'Preventive Maintenance', code: 'PM' },
+    { id: 'sp10', nameAr: 'الصيانة التصحيحية', nameEn: 'Corrective Maintenance', code: 'CM' },
+  ],
+  'p6': [ // الجودة
+    { id: 'sp11', nameAr: 'ضبط الجودة', nameEn: 'Quality Control', code: 'QC' },
+    { id: 'sp12', nameAr: 'ضمان الجودة', nameEn: 'Quality Assurance', code: 'QA' },
+  ],
+  'p7': [ // البنية التحتية
+    { id: 'sp13', nameAr: 'الشبكات', nameEn: 'Networks', code: 'NET' },
+    { id: 'sp14', nameAr: 'الخوادم', nameEn: 'Servers', code: 'SRV' },
+  ],
+  'p8': [ // الأمن السيبراني
+    { id: 'sp15', nameAr: 'أمن المعلومات', nameEn: 'Information Security', code: 'IS' },
+    { id: 'sp16', nameAr: 'إدارة الثغرات', nameEn: 'Vulnerability Management', code: 'VM' },
+  ],
+  'p9': [ // تطوير الأنظمة
+    { id: 'sp17', nameAr: 'تحليل الأعمال', nameEn: 'Business Analysis', code: 'BA' },
+    { id: 'sp18', nameAr: 'البرمجة', nameEn: 'Development', code: 'DEV' },
+  ],
+  'p10': [ // المشتريات
+    { id: 'sp19', nameAr: 'إدارة الموردين', nameEn: 'Supplier Management', code: 'SM' },
+    { id: 'sp20', nameAr: 'إدارة العقود', nameEn: 'Contract Management', code: 'CTM' },
+  ],
+  'p11': [ // المخازن
+    { id: 'sp21', nameAr: 'استلام المواد', nameEn: 'Material Receipt', code: 'MR' },
+    { id: 'sp22', nameAr: 'صرف المواد', nameEn: 'Material Issuance', code: 'MI' },
+  ],
+  'p12': [ // اللوجستيات
+    { id: 'sp23', nameAr: 'النقل', nameEn: 'Transportation', code: 'TRP' },
+    { id: 'sp24', nameAr: 'التوزيع', nameEn: 'Distribution', code: 'DST' },
+  ],
+  'p13': [ // السلامة المهنية
+    { id: 'sp25', nameAr: 'تقييم المخاطر', nameEn: 'Risk Assessment', code: 'RA' },
+    { id: 'sp26', nameAr: 'التحقيقات', nameEn: 'Investigations', code: 'INV' },
+  ],
+  'p14': [ // البيئة
+    { id: 'sp27', nameAr: 'إدارة النفايات', nameEn: 'Waste Management', code: 'WM' },
+    { id: 'sp28', nameAr: 'الامتثال البيئي', nameEn: 'Environmental Compliance', code: 'EC' },
+  ],
+  'p15': [ // التوظيف
+    { id: 'sp29', nameAr: 'الاستقطاب', nameEn: 'Recruitment', code: 'REC' },
+    { id: 'sp30', nameAr: 'المقابلات', nameEn: 'Interviews', code: 'INT' },
+  ],
+  'p16': [ // التدريب
+    { id: 'sp31', nameAr: 'تحديد الاحتياجات', nameEn: 'Needs Assessment', code: 'NA' },
+    { id: 'sp32', nameAr: 'تنفيذ البرامج', nameEn: 'Program Delivery', code: 'PD' },
+  ],
+};
+
 const mockUsers = [
   { id: 'u1', nameAr: 'أحمد محمد', nameEn: 'Ahmed Mohammed' },
   { id: 'u2', nameAr: 'سارة علي', nameEn: 'Sarah Ali' },
@@ -175,6 +243,12 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     if (!formData.departmentId) return [];
     return mockProcesses[formData.departmentId] || [];
   }, [formData.departmentId]);
+
+  // Get sub-processes based on selected process
+  const availableSubProcesses = useMemo(() => {
+    if (!formData.processId) return [];
+    return mockSubProcesses[formData.processId] || [];
+  }, [formData.processId]);
 
   const updateField = useCallback(<K extends keyof RiskFormData>(
     field: K,
@@ -407,7 +481,10 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
               label: isAr ? proc.nameAr : proc.nameEn,
             }))}
             value={formData.processId}
-            onChange={(value) => updateField('processId', value)}
+            onChange={(value) => {
+              updateField('processId', value);
+              updateField('subProcessId', '');
+            }}
             placeholder={isAr ? 'اختر العملية' : 'Select Process'}
             disabled={!formData.departmentId}
           />
@@ -421,7 +498,10 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
         <div>
           <Select
             label={t('risks.subProcess')}
-            options={[]}
+            options={availableSubProcesses.map(subProc => ({
+              value: subProc.id,
+              label: isAr ? subProc.nameAr : subProc.nameEn,
+            }))}
             value={formData.subProcessId}
             onChange={(value) => updateField('subProcessId', value)}
             placeholder={isAr ? 'اختر العملية الفرعية' : 'Select Sub Process'}

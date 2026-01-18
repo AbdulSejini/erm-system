@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -32,8 +33,11 @@ import {
   Building2,
   Shield,
   RefreshCw,
+  MessageSquare,
+  ExternalLink,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { RiskDiscussion } from '@/components/RiskDiscussion';
 import {
   type RiskRating,
   type RiskStatus,
@@ -51,6 +55,20 @@ interface APICategory {
   descriptionEn?: string | null;
   color?: string | null;
   isActive: boolean;
+}
+
+interface APIRiskStatus {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr?: string | null;
+  descriptionEn?: string | null;
+  color?: string | null;
+  icon?: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  order: number;
 }
 import { hrRisks } from '@/data/hrRisks';
 
@@ -103,6 +121,8 @@ const mockRisks = [
     departmentEn: 'Finance',
     processAr: 'المشتريات',
     processEn: 'Procurement',
+    subProcessAr: 'إدارة العقود',
+    subProcessEn: 'Contract Management',
     ownerAr: 'سارة علي',
     ownerEn: 'Sarah Ali',
     championAr: 'أحمد محمد',
@@ -135,6 +155,8 @@ const mockRisks = [
     departmentEn: 'Supply Chain',
     processAr: 'المشتريات',
     processEn: 'Procurement',
+    subProcessAr: 'إدارة الموردين',
+    subProcessEn: 'Supplier Management',
     ownerAr: 'أحمد محمد',
     ownerEn: 'Ahmed Mohammed',
     championAr: 'خالد أحمد',
@@ -315,6 +337,8 @@ interface APIRisk {
   potentialCauseEn: string | null;
   potentialImpactAr: string | null;
   potentialImpactEn: string | null;
+  processText: string | null;
+  subProcessText: string | null;
   identifiedDate: string;
   category?: { id: string; code: string; nameAr: string; nameEn: string } | null;
   department?: { id: string; code: string; nameAr: string; nameEn: string };
@@ -323,6 +347,7 @@ interface APIRisk {
 
 export default function RisksPage() {
   const { t, language } = useTranslation();
+  const router = useRouter();
   const isAr = language === 'ar';
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -340,6 +365,9 @@ export default function RisksPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [categories, setCategories] = useState<APICategory[]>([]);
+  const [riskStatuses, setRiskStatuses] = useState<APIRiskStatus[]>([]);
+  const [viewModalTab, setViewModalTab] = useState<'details' | 'discussion'>('details');
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
 
   // Normalize rating to valid values
   const normalizeRating = (rating: string | null | undefined): RiskRating => {
@@ -375,8 +403,10 @@ export default function RisksPage() {
           status: (risk.status || 'open') as RiskStatus,
           departmentAr: risk.department?.nameAr || 'عام',
           departmentEn: risk.department?.nameEn || 'General',
-          processAr: risk.department?.nameAr || 'عام',
-          processEn: risk.department?.nameEn || 'General',
+          processAr: risk.processText || 'عام',
+          processEn: risk.processText || 'General',
+          subProcessAr: risk.subProcessText || '',
+          subProcessEn: risk.subProcessText || '',
           ownerAr: risk.owner?.fullName || 'غير محدد',
           ownerEn: risk.owner?.fullNameEn || risk.owner?.fullName || 'Not Assigned',
           championAr: risk.owner?.fullName || 'غير محدد',
@@ -425,11 +455,43 @@ export default function RisksPage() {
     }
   }, []);
 
-  // Fetch risks and categories on component mount
+  // Fetch risk statuses from API
+  const fetchRiskStatuses = useCallback(async () => {
+    try {
+      const response = await fetch('/api/risk-statuses');
+      const result = await response.json();
+      if (result.success && result.data.length > 0) {
+        setRiskStatuses(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching risk statuses:', error);
+    }
+  }, []);
+
+  // Fetch risks, categories, and statuses on component mount
   useEffect(() => {
     fetchRisks();
     fetchCategories();
-  }, [fetchRisks, fetchCategories]);
+    fetchRiskStatuses();
+  }, [fetchRisks, fetchCategories, fetchRiskStatuses]);
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.user) {
+            setCurrentUser({ id: data.user.id, role: data.user.role });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   // Handle refresh button click
   const handleRefresh = () => {
@@ -454,14 +516,27 @@ export default function RisksPage() {
     })),
   ], [categories, isAr]);
 
-  const statusOptions = [
-    { value: '', label: isAr ? 'جميع الحالات' : 'All Statuses' },
-    { value: 'open', label: t('risks.statuses.open') },
-    { value: 'inProgress', label: t('risks.statuses.inProgress') },
-    { value: 'mitigated', label: t('risks.statuses.mitigated') },
-    { value: 'closed', label: t('risks.statuses.closed') },
-    { value: 'accepted', label: t('risks.statuses.accepted') },
-  ];
+  // Status options from database, with fallback to default values
+  const statusOptions = useMemo(() => {
+    if (riskStatuses.length > 0) {
+      return [
+        { value: '', label: isAr ? 'جميع الحالات' : 'All Statuses' },
+        ...riskStatuses.filter(s => s.isActive).map(status => ({
+          value: status.code,
+          label: isAr ? status.nameAr : status.nameEn,
+        })),
+      ];
+    }
+    // Fallback to default statuses if API hasn't loaded yet
+    return [
+      { value: '', label: isAr ? 'جميع الحالات' : 'All Statuses' },
+      { value: 'open', label: t('risks.statuses.open') },
+      { value: 'inProgress', label: t('risks.statuses.inProgress') },
+      { value: 'mitigated', label: t('risks.statuses.mitigated') },
+      { value: 'closed', label: t('risks.statuses.closed') },
+      { value: 'accepted', label: t('risks.statuses.accepted') },
+    ];
+  }, [riskStatuses, isAr, t]);
 
   const filteredRisks = useMemo(() => {
     return risks.filter((risk) => {
@@ -504,6 +579,16 @@ export default function RisksPage() {
       case 'open': return 'info';
       default: return 'default';
     }
+  };
+
+  // Get status display name from API or fallback to translation
+  const getStatusDisplayName = (statusCode: string): string => {
+    const statusFromDB = riskStatuses.find(s => s.code === statusCode);
+    if (statusFromDB) {
+      return isAr ? statusFromDB.nameAr : statusFromDB.nameEn;
+    }
+    // Fallback to translation
+    return t(`risks.statuses.${statusCode}`);
   };
 
   const handleSaveRisk = (data: unknown) => {
@@ -847,7 +932,7 @@ export default function RisksPage() {
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
                         <Badge variant={getStatusBadgeVariant(risk.status)} className="text-[9px] sm:text-[10px] md:text-xs px-1.5 sm:px-2">
-                          {t(`risks.statuses.${risk.status}`)}
+                          {getStatusDisplayName(risk.status)}
                         </Badge>
                       </td>
                       <td className="p-2 sm:p-3 md:p-4 text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
@@ -857,6 +942,15 @@ export default function RisksPage() {
                         <div className="flex items-center justify-center gap-0.5 sm:gap-1">
                           <Button variant="ghost" size="icon-sm" title={isAr ? 'عرض' : 'View'} onClick={() => handleViewRisk(risk)} className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8">
                             <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title={isAr ? 'التفاصيل والنقاش' : 'Details & Discussion'}
+                            onClick={() => router.push(`/risks/${risk.id}`)}
+                            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-[var(--primary)]"
+                          >
+                            <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
                           </Button>
                           <Button variant="ghost" size="icon-sm" title={isAr ? 'تعديل' : 'Edit'} onClick={() => handleEditRisk(risk)} className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8">
                             <Edit className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
@@ -909,7 +1003,7 @@ export default function RisksPage() {
                     {risk.riskNumber}
                   </code>
                   <Badge variant={getStatusBadgeVariant(risk.status)}>
-                    {t(`risks.statuses.${risk.status}`)}
+                    {getStatusDisplayName(risk.status)}
                   </Badge>
                 </div>
 
@@ -966,13 +1060,22 @@ export default function RisksPage() {
                     {isAr ? risk.ownerAr : risk.ownerEn}
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleViewRisk(risk)}>
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleViewRisk(risk)} title={isAr ? 'عرض' : 'View'}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleEditRisk(risk)}>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => router.push(`/risks/${risk.id}`)}
+                      title={isAr ? 'التفاصيل والنقاش' : 'Details & Discussion'}
+                      className="text-[var(--primary)]"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleEditRisk(risk)} title={isAr ? 'تعديل' : 'Edit'}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon-sm" className="text-[var(--status-error)]" onClick={() => handleDeleteRisk(risk)}>
+                    <Button variant="ghost" size="icon-sm" className="text-[var(--status-error)]" onClick={() => handleDeleteRisk(risk)} title={isAr ? 'حذف' : 'Delete'}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1010,12 +1113,13 @@ export default function RisksPage() {
         onClose={() => {
           setShowViewModal(false);
           setSelectedRisk(null);
+          setViewModalTab('details');
         }}
         title={isAr ? 'تفاصيل الخطر' : 'Risk Details'}
-        size="lg"
+        size="xl"
       >
         {selectedRisk && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Header Info */}
             <div className="flex items-start justify-between">
               <div>
@@ -1027,20 +1131,50 @@ export default function RisksPage() {
                 </h3>
               </div>
               <Badge variant={getStatusBadgeVariant(selectedRisk.status)}>
-                {t(`risks.statuses.${selectedRisk.status}`)}
+                {getStatusDisplayName(selectedRisk.status)}
               </Badge>
             </div>
 
-            {/* Description */}
-            <div>
-              <h4 className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--foreground-secondary)]">
+            {/* Tabs */}
+            <div className="flex gap-1 border-b border-[var(--border)]">
+              <button
+                onClick={() => setViewModalTab('details')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  viewModalTab === 'details'
+                    ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
+                    : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
                 <FileText className="h-4 w-4" />
-                {isAr ? 'الوصف' : 'Description'}
-              </h4>
-              <p className="text-sm text-[var(--foreground)]">
-                {isAr ? selectedRisk.descriptionAr : selectedRisk.descriptionEn}
-              </p>
+                {isAr ? 'التفاصيل' : 'Details'}
+              </button>
+              <button
+                onClick={() => setViewModalTab('discussion')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  viewModalTab === 'discussion'
+                    ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
+                    : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <MessageSquare className="h-4 w-4" />
+                {isAr ? 'النقاش' : 'Discussion'}
+              </button>
             </div>
+
+            {/* Tab Content */}
+            <div className="max-h-[60vh] overflow-y-auto">
+              {viewModalTab === 'details' ? (
+                <div className="space-y-6">
+                  {/* Description */}
+                  <div>
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--foreground-secondary)]">
+                      <FileText className="h-4 w-4" />
+                      {isAr ? 'الوصف' : 'Description'}
+                    </h4>
+                    <p className="text-sm text-[var(--foreground)]">
+                      {isAr ? selectedRisk.descriptionAr : selectedRisk.descriptionEn}
+                    </p>
+                  </div>
 
             {/* Classification */}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1158,11 +1292,29 @@ export default function RisksPage() {
               </div>
             )}
 
-            {/* Date */}
-            <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
-              <Calendar className="h-4 w-4" />
-              <span>{isAr ? 'تاريخ التحديد:' : 'Identified Date:'}</span>
-              <span className="font-medium">{new Date(selectedRisk.identifiedDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+                  {/* Date */}
+                  <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
+                    <Calendar className="h-4 w-4" />
+                    <span>{isAr ? 'تاريخ التحديد:' : 'Identified Date:'}</span>
+                    <span className="font-medium">{new Date(selectedRisk.identifiedDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+                  </div>
+                </div>
+              ) : (
+                /* Discussion Tab */
+                <div className="py-2">
+                  {currentUser ? (
+                    <RiskDiscussion
+                      riskId={selectedRisk.id}
+                      currentUserId={currentUser.id}
+                      currentUserRole={currentUser.role}
+                    />
+                  ) : (
+                    <div className="text-center py-8 text-[var(--foreground-secondary)]">
+                      {isAr ? 'جاري التحميل...' : 'Loading...'}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

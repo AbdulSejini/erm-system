@@ -374,6 +374,7 @@
     "processes": "Processes",
     "categories": "Categories",
     "sources": "Sources",
+    "riskStatuses": "Risk Statuses",
     "riskOwners": "Risk Owners",
     "assessmentCriteria": "Assessment Criteria",
     "likelihoodCriteria": "Likelihood Criteria",

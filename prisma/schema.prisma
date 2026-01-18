@@ -168,7 +168,8 @@ model Risk {
   iaRef                String?   // مرجع التدقيق الداخلي
 
   // الحالة والمتابعة
-  status               String    @default("open") // open, inProgress, mitigated, closed, accepted
+  status               String    @default("open") // open, inProgress, mitigated, closed, accepted (للتوافقية)
+  statusId             String?   // ربط مع جدول حالات المخاطر
   // حالة الموافقة (يستلزم موافقة الإدارة وإدارة المخاطر)
   approvalStatus       String    @default("Draft") // Approved, Draft, Future, N/A, Sent, Under Discussing
   followUpDate         DateTime?
@@ -193,6 +194,7 @@ model Risk {
   department    Department        @relation(fields: [departmentId], references: [id])
   process       Process?          @relation(fields: [processId], references: [id])
   source        RiskSource?       @relation(fields: [sourceId], references: [id])
+  riskStatus    RiskStatus?       @relation(fields: [statusId], references: [id])
   owner         User              @relation("RiskOwner", fields: [ownerId], references: [id])
   riskOwner     RiskOwner?        @relation("RiskToOwner", fields: [riskOwnerId], references: [id])
   champion      User?             @relation("RiskChampion", fields: [championId], references: [id])
@@ -205,6 +207,7 @@ model Risk {
   @@index([categoryId])
   @@index([departmentId])
   @@index([status])
+  @@index([statusId])
   @@index([approvalStatus])
   @@index([inherentRating])
   @@index([sourceId])
@@ -382,6 +385,26 @@ model RiskSource {
   nameEn        String
   descriptionAr String?
   descriptionEn String?
+  isActive      Boolean   @default(true)
+  order         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // العلاقات
+  risks         Risk[]
+}
+
+// حالات المخاطر (Risk Status)
+model RiskStatus {
+  id            String    @id @default(cuid())
+  code          String    @unique // open, inProgress, closed, mitigated
+  nameAr        String
+  nameEn        String
+  descriptionAr String?
+  descriptionEn String?
+  color         String?   // لون الشارة
+  icon          String?   // أيقونة الحالة
+  isDefault     Boolean   @default(false) // الحالة الافتراضية للمخاطر الجديدة
   isActive      Boolean   @default(true)
   order         Int       @default(0)
   createdAt     DateTime  @default(now())

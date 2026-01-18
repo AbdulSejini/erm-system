@@ -198,7 +198,9 @@ export async function POST(request: NextRequest) {
         residualScore: body.residualLikelihood && body.residualImpact
           ? body.residualLikelihood * body.residualImpact
           : null,
-        residualRating: body.residualRating,
+        residualRating: body.residualLikelihood && body.residualImpact
+          ? calculateRating(body.residualLikelihood * body.residualImpact)
+          : null,
         status: body.status || 'open',
         approvalStatus: body.approvalStatus || 'Draft',
         ownerId: body.ownerId,

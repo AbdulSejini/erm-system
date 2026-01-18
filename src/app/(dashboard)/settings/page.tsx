@@ -47,6 +47,7 @@ const allSettingsTabs = [
   { id: 'departments', icon: Building2 },
   { id: 'categories', icon: Tag },
   { id: 'sources', icon: FileText },
+  { id: 'riskStatuses', icon: Activity },
   { id: 'riskOwners', icon: UserCheck },
   { id: 'notifications', icon: Bell },
   { id: 'dataManagement', icon: Database },
@@ -62,8 +63,8 @@ const allSettingsTabs = [
 // executive: only notifications
 // employee: only notifications
 const roleTabAccess: Record<string, string[]> = {
-  admin: ['users', 'departments', 'categories', 'sources', 'riskOwners', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
-  riskManager: ['users', 'departments', 'categories', 'sources', 'riskOwners', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
+  admin: ['users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
+  riskManager: ['users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
   riskAnalyst: ['notifications'],
   riskChampion: ['notifications'],
   executive: ['notifications'],
@@ -222,6 +223,44 @@ interface APIRiskOwner {
   _count?: { risks: number };
 }
 
+interface APIRiskStatus {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr?: string | null;
+  descriptionEn?: string | null;
+  color?: string | null;
+  icon?: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  order: number;
+  _count?: { risks: number };
+}
+
+// Status color options
+const statusColors = [
+  { value: '#f59e0b', label: 'برتقالي / Orange' },
+  { value: '#3b82f6', label: 'أزرق / Blue' },
+  { value: '#10b981', label: 'أخضر / Green' },
+  { value: '#6b7280', label: 'رمادي / Gray' },
+  { value: '#8b5cf6', label: 'بنفسجي / Purple' },
+  { value: '#ef4444', label: 'أحمر / Red' },
+  { value: '#14b8a6', label: 'أزرق مخضر / Teal' },
+  { value: '#ec4899', label: 'وردي / Pink' },
+];
+
+// Status icon options
+const statusIcons = [
+  { value: 'AlertCircle', label: 'تنبيه / Alert' },
+  { value: 'Clock', label: 'ساعة / Clock' },
+  { value: 'CheckCircle', label: 'تم / Check' },
+  { value: 'XCircle', label: 'إغلاق / Close' },
+  { value: 'Check', label: 'صح / Checkmark' },
+  { value: 'Shield', label: 'درع / Shield' },
+  { value: 'Flag', label: 'علم / Flag' },
+];
+
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { t, language } = useTranslation();
@@ -289,6 +328,7 @@ export default function SettingsPage() {
   const [categories, setCategories] = useState<APICategory[]>([]);
   const [sources, setSources] = useState<APISource[]>([]);
   const [riskOwners, setRiskOwners] = useState<APIRiskOwner[]>([]);
+  const [riskStatuses, setRiskStatuses] = useState<APIRiskStatus[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   // Modal states for sources
@@ -301,6 +341,12 @@ export default function SettingsPage() {
   const [showEditRiskOwnerModal, setShowEditRiskOwnerModal] = useState(false);
   const [showDeleteRiskOwnerModal, setShowDeleteRiskOwnerModal] = useState(false);
 
+  // Modal states for risk statuses
+  const [showAddStatusModal, setShowAddStatusModal] = useState(false);
+  const [showEditStatusModal, setShowEditStatusModal] = useState(false);
+  const [showDeleteStatusModal, setShowDeleteStatusModal] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<APIRiskStatus | null>(null);
+
   // Parsed risks data for import
   const [parsedRisksData, setParsedRisksData] = useState<Array<Record<string, string>>>([]);
   const [isImporting, setIsImporting] = useState(false);
@@ -310,20 +356,22 @@ export default function SettingsPage() {
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [usersRes, deptsRes, catsRes, sourcesRes, ownersRes] = await Promise.all([
+        const [usersRes, deptsRes, catsRes, sourcesRes, ownersRes, statusesRes] = await Promise.all([
           fetch('/api/users'),
           fetch('/api/departments'),
           fetch('/api/categories'),
           fetch('/api/sources'),
           fetch('/api/risk-owners'),
+          fetch('/api/risk-statuses'),
         ]);
 
-        const [usersData, deptsData, catsData, sourcesData, ownersData] = await Promise.all([
+        const [usersData, deptsData, catsData, sourcesData, ownersData, statusesData] = await Promise.all([
           usersRes.json(),
           deptsRes.json(),
           catsRes.json(),
           sourcesRes.json(),
           ownersRes.json(),
+          statusesRes.json(),
         ]);
 
         if (usersData.success) setUsers(usersData.data);
@@ -331,6 +379,7 @@ export default function SettingsPage() {
         if (catsData.success) setCategories(catsData.data);
         if (sourcesData.success) setSources(sourcesData.data);
         if (ownersData.success) setRiskOwners(ownersData.data);
+        if (statusesData.success) setRiskStatuses(statusesData.data);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -419,6 +468,30 @@ export default function SettingsPage() {
     email: '',
     phone: '',
     departmentId: '',
+  });
+
+  // Form states for adding new risk status
+  const [newStatusForm, setNewStatusForm] = useState({
+    code: '',
+    nameAr: '',
+    nameEn: '',
+    descriptionAr: '',
+    descriptionEn: '',
+    color: '#3b82f6',
+    icon: 'AlertCircle',
+    isDefault: false,
+  });
+
+  // Form states for editing risk status
+  const [editStatusForm, setEditStatusForm] = useState({
+    code: '',
+    nameAr: '',
+    nameEn: '',
+    descriptionAr: '',
+    descriptionEn: '',
+    color: '',
+    icon: '',
+    isDefault: false,
   });
 
   // Handle Edit User
@@ -956,6 +1029,115 @@ export default function SettingsPage() {
       } catch (error) {
         console.error('Error deleting source:', error);
         alert(isAr ? 'حدث خطأ أثناء حذف المصدر' : 'An error occurred while deleting source');
+      }
+    }
+  };
+
+  // ======= Risk Status Handlers =======
+  const handleAddStatus = async () => {
+    if (!newStatusForm.nameAr || !newStatusForm.nameEn || !newStatusForm.code) {
+      alert(isAr ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/risk-statuses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStatusForm),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setRiskStatuses(prev => [...prev, result.data]);
+        setShowAddStatusModal(false);
+        setNewStatusForm({
+          code: '',
+          nameAr: '',
+          nameEn: '',
+          descriptionAr: '',
+          descriptionEn: '',
+          color: '#3b82f6',
+          icon: 'AlertCircle',
+          isDefault: false,
+        });
+        alert(isAr ? 'تم إضافة الحالة بنجاح!' : 'Status added successfully!');
+      } else {
+        alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error adding status:', error);
+      alert(isAr ? 'حدث خطأ أثناء إضافة الحالة' : 'An error occurred while adding status');
+    }
+  };
+
+  const handleEditStatus = (status: APIRiskStatus) => {
+    setSelectedStatus(status);
+    setEditStatusForm({
+      code: status.code,
+      nameAr: status.nameAr,
+      nameEn: status.nameEn,
+      descriptionAr: status.descriptionAr || '',
+      descriptionEn: status.descriptionEn || '',
+      color: status.color || '#3b82f6',
+      icon: status.icon || 'AlertCircle',
+      isDefault: status.isDefault,
+    });
+    setShowEditStatusModal(true);
+  };
+
+  const saveEditStatus = async () => {
+    if (selectedStatus) {
+      try {
+        const response = await fetch(`/api/risk-statuses/${selectedStatus.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editStatusForm),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setRiskStatuses(prev => prev.map(s => s.id === selectedStatus.id ? result.data : s));
+          setShowEditStatusModal(false);
+          setSelectedStatus(null);
+          alert(isAr ? 'تم تحديث الحالة بنجاح!' : 'Status updated successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error updating status:', error);
+        alert(isAr ? 'حدث خطأ أثناء تحديث الحالة' : 'An error occurred while updating status');
+      }
+    }
+  };
+
+  const handleDeleteStatus = (status: APIRiskStatus) => {
+    setSelectedStatus(status);
+    setShowDeleteStatusModal(true);
+  };
+
+  const confirmDeleteStatus = async () => {
+    if (selectedStatus) {
+      try {
+        const response = await fetch(`/api/risk-statuses/${selectedStatus.id}`, {
+          method: 'DELETE',
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setRiskStatuses(prev => prev.filter(s => s.id !== selectedStatus.id));
+          setShowDeleteStatusModal(false);
+          setSelectedStatus(null);
+          alert(isAr ? 'تم حذف الحالة بنجاح!' : 'Status deleted successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error deleting status:', error);
+        alert(isAr ? 'حدث خطأ أثناء حذف الحالة' : 'An error occurred while deleting status');
       }
     }
   };
@@ -2258,6 +2440,89 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Risk Statuses Tab */}
+      {activeTab === 'riskStatuses' && canAccessTab('riskStatuses') && (
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex justify-end">
+            <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} className="text-xs sm:text-sm" onClick={() => setShowAddStatusModal(true)}>
+              {isAr ? 'إضافة حالة' : 'Add Status'}
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--border)]">
+                  <th className="p-2 sm:p-3 text-start text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'الحالة' : 'Status'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-start text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'الكود' : 'Code'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-start text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'الوصف' : 'Description'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-center text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'افتراضي' : 'Default'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-center text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'المخاطر' : 'Risks'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-center text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'الإجراءات' : 'Actions'}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {riskStatuses.map((status) => (
+                  <tr key={status.id} className="border-b border-[var(--border)] hover:bg-[var(--background-tertiary)]">
+                    <td className="p-2 sm:p-3">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div
+                          className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full"
+                          style={{ backgroundColor: status.color || '#3b82f6' }}
+                        >
+                          <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                        </div>
+                        <p className="font-medium text-[var(--foreground)] text-xs sm:text-sm">
+                          {isAr ? status.nameAr : status.nameEn}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                      {status.code}
+                    </td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm text-[var(--foreground-secondary)] max-w-[200px] truncate">
+                      {isAr ? status.descriptionAr || '-' : status.descriptionEn || '-'}
+                    </td>
+                    <td className="p-2 sm:p-3 text-center">
+                      {status.isDefault ? (
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 mx-auto" />
+                      ) : (
+                        <span className="text-[var(--foreground-secondary)]">-</span>
+                      )}
+                    </td>
+                    <td className="p-2 sm:p-3 text-center">
+                      <Badge variant="primary" className="text-[10px] sm:text-xs">{status._count?.risks || 0}</Badge>
+                    </td>
+                    <td className="p-2 sm:p-3">
+                      <div className="flex justify-center gap-1">
+                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8" onClick={() => handleEditStatus(status)} title={isAr ? 'تعديل' : 'Edit'}>
+                          <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8 text-[var(--status-error)]" onClick={() => handleDeleteStatus(status)} title={isAr ? 'حذف' : 'Delete'}>
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Risk Owners Tab */}
       {activeTab === 'riskOwners' && canAccessTab('riskOwners') && (
         <div className="space-y-3 sm:space-y-4">
@@ -3028,6 +3293,219 @@ export default function SettingsPage() {
             {t('common.cancel')}
           </Button>
           <Button variant="danger" onClick={confirmDeleteRiskOwner}>
+            <Trash2 className="me-2 h-4 w-4" />
+            {t('common.delete')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Add Risk Status Modal */}
+      <Modal
+        isOpen={showAddStatusModal}
+        onClose={() => setShowAddStatusModal(false)}
+        title={isAr ? 'إضافة حالة جديدة' : 'Add New Status'}
+        size="lg"
+      >
+        <form className="space-y-4">
+          <Input
+            label={isAr ? 'الكود' : 'Code'}
+            value={newStatusForm.code}
+            onChange={(e) => setNewStatusForm(prev => ({ ...prev, code: e.target.value.toLowerCase() }))}
+            placeholder={isAr ? 'مثال: open' : 'e.g., open'}
+            required
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label={isAr ? 'الاسم بالعربي' : 'Name (Arabic)'}
+              value={newStatusForm.nameAr}
+              onChange={(e) => setNewStatusForm(prev => ({ ...prev, nameAr: e.target.value }))}
+              required
+            />
+            <Input
+              label={isAr ? 'الاسم بالإنجليزي' : 'Name (English)'}
+              value={newStatusForm.nameEn}
+              onChange={(e) => setNewStatusForm(prev => ({ ...prev, nameEn: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label={isAr ? 'الوصف بالعربي' : 'Description (Arabic)'}
+              value={newStatusForm.descriptionAr}
+              onChange={(e) => setNewStatusForm(prev => ({ ...prev, descriptionAr: e.target.value }))}
+            />
+            <Input
+              label={isAr ? 'الوصف بالإنجليزي' : 'Description (English)'}
+              value={newStatusForm.descriptionEn}
+              onChange={(e) => setNewStatusForm(prev => ({ ...prev, descriptionEn: e.target.value }))}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select
+              label={isAr ? 'اللون' : 'Color'}
+              options={statusColors.map(c => ({ value: c.value, label: c.label }))}
+              value={newStatusForm.color}
+              onChange={(value) => setNewStatusForm(prev => ({ ...prev, color: value }))}
+            />
+            <Select
+              label={isAr ? 'الأيقونة' : 'Icon'}
+              options={statusIcons.map(i => ({ value: i.value, label: i.label }))}
+              value={newStatusForm.icon}
+              onChange={(value) => setNewStatusForm(prev => ({ ...prev, icon: value }))}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isDefault"
+              checked={newStatusForm.isDefault}
+              onChange={(e) => setNewStatusForm(prev => ({ ...prev, isDefault: e.target.checked }))}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <label htmlFor="isDefault" className="text-sm text-[var(--foreground)]">
+              {isAr ? 'حالة افتراضية للمخاطر الجديدة' : 'Default status for new risks'}
+            </label>
+          </div>
+        </form>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowAddStatusModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleAddStatus}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Risk Status Modal */}
+      <Modal
+        isOpen={showEditStatusModal}
+        onClose={() => { setShowEditStatusModal(false); setSelectedStatus(null); }}
+        title={isAr ? 'تعديل الحالة' : 'Edit Status'}
+        size="lg"
+      >
+        <form className="space-y-4">
+          <Input
+            label={isAr ? 'الكود' : 'Code'}
+            value={editStatusForm.code}
+            onChange={(e) => setEditStatusForm(prev => ({ ...prev, code: e.target.value.toLowerCase() }))}
+            required
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label={isAr ? 'الاسم بالعربي' : 'Name (Arabic)'}
+              value={editStatusForm.nameAr}
+              onChange={(e) => setEditStatusForm(prev => ({ ...prev, nameAr: e.target.value }))}
+              required
+            />
+            <Input
+              label={isAr ? 'الاسم بالإنجليزي' : 'Name (English)'}
+              value={editStatusForm.nameEn}
+              onChange={(e) => setEditStatusForm(prev => ({ ...prev, nameEn: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label={isAr ? 'الوصف بالعربي' : 'Description (Arabic)'}
+              value={editStatusForm.descriptionAr}
+              onChange={(e) => setEditStatusForm(prev => ({ ...prev, descriptionAr: e.target.value }))}
+            />
+            <Input
+              label={isAr ? 'الوصف بالإنجليزي' : 'Description (English)'}
+              value={editStatusForm.descriptionEn}
+              onChange={(e) => setEditStatusForm(prev => ({ ...prev, descriptionEn: e.target.value }))}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select
+              label={isAr ? 'اللون' : 'Color'}
+              options={statusColors.map(c => ({ value: c.value, label: c.label }))}
+              value={editStatusForm.color}
+              onChange={(value) => setEditStatusForm(prev => ({ ...prev, color: value }))}
+            />
+            <Select
+              label={isAr ? 'الأيقونة' : 'Icon'}
+              options={statusIcons.map(i => ({ value: i.value, label: i.label }))}
+              value={editStatusForm.icon}
+              onChange={(value) => setEditStatusForm(prev => ({ ...prev, icon: value }))}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="editIsDefault"
+              checked={editStatusForm.isDefault}
+              onChange={(e) => setEditStatusForm(prev => ({ ...prev, isDefault: e.target.checked }))}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <label htmlFor="editIsDefault" className="text-sm text-[var(--foreground)]">
+              {isAr ? 'حالة افتراضية للمخاطر الجديدة' : 'Default status for new risks'}
+            </label>
+          </div>
+        </form>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowEditStatusModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={saveEditStatus}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Delete Risk Status Modal */}
+      <Modal
+        isOpen={showDeleteStatusModal}
+        onClose={() => { setShowDeleteStatusModal(false); setSelectedStatus(null); }}
+        title={isAr ? 'تأكيد الحذف' : 'Confirm Delete'}
+        size="sm"
+      >
+        {selectedStatus && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+              <Trash2 className="h-6 w-6 text-red-500" />
+              <div>
+                <p className="font-medium text-[var(--foreground)]">
+                  {isAr ? 'هل أنت متأكد من حذف هذه الحالة؟' : 'Are you sure you want to delete this status?'}
+                </p>
+                <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+                  {isAr ? 'لا يمكن التراجع عن هذا الإجراء' : 'This action cannot be undone'}
+                </p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--border)] p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="h-10 w-10 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: selectedStatus.color || '#3b82f6' }}
+                >
+                  <Activity className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-[var(--foreground)]">
+                    {isAr ? selectedStatus.nameAr : selectedStatus.nameEn}
+                  </p>
+                  <p className="text-sm text-[var(--foreground-secondary)]">{selectedStatus.code}</p>
+                </div>
+              </div>
+            </div>
+            {(selectedStatus._count?.risks || 0) > 0 && (
+              <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 p-3">
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  {isAr
+                    ? `تحذير: هذه الحالة مرتبطة بـ ${selectedStatus._count?.risks} خطر`
+                    : `Warning: This status is linked to ${selectedStatus._count?.risks} risks`}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowDeleteStatusModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteStatus}>
             <Trash2 className="me-2 h-4 w-4" />
             {t('common.delete')}
           </Button>
