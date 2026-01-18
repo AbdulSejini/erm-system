@@ -83,6 +83,7 @@ model Department {
   risks          Risk[]
   incidents      Incident[]
   processes      Process[]
+  riskOwners     RiskOwner[]            @relation("RiskOwnerDepartment")
 }
 
 // العمليات (Processes)
@@ -109,7 +110,10 @@ model Process {
 model Risk {
   id                   String    @id @default(cuid())
   riskNumber           String    @unique // مثل FIN-R-001, OPS-R-001
-  issuedBy             String?   // الجهة المصدرة (KPMG, Internal, etc.)
+
+  // الجهة المصدرة
+  sourceId             String?   // ربط بنموذج RiskSource
+  issuedBy             String?   // الجهة المصدرة (للتوافق مع البيانات القديمة)
 
   // المعلومات الأساسية
   titleAr              String
@@ -120,7 +124,11 @@ model Risk {
   // التصنيف
   categoryId           String?   // فئة الخطر (مالي، تشغيلي، إلخ)
   departmentId         String    // الوظيفة/الإدارة
-  processId            String?   // العملية
+  processId            String?   // العملية (للربط مع نموذج Process)
+
+  // العمليات (نص حر كما طلب المستخدم)
+  processText          String?   // العملية - Process (نص)
+  subProcessText       String?   // العملية الفرعية - Sub Process (نص)
 
   // تفاصيل الخطر
   potentialCauseAr     String?   // السبب المحتمل بالعربي
@@ -160,11 +168,14 @@ model Risk {
 
   // الحالة والمتابعة
   status               String    @default("open") // open, inProgress, mitigated, closed, accepted
+  // حالة الموافقة (يستلزم موافقة الإدارة وإدارة المخاطر)
+  approvalStatus       String    @default("Draft") // Approved, Draft, Future, N/A, Sent, Under Discussing
   followUpDate         DateTime?
 
   // المسؤولين
-  ownerId              String    // مالك الخطر
-  championId           String?   // رائد المخاطر
+  ownerId              String    // مالك الخطر (User - للتوافق القديم)
+  riskOwnerId          String?   // مالك الخطر (RiskOwner - الجديد)
+  championId           String?   // رائد المخاطر (يجب أن يكون من المستخدمين بدور riskChampion)
 
   // التواريخ
   identifiedDate       DateTime  @default(now())
@@ -180,7 +191,9 @@ model Risk {
   category      RiskCategory?     @relation(fields: [categoryId], references: [id])
   department    Department        @relation(fields: [departmentId], references: [id])
   process       Process?          @relation(fields: [processId], references: [id])
+  source        RiskSource?       @relation(fields: [sourceId], references: [id])
   owner         User              @relation("RiskOwner", fields: [ownerId], references: [id])
+  riskOwner     RiskOwner?        @relation("RiskToOwner", fields: [riskOwnerId], references: [id])
   champion      User?             @relation("RiskChampion", fields: [championId], references: [id])
   createdBy     User              @relation("RiskCreator", fields: [createdById], references: [id])
   assessments   RiskAssessment[]
@@ -190,7 +203,10 @@ model Risk {
   @@index([categoryId])
   @@index([departmentId])
   @@index([status])
+  @@index([approvalStatus])
   @@index([inherentRating])
+  @@index([sourceId])
+  @@index([riskOwnerId])
 }
 
 // تقييمات المخاطر (سجل التاريخ)
@@ -354,6 +370,40 @@ model RiskCategory {
 
   // العلاقات
   risks         Risk[]
+}
+
+// مصادر المخاطر (الجهة المصدرة)
+model RiskSource {
+  id            String    @id @default(cuid())
+  code          String    @unique // مثل: KPMG, INT, EXT, AUD
+  nameAr        String
+  nameEn        String
+  descriptionAr String?
+  descriptionEn String?
+  isActive      Boolean   @default(true)
+  order         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // العلاقات
+  risks         Risk[]
+}
+
+// ملاك المخاطر (Risk Owners)
+model RiskOwner {
+  id            String    @id @default(cuid())
+  fullName      String
+  fullNameEn    String?
+  email         String?
+  phone         String?
+  departmentId  String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // العلاقات
+  department    Department? @relation("RiskOwnerDepartment", fields: [departmentId], references: [id])
+  risks         Risk[]      @relation("RiskToOwner")
 }
 
 // معايير الاحتمالية

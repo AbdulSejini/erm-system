@@ -373,6 +373,8 @@
     "departments": "Functions",
     "processes": "Processes",
     "categories": "Categories",
+    "sources": "Sources",
+    "riskOwners": "Risk Owners",
     "assessmentCriteria": "Assessment Criteria",
     "likelihoodCriteria": "Likelihood Criteria",
     "impactCriteria": "Impact Criteria",

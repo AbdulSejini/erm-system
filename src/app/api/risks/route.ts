@@ -36,7 +36,26 @@ export async function GET(request: NextRequest) {
       include: {
         category: true,
         department: true,
+        source: true,
+        riskOwner: {
+          include: {
+            department: {
+              select: {
+                id: true,
+                nameAr: true,
+                nameEn: true,
+              },
+            },
+          },
+        },
         owner: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        champion: {
           select: {
             id: true,
             fullName: true,
@@ -87,6 +106,10 @@ export async function POST(request: NextRequest) {
         descriptionEn: body.descriptionEn || '',
         categoryId: body.categoryId || null,
         departmentId: body.departmentId,
+        sourceId: body.sourceId || null,
+        issuedBy: body.issuedBy || null,
+        processText: body.processText || null,
+        subProcessText: body.subProcessText || null,
         inherentLikelihood: body.inherentLikelihood || 3,
         inherentImpact: body.inherentImpact || 3,
         inherentScore: (body.inherentLikelihood || 3) * (body.inherentImpact || 3),
@@ -98,7 +121,10 @@ export async function POST(request: NextRequest) {
           : null,
         residualRating: body.residualRating,
         status: body.status || 'open',
+        approvalStatus: body.approvalStatus || 'Draft',
         ownerId: body.ownerId,
+        riskOwnerId: body.riskOwnerId || null,
+        championId: body.championId || null,
         createdById: body.createdById || body.ownerId,
         mitigationActionsAr: body.mitigationActionsAr,
         mitigationActionsEn: body.mitigationActionsEn,
@@ -108,7 +134,16 @@ export async function POST(request: NextRequest) {
       include: {
         category: true,
         department: true,
+        source: true,
+        riskOwner: true,
         owner: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        champion: {
           select: {
             id: true,
             fullName: true,

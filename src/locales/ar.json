@@ -373,6 +373,8 @@
     "departments": "الوظائف",
     "processes": "العمليات",
     "categories": "التصنيفات",
+    "sources": "المصادر",
+    "riskOwners": "ملاك المخاطر",
     "assessmentCriteria": "معايير التقييم",
     "likelihoodCriteria": "معايير الاحتمالية",
     "impactCriteria": "معايير التأثير",

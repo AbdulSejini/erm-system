@@ -34,6 +34,8 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  FileText,
+  UserCheck,
 } from 'lucide-react';
 import { hrRisks, hrRisksSummary } from '@/data/hrRisks';
 import RiskEditor from '@/components/RiskEditor';
@@ -44,6 +46,8 @@ const allSettingsTabs = [
   { id: 'users', icon: Users },
   { id: 'departments', icon: Building2 },
   { id: 'categories', icon: Tag },
+  { id: 'sources', icon: FileText },
+  { id: 'riskOwners', icon: UserCheck },
   { id: 'notifications', icon: Bell },
   { id: 'dataManagement', icon: Database },
   { id: 'auditLog', icon: Activity },
@@ -58,8 +62,8 @@ const allSettingsTabs = [
 // executive: only notifications
 // employee: only notifications
 const roleTabAccess: Record<string, string[]> = {
-  admin: ['users', 'departments', 'categories', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
-  riskManager: ['users', 'departments', 'categories', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
+  admin: ['users', 'departments', 'categories', 'sources', 'riskOwners', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
+  riskManager: ['users', 'departments', 'categories', 'sources', 'riskOwners', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
   riskAnalyst: ['notifications'],
   riskChampion: ['notifications'],
   executive: ['notifications'],
@@ -190,6 +194,34 @@ interface APIUser {
   accessibleDepartments?: DepartmentAccess[];
 }
 
+interface APISource {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr?: string | null;
+  descriptionEn?: string | null;
+  isActive: boolean;
+  _count?: { risks: number };
+}
+
+interface APIRiskOwner {
+  id: string;
+  fullName: string;
+  fullNameEn?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  departmentId?: string | null;
+  department?: {
+    id: string;
+    code: string;
+    nameAr: string;
+    nameEn: string;
+  } | null;
+  isActive: boolean;
+  _count?: { risks: number };
+}
+
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { t, language } = useTranslation();
@@ -250,10 +282,24 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState<typeof mockUsers[0] | null>(null);
   const [selectedDept, setSelectedDept] = useState<APIDepartment | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<APICategory | null>(null);
+  const [selectedSource, setSelectedSource] = useState<APISource | null>(null);
+  const [selectedRiskOwner, setSelectedRiskOwner] = useState<APIRiskOwner | null>(null);
   const [users, setUsers] = useState<APIUser[]>([]);
   const [departments, setDepartments] = useState<APIDepartment[]>([]);
   const [categories, setCategories] = useState<APICategory[]>([]);
+  const [sources, setSources] = useState<APISource[]>([]);
+  const [riskOwners, setRiskOwners] = useState<APIRiskOwner[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+
+  // Modal states for sources
+  const [showAddSourceModal, setShowAddSourceModal] = useState(false);
+  const [showEditSourceModal, setShowEditSourceModal] = useState(false);
+  const [showDeleteSourceModal, setShowDeleteSourceModal] = useState(false);
+
+  // Modal states for risk owners
+  const [showAddRiskOwnerModal, setShowAddRiskOwnerModal] = useState(false);
+  const [showEditRiskOwnerModal, setShowEditRiskOwnerModal] = useState(false);
+  const [showDeleteRiskOwnerModal, setShowDeleteRiskOwnerModal] = useState(false);
 
   // Parsed risks data for import
   const [parsedRisksData, setParsedRisksData] = useState<Array<Record<string, string>>>([]);
@@ -264,21 +310,27 @@ export default function SettingsPage() {
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [usersRes, deptsRes, catsRes] = await Promise.all([
+        const [usersRes, deptsRes, catsRes, sourcesRes, ownersRes] = await Promise.all([
           fetch('/api/users'),
           fetch('/api/departments'),
           fetch('/api/categories'),
+          fetch('/api/sources'),
+          fetch('/api/risk-owners'),
         ]);
 
-        const [usersData, deptsData, catsData] = await Promise.all([
+        const [usersData, deptsData, catsData, sourcesData, ownersData] = await Promise.all([
           usersRes.json(),
           deptsRes.json(),
           catsRes.json(),
+          sourcesRes.json(),
+          ownersRes.json(),
         ]);
 
         if (usersData.success) setUsers(usersData.data);
         if (deptsData.success) setDepartments(deptsData.data);
         if (catsData.success) setCategories(catsData.data);
+        if (sourcesData.success) setSources(sourcesData.data);
+        if (ownersData.success) setRiskOwners(ownersData.data);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -335,6 +387,38 @@ export default function SettingsPage() {
     nameEn: '',
     code: '',
     color: '',
+  });
+
+  // Form states for adding new source
+  const [newSourceForm, setNewSourceForm] = useState({
+    nameAr: '',
+    nameEn: '',
+    code: '',
+  });
+
+  // Form states for editing source
+  const [editSourceForm, setEditSourceForm] = useState({
+    nameAr: '',
+    nameEn: '',
+    code: '',
+  });
+
+  // Form states for adding new risk owner
+  const [newRiskOwnerForm, setNewRiskOwnerForm] = useState({
+    fullName: '',
+    fullNameEn: '',
+    email: '',
+    phone: '',
+    departmentId: '',
+  });
+
+  // Form states for editing risk owner
+  const [editRiskOwnerForm, setEditRiskOwnerForm] = useState({
+    fullName: '',
+    fullNameEn: '',
+    email: '',
+    phone: '',
+    departmentId: '',
   });
 
   // Handle Edit User
@@ -777,6 +861,198 @@ export default function SettingsPage() {
       } catch (error) {
         console.error('Error deleting category:', error);
         alert(isAr ? 'حدث خطأ أثناء حذف التصنيف' : 'An error occurred while deleting category');
+      }
+    }
+  };
+
+  // ======= Source Handlers =======
+  const handleAddSource = async () => {
+    if (!newSourceForm.nameAr || !newSourceForm.nameEn || !newSourceForm.code) {
+      alert(isAr ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSourceForm),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSources(prev => [...prev, result.data]);
+        setShowAddSourceModal(false);
+        setNewSourceForm({ nameAr: '', nameEn: '', code: '' });
+        alert(isAr ? 'تم إضافة المصدر بنجاح!' : 'Source added successfully!');
+      } else {
+        alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error adding source:', error);
+      alert(isAr ? 'حدث خطأ أثناء إضافة المصدر' : 'An error occurred while adding source');
+    }
+  };
+
+  const handleEditSource = (source: APISource) => {
+    setSelectedSource(source);
+    setEditSourceForm({
+      nameAr: source.nameAr,
+      nameEn: source.nameEn,
+      code: source.code,
+    });
+    setShowEditSourceModal(true);
+  };
+
+  const saveEditSource = async () => {
+    if (selectedSource) {
+      try {
+        const response = await fetch(`/api/sources/${selectedSource.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editSourceForm),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setSources(prev => prev.map(s => s.id === selectedSource.id ? result.data : s));
+          setShowEditSourceModal(false);
+          setSelectedSource(null);
+          alert(isAr ? 'تم تحديث المصدر بنجاح!' : 'Source updated successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error updating source:', error);
+        alert(isAr ? 'حدث خطأ أثناء تحديث المصدر' : 'An error occurred while updating source');
+      }
+    }
+  };
+
+  const handleDeleteSource = (source: APISource) => {
+    setSelectedSource(source);
+    setShowDeleteSourceModal(true);
+  };
+
+  const confirmDeleteSource = async () => {
+    if (selectedSource) {
+      try {
+        const response = await fetch(`/api/sources/${selectedSource.id}`, {
+          method: 'DELETE',
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setSources(prev => prev.filter(s => s.id !== selectedSource.id));
+          setShowDeleteSourceModal(false);
+          setSelectedSource(null);
+          alert(isAr ? 'تم حذف المصدر بنجاح!' : 'Source deleted successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error deleting source:', error);
+        alert(isAr ? 'حدث خطأ أثناء حذف المصدر' : 'An error occurred while deleting source');
+      }
+    }
+  };
+
+  // ======= Risk Owner Handlers =======
+  const handleAddRiskOwner = async () => {
+    if (!newRiskOwnerForm.fullName) {
+      alert(isAr ? 'يرجى إدخال الاسم الكامل' : 'Please enter the full name');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/risk-owners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRiskOwnerForm),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setRiskOwners(prev => [...prev, result.data]);
+        setShowAddRiskOwnerModal(false);
+        setNewRiskOwnerForm({ fullName: '', fullNameEn: '', email: '', phone: '', departmentId: '' });
+        alert(isAr ? 'تم إضافة مالك الخطر بنجاح!' : 'Risk Owner added successfully!');
+      } else {
+        alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error adding risk owner:', error);
+      alert(isAr ? 'حدث خطأ أثناء إضافة مالك الخطر' : 'An error occurred while adding risk owner');
+    }
+  };
+
+  const handleEditRiskOwner = (owner: APIRiskOwner) => {
+    setSelectedRiskOwner(owner);
+    setEditRiskOwnerForm({
+      fullName: owner.fullName,
+      fullNameEn: owner.fullNameEn || '',
+      email: owner.email || '',
+      phone: owner.phone || '',
+      departmentId: owner.departmentId || '',
+    });
+    setShowEditRiskOwnerModal(true);
+  };
+
+  const saveEditRiskOwner = async () => {
+    if (selectedRiskOwner) {
+      try {
+        const response = await fetch(`/api/risk-owners/${selectedRiskOwner.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editRiskOwnerForm),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setRiskOwners(prev => prev.map(o => o.id === selectedRiskOwner.id ? result.data : o));
+          setShowEditRiskOwnerModal(false);
+          setSelectedRiskOwner(null);
+          alert(isAr ? 'تم تحديث مالك الخطر بنجاح!' : 'Risk Owner updated successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error updating risk owner:', error);
+        alert(isAr ? 'حدث خطأ أثناء تحديث مالك الخطر' : 'An error occurred while updating risk owner');
+      }
+    }
+  };
+
+  const handleDeleteRiskOwner = (owner: APIRiskOwner) => {
+    setSelectedRiskOwner(owner);
+    setShowDeleteRiskOwnerModal(true);
+  };
+
+  const confirmDeleteRiskOwner = async () => {
+    if (selectedRiskOwner) {
+      try {
+        const response = await fetch(`/api/risk-owners/${selectedRiskOwner.id}`, {
+          method: 'DELETE',
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setRiskOwners(prev => prev.filter(o => o.id !== selectedRiskOwner.id));
+          setShowDeleteRiskOwnerModal(false);
+          setSelectedRiskOwner(null);
+          alert(isAr ? 'تم حذف مالك الخطر بنجاح!' : 'Risk Owner deleted successfully!');
+        } else {
+          alert(isAr ? `خطأ: ${result.error}` : `Error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error deleting risk owner:', error);
+        alert(isAr ? 'حدث خطأ أثناء حذف مالك الخطر' : 'An error occurred while deleting risk owner');
       }
     }
   };
@@ -1916,6 +2192,128 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Sources Tab */}
+      {activeTab === 'sources' && canAccessTab('sources') && (
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex justify-end">
+            <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} className="text-xs sm:text-sm" onClick={() => setShowAddSourceModal(true)}>
+              {isAr ? 'إضافة مصدر' : 'Add Source'}
+            </Button>
+          </div>
+
+          <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 lg:grid-cols-3">
+            {sources.map((source) => (
+              <Card key={source.id} hover>
+                <CardContent className="p-2 sm:p-3 md:p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="flex h-9 w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 items-center justify-center rounded-lg bg-blue-500 shrink-0">
+                        <FileText className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-[var(--foreground)] text-xs sm:text-sm md:text-base truncate">
+                          {isAr ? source.nameAr : source.nameEn}
+                        </h3>
+                        <p className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">{source.code}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8" onClick={() => handleEditSource(source)} title={isAr ? 'تعديل' : 'Edit'}>
+                        <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8 text-[var(--status-error)]" onClick={() => handleDeleteSource(source)} title={isAr ? 'حذف' : 'Delete'}>
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 sm:mt-4 flex items-center justify-between border-t border-[var(--border)] pt-2 sm:pt-3 md:pt-4">
+                    <span className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                      {isAr ? 'عدد المخاطر' : 'Risks Count'}
+                    </span>
+                    <Badge variant="primary" className="text-[10px] sm:text-xs">{source._count?.risks || 0}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Risk Owners Tab */}
+      {activeTab === 'riskOwners' && canAccessTab('riskOwners') && (
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex justify-end">
+            <Button leftIcon={<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} className="text-xs sm:text-sm" onClick={() => setShowAddRiskOwnerModal(true)}>
+              {isAr ? 'إضافة مالك خطر' : 'Add Risk Owner'}
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--border)]">
+                  <th className="p-2 sm:p-3 text-start text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'الاسم' : 'Name'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-start text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'البريد الإلكتروني' : 'Email'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-start text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'الإدارة' : 'Department'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-start text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'المخاطر' : 'Risks'}
+                  </th>
+                  <th className="p-2 sm:p-3 text-center text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                    {isAr ? 'الإجراءات' : 'Actions'}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {riskOwners.map((owner) => (
+                  <tr key={owner.id} className="border-b border-[var(--border)] hover:bg-[var(--background-tertiary)]">
+                    <td className="p-2 sm:p-3">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] text-white text-xs sm:text-sm font-semibold">
+                          {owner.fullName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-[var(--foreground)] text-xs sm:text-sm">
+                            {isAr ? owner.fullName : (owner.fullNameEn || owner.fullName)}
+                          </p>
+                          {owner.phone && (
+                            <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">{owner.phone}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                      {owner.email || '-'}
+                    </td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                      {owner.department ? (isAr ? owner.department.nameAr : owner.department.nameEn) : '-'}
+                    </td>
+                    <td className="p-2 sm:p-3">
+                      <Badge variant="primary" className="text-[10px] sm:text-xs">{owner._count?.risks || 0}</Badge>
+                    </td>
+                    <td className="p-2 sm:p-3">
+                      <div className="flex justify-center gap-1">
+                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8" onClick={() => handleEditRiskOwner(owner)} title={isAr ? 'تعديل' : 'Edit'}>
+                          <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 sm:h-8 sm:w-8 text-[var(--status-error)]" onClick={() => handleDeleteRiskOwner(owner)} title={isAr ? 'حذف' : 'Delete'}>
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Add User Modal */}
       <Modal
         isOpen={showAddModal}
@@ -2324,6 +2722,293 @@ export default function SettingsPage() {
             {t('common.cancel')}
           </Button>
           <Button variant="danger" onClick={confirmDeleteCategory}>
+            <Trash2 className="me-2 h-4 w-4" />
+            {t('common.delete')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Add Source Modal */}
+      <Modal
+        isOpen={showAddSourceModal}
+        onClose={() => setShowAddSourceModal(false)}
+        title={isAr ? 'إضافة مصدر جديد' : 'Add New Source'}
+        size="md"
+      >
+        <form className="space-y-4">
+          <Input
+            label={isAr ? 'الكود' : 'Code'}
+            value={newSourceForm.code}
+            onChange={(e) => setNewSourceForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+            placeholder={isAr ? 'مثال: KPMG' : 'e.g., KPMG'}
+            required
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label={isAr ? 'الاسم بالعربي' : 'Name (Arabic)'}
+              value={newSourceForm.nameAr}
+              onChange={(e) => setNewSourceForm(prev => ({ ...prev, nameAr: e.target.value }))}
+              required
+            />
+            <Input
+              label={isAr ? 'الاسم بالإنجليزي' : 'Name (English)'}
+              value={newSourceForm.nameEn}
+              onChange={(e) => setNewSourceForm(prev => ({ ...prev, nameEn: e.target.value }))}
+              required
+            />
+          </div>
+        </form>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowAddSourceModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleAddSource}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Source Modal */}
+      <Modal
+        isOpen={showEditSourceModal}
+        onClose={() => { setShowEditSourceModal(false); setSelectedSource(null); }}
+        title={isAr ? 'تعديل المصدر' : 'Edit Source'}
+        size="md"
+      >
+        <form className="space-y-4">
+          <Input
+            label={isAr ? 'الكود' : 'Code'}
+            value={editSourceForm.code}
+            onChange={(e) => setEditSourceForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+            required
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label={isAr ? 'الاسم بالعربي' : 'Name (Arabic)'}
+              value={editSourceForm.nameAr}
+              onChange={(e) => setEditSourceForm(prev => ({ ...prev, nameAr: e.target.value }))}
+              required
+            />
+            <Input
+              label={isAr ? 'الاسم بالإنجليزي' : 'Name (English)'}
+              value={editSourceForm.nameEn}
+              onChange={(e) => setEditSourceForm(prev => ({ ...prev, nameEn: e.target.value }))}
+              required
+            />
+          </div>
+        </form>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowEditSourceModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={saveEditSource}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Delete Source Modal */}
+      <Modal
+        isOpen={showDeleteSourceModal}
+        onClose={() => { setShowDeleteSourceModal(false); setSelectedSource(null); }}
+        title={isAr ? 'تأكيد الحذف' : 'Confirm Delete'}
+        size="sm"
+      >
+        {selectedSource && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg bg-red-50 p-4">
+              <Trash2 className="h-6 w-6 text-red-500" />
+              <div>
+                <p className="font-medium text-[var(--foreground)]">
+                  {isAr ? 'هل أنت متأكد من حذف هذا المصدر؟' : 'Are you sure you want to delete this source?'}
+                </p>
+                <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+                  {isAr ? 'لا يمكن التراجع عن هذا الإجراء' : 'This action cannot be undone'}
+                </p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--border)] p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-[var(--foreground)]">
+                    {isAr ? selectedSource.nameAr : selectedSource.nameEn}
+                  </p>
+                  <p className="text-sm text-[var(--foreground-secondary)]">{selectedSource.code}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowDeleteSourceModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteSource}>
+            <Trash2 className="me-2 h-4 w-4" />
+            {t('common.delete')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Add Risk Owner Modal */}
+      <Modal
+        isOpen={showAddRiskOwnerModal}
+        onClose={() => setShowAddRiskOwnerModal(false)}
+        title={isAr ? 'إضافة مالك خطر جديد' : 'Add New Risk Owner'}
+        size="lg"
+      >
+        <form className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label={isAr ? 'الاسم الكامل (عربي)' : 'Full Name (Arabic)'}
+              value={newRiskOwnerForm.fullName}
+              onChange={(e) => setNewRiskOwnerForm(prev => ({ ...prev, fullName: e.target.value }))}
+              required
+            />
+            <Input
+              label={isAr ? 'الاسم الكامل (إنجليزي)' : 'Full Name (English)'}
+              value={newRiskOwnerForm.fullNameEn}
+              onChange={(e) => setNewRiskOwnerForm(prev => ({ ...prev, fullNameEn: e.target.value }))}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              type="email"
+              label={isAr ? 'البريد الإلكتروني' : 'Email'}
+              value={newRiskOwnerForm.email}
+              onChange={(e) => setNewRiskOwnerForm(prev => ({ ...prev, email: e.target.value }))}
+            />
+            <Input
+              label={isAr ? 'رقم الهاتف' : 'Phone'}
+              value={newRiskOwnerForm.phone}
+              onChange={(e) => setNewRiskOwnerForm(prev => ({ ...prev, phone: e.target.value }))}
+            />
+          </div>
+          <Select
+            label={isAr ? 'الإدارة' : 'Department'}
+            options={[
+              { value: '', label: isAr ? 'بدون إدارة' : 'No Department' },
+              ...departments.map((d) => ({
+                value: d.id,
+                label: isAr ? d.nameAr : d.nameEn,
+              })),
+            ]}
+            value={newRiskOwnerForm.departmentId}
+            onChange={(value) => setNewRiskOwnerForm(prev => ({ ...prev, departmentId: value }))}
+            placeholder={isAr ? 'اختر الإدارة' : 'Select Department'}
+          />
+        </form>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowAddRiskOwnerModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleAddRiskOwner}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Risk Owner Modal */}
+      <Modal
+        isOpen={showEditRiskOwnerModal}
+        onClose={() => { setShowEditRiskOwnerModal(false); setSelectedRiskOwner(null); }}
+        title={isAr ? 'تعديل مالك الخطر' : 'Edit Risk Owner'}
+        size="lg"
+      >
+        <form className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label={isAr ? 'الاسم الكامل (عربي)' : 'Full Name (Arabic)'}
+              value={editRiskOwnerForm.fullName}
+              onChange={(e) => setEditRiskOwnerForm(prev => ({ ...prev, fullName: e.target.value }))}
+              required
+            />
+            <Input
+              label={isAr ? 'الاسم الكامل (إنجليزي)' : 'Full Name (English)'}
+              value={editRiskOwnerForm.fullNameEn}
+              onChange={(e) => setEditRiskOwnerForm(prev => ({ ...prev, fullNameEn: e.target.value }))}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              type="email"
+              label={isAr ? 'البريد الإلكتروني' : 'Email'}
+              value={editRiskOwnerForm.email}
+              onChange={(e) => setEditRiskOwnerForm(prev => ({ ...prev, email: e.target.value }))}
+            />
+            <Input
+              label={isAr ? 'رقم الهاتف' : 'Phone'}
+              value={editRiskOwnerForm.phone}
+              onChange={(e) => setEditRiskOwnerForm(prev => ({ ...prev, phone: e.target.value }))}
+            />
+          </div>
+          <Select
+            label={isAr ? 'الإدارة' : 'Department'}
+            options={[
+              { value: '', label: isAr ? 'بدون إدارة' : 'No Department' },
+              ...departments.map((d) => ({
+                value: d.id,
+                label: isAr ? d.nameAr : d.nameEn,
+              })),
+            ]}
+            value={editRiskOwnerForm.departmentId}
+            onChange={(value) => setEditRiskOwnerForm(prev => ({ ...prev, departmentId: value }))}
+            placeholder={isAr ? 'اختر الإدارة' : 'Select Department'}
+          />
+        </form>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowEditRiskOwnerModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={saveEditRiskOwner}>
+            {t('common.save')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Delete Risk Owner Modal */}
+      <Modal
+        isOpen={showDeleteRiskOwnerModal}
+        onClose={() => { setShowDeleteRiskOwnerModal(false); setSelectedRiskOwner(null); }}
+        title={isAr ? 'تأكيد الحذف' : 'Confirm Delete'}
+        size="sm"
+      >
+        {selectedRiskOwner && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg bg-red-50 p-4">
+              <Trash2 className="h-6 w-6 text-red-500" />
+              <div>
+                <p className="font-medium text-[var(--foreground)]">
+                  {isAr ? 'هل أنت متأكد من حذف مالك الخطر هذا؟' : 'Are you sure you want to delete this risk owner?'}
+                </p>
+                <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+                  {isAr ? 'لا يمكن التراجع عن هذا الإجراء' : 'This action cannot be undone'}
+                </p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--border)] p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] flex items-center justify-center text-white font-semibold">
+                  {selectedRiskOwner.fullName.charAt(0)}
+                </div>
+                <div>
+                  <p className="font-medium text-[var(--foreground)]">
+                    {isAr ? selectedRiskOwner.fullName : (selectedRiskOwner.fullNameEn || selectedRiskOwner.fullName)}
+                  </p>
+                  <p className="text-sm text-[var(--foreground-secondary)]">{selectedRiskOwner.email || '-'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowDeleteRiskOwnerModal(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteRiskOwner}>
             <Trash2 className="me-2 h-4 w-4" />
             {t('common.delete')}
           </Button>
