@@ -253,9 +253,79 @@ export default function DashboardPage() {
     }));
   }, [recentRisks]);
 
+  // Generate alerts based on actual risk data
+  const alertsData = useMemo(() => {
+    const alerts: Array<{
+      type: 'critical' | 'warning' | 'info';
+      titleAr: string;
+      titleEn: string;
+      descAr: string;
+      descEn: string;
+    }> = [];
+
+    // Alert for critical risks
+    const criticalCount = stats.ratingBreakdown.Critical;
+    if (criticalCount > 0) {
+      alerts.push({
+        type: 'critical',
+        titleAr: `${criticalCount} مخاطر حرجة تتطلب اهتمام فوري`,
+        titleEn: `${criticalCount} critical risks require immediate attention`,
+        descAr: 'يوجد مخاطر بتصنيف حرج في السجل',
+        descEn: 'There are risks with critical rating in the register',
+      });
+    }
+
+    // Alert for overdue reviews
+    const overdueRisks = risks.filter(r => {
+      if (!r.nextReviewDate) return false;
+      return new Date(r.nextReviewDate) < new Date();
+    });
+    if (overdueRisks.length > 0) {
+      alerts.push({
+        type: 'warning',
+        titleAr: `${overdueRisks.length} مخاطر تجاوزت موعد المراجعة`,
+        titleEn: `${overdueRisks.length} risks overdue for review`,
+        descAr: 'هناك مخاطر تحتاج مراجعة دورية',
+        descEn: 'Some risks need periodic review',
+      });
+    }
+
+    // Alert for unassigned risks
+    const unassignedRisks = risks.filter(r => !r.owner);
+    if (unassignedRisks.length > 0) {
+      alerts.push({
+        type: 'info',
+        titleAr: `${unassignedRisks.length} مخاطر بدون مالك`,
+        titleEn: `${unassignedRisks.length} risks without owner`,
+        descAr: 'يرجى تعيين مالك لهذه المخاطر',
+        descEn: 'Please assign owners to these risks',
+      });
+    }
+
+    return alerts;
+  }, [risks, stats.ratingBreakdown.Critical]);
+
   // Handle Monthly Report generation
   const handleMonthlyReport = () => {
-    alert(isAr ? 'جاري إنشاء التقرير الشهري...' : 'Generating monthly report...');
+    // Generate CSV report
+    const headers = [
+      'Risk ID', 'Title', 'Category', 'Rating', 'Status', 'Owner'
+    ];
+    const rows = risks.map(r => [
+      r.riskNumber,
+      isAr ? r.titleAr : r.titleEn,
+      r.category ? (isAr ? r.category.nameAr : r.category.nameEn) : '',
+      r.inherentRating,
+      r.status,
+      r.owner?.fullName || ''
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `monthly_risk_report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
   };
 
   // Handle Alerts
@@ -314,18 +384,67 @@ export default function DashboardPage() {
             >
               {isAr ? 'تقرير شهري' : 'Monthly Report'}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Bell className="h-4 w-4" />}
-              onClick={handleAlerts}
-              className="rounded-xl relative"
-            >
-              {isAr ? 'التنبيهات' : 'Alerts'}
-              <span className="absolute -top-2 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--status-error)] text-xs text-white font-bold">
-                3
-              </span>
-            </Button>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Bell className="h-4 w-4" />}
+                onClick={handleAlerts}
+                className="rounded-xl relative"
+              >
+                {isAr ? 'التنبيهات' : 'Alerts'}
+                {alertsData.length > 0 && (
+                  <span className="absolute -top-2 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--status-error)] text-xs text-white font-bold">
+                    {alertsData.length}
+                  </span>
+                )}
+              </Button>
+
+              {/* Alerts Dropdown */}
+              {showAlerts && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowAlerts(false)} />
+                  <div className={`absolute top-full z-50 mt-2 w-80 sm:w-96 rounded-2xl border border-[var(--border)] bg-white shadow-xl ${isAr ? 'left-0' : 'right-0'}`}>
+                    <div className="flex items-center justify-between border-b border-[var(--border)] p-4">
+                      <h3 className="font-semibold text-[var(--foreground)]">
+                        {isAr ? 'التنبيهات' : 'Alerts'}
+                        <span className="ms-2 text-xs font-normal text-[var(--foreground-secondary)]">
+                          ({alertsData.length})
+                        </span>
+                      </h3>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">
+                      {alertsData.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <Bell className="mx-auto h-10 w-10 text-[var(--foreground-muted)]" />
+                          <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
+                            {isAr ? 'لا توجد تنبيهات' : 'No alerts'}
+                          </p>
+                        </div>
+                      ) : (
+                        alertsData.map((alert, index) => (
+                          <div key={index} className="p-3 hover:bg-[var(--background-tertiary)] transition-colors">
+                            <div className="flex items-start gap-3">
+                              <div className={`p-2 rounded-lg ${alert.type === 'critical' ? 'bg-red-100 text-red-600' : alert.type === 'warning' ? 'bg-yellow-100 text-yellow-600' : 'bg-blue-100 text-blue-600'}`}>
+                                {alert.type === 'critical' ? <AlertTriangle className="h-4 w-4" /> : alert.type === 'warning' ? <AlertCircle className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-[var(--foreground)]">
+                                  {isAr ? alert.titleAr : alert.titleEn}
+                                </p>
+                                <p className="text-xs text-[var(--foreground-secondary)] mt-1">
+                                  {isAr ? alert.descAr : alert.descEn}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

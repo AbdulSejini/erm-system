@@ -175,6 +175,24 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     const clientInfo = getClientInfo(request);
 
+    // التحقق من عدم تكرار رقم الخطر
+    if (body.riskNumber) {
+      const existingRisk = await prisma.risk.findUnique({
+        where: { riskNumber: body.riskNumber },
+      });
+      if (existingRisk) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'رقم الخطر موجود مسبقاً',
+            errorEn: 'Risk ID already exists',
+            field: 'riskNumber'
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // إنشاء خطر واحد
     const risk = await prisma.risk.create({
       data: {
@@ -357,37 +375,50 @@ async function handleBulkImport(
       const score = likelihood * impact;
       const rating = String(riskData.Risk_Rating || '') || calculateRating(score);
 
-      const riskPayload = {
-        riskNumber,
-        titleAr: String(riskData.Title_AR || riskData.titleAr || riskNumber),
-        titleEn: String(riskData.Title_EN || riskData.titleEn || riskNumber),
-        descriptionAr: String(riskData.Description_AR || riskData.descriptionAr || ''),
-        descriptionEn: String(riskData.Description_EN || riskData.descriptionEn || ''),
-        categoryId,
-        departmentId,
-        inherentLikelihood: likelihood,
-        inherentImpact: impact,
-        inherentScore: score,
-        inherentRating: rating,
-        status: mapStatus(String(riskData.Status || 'open')),
-        ownerId,
-        createdById: defaultUserId,
-        mitigationActionsAr: String(riskData.Treatment_Plan_AR || ''),
-        mitigationActionsEn: String(riskData.Treatment_Plan_EN || ''),
-        followUpDate: parseDate(riskData.Due_Date),
-        nextReviewDate: parseDate(riskData.Review_Date),
-      };
-
       if (existingRisk) {
         // الخطر موجود
         if (mode === 'addOnly') {
           results.skipped++;
           continue;
         }
-        // تحديث الخطر
+
+        // بناء payload للتحديث - فقط الحقول الموجودة في البيانات المستوردة
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updatePayload: any = {};
+
+        if (riskData.Title_AR || riskData.titleAr) updatePayload.titleAr = String(riskData.Title_AR || riskData.titleAr);
+        if (riskData.Title_EN || riskData.titleEn) updatePayload.titleEn = String(riskData.Title_EN || riskData.titleEn);
+        if (riskData.Description_AR || riskData.descriptionAr) updatePayload.descriptionAr = String(riskData.Description_AR || riskData.descriptionAr);
+        if (riskData.Description_EN || riskData.descriptionEn) updatePayload.descriptionEn = String(riskData.Description_EN || riskData.descriptionEn);
+        if (riskData.Category) updatePayload.categoryId = categoryId;
+        if (riskData.Department) updatePayload.departmentId = departmentId;
+        if (riskData.Likelihood) {
+          updatePayload.inherentLikelihood = likelihood;
+          updatePayload.inherentImpact = impact;
+          updatePayload.inherentScore = score;
+          updatePayload.inherentRating = rating;
+        }
+        if (riskData.Status) updatePayload.status = mapStatus(String(riskData.Status));
+        if (riskData.Potential_Cause_AR) updatePayload.potentialCauseAr = String(riskData.Potential_Cause_AR);
+        if (riskData.Potential_Cause_EN) updatePayload.potentialCauseEn = String(riskData.Potential_Cause_EN);
+        if (riskData.Potential_Impact_AR) updatePayload.potentialImpactAr = String(riskData.Potential_Impact_AR);
+        if (riskData.Potential_Impact_EN) updatePayload.potentialImpactEn = String(riskData.Potential_Impact_EN);
+        if (riskData.Layers_Of_Protection_AR) updatePayload.layersOfProtectionAr = String(riskData.Layers_Of_Protection_AR);
+        if (riskData.Layers_Of_Protection_EN) updatePayload.layersOfProtectionEn = String(riskData.Layers_Of_Protection_EN);
+        if (riskData.KRIs_AR) updatePayload.krisAr = String(riskData.KRIs_AR);
+        if (riskData.KRIs_EN) updatePayload.krisEn = String(riskData.KRIs_EN);
+        if (riskData.Treatment_Plan_AR) updatePayload.mitigationActionsAr = String(riskData.Treatment_Plan_AR);
+        if (riskData.Treatment_Plan_EN) updatePayload.mitigationActionsEn = String(riskData.Treatment_Plan_EN);
+        if (riskData.Due_Date) updatePayload.followUpDate = parseDate(riskData.Due_Date);
+        if (riskData.Review_Date) updatePayload.nextReviewDate = parseDate(riskData.Review_Date);
+        if (riskData.Process) updatePayload.processText = String(riskData.Process);
+        if (riskData.Sub_Process) updatePayload.subProcessText = String(riskData.Sub_Process);
+        if (riskData.Approval_Status) updatePayload.approvalStatus = String(riskData.Approval_Status);
+
+        // تحديث الخطر - فقط الحقول الموجودة في payload
         await prisma.risk.update({
           where: { riskNumber },
-          data: riskPayload,
+          data: updatePayload,
         });
         results.updated++;
       } else {
@@ -396,9 +427,43 @@ async function handleBulkImport(
           results.skipped++;
           continue;
         }
+
+        // payload كامل للإضافة الجديدة
+        const createPayload = {
+          riskNumber,
+          titleAr: String(riskData.Title_AR || riskData.titleAr || riskNumber),
+          titleEn: String(riskData.Title_EN || riskData.titleEn || riskNumber),
+          descriptionAr: String(riskData.Description_AR || riskData.descriptionAr || ''),
+          descriptionEn: String(riskData.Description_EN || riskData.descriptionEn || ''),
+          categoryId,
+          departmentId,
+          inherentLikelihood: likelihood,
+          inherentImpact: impact,
+          inherentScore: score,
+          inherentRating: rating,
+          status: mapStatus(String(riskData.Status || 'open')),
+          ownerId,
+          createdById: defaultUserId,
+          potentialCauseAr: riskData.Potential_Cause_AR ? String(riskData.Potential_Cause_AR) : null,
+          potentialCauseEn: riskData.Potential_Cause_EN ? String(riskData.Potential_Cause_EN) : null,
+          potentialImpactAr: riskData.Potential_Impact_AR ? String(riskData.Potential_Impact_AR) : null,
+          potentialImpactEn: riskData.Potential_Impact_EN ? String(riskData.Potential_Impact_EN) : null,
+          layersOfProtectionAr: riskData.Layers_Of_Protection_AR ? String(riskData.Layers_Of_Protection_AR) : null,
+          layersOfProtectionEn: riskData.Layers_Of_Protection_EN ? String(riskData.Layers_Of_Protection_EN) : null,
+          krisAr: riskData.KRIs_AR ? String(riskData.KRIs_AR) : null,
+          krisEn: riskData.KRIs_EN ? String(riskData.KRIs_EN) : null,
+          mitigationActionsAr: riskData.Treatment_Plan_AR ? String(riskData.Treatment_Plan_AR) : null,
+          mitigationActionsEn: riskData.Treatment_Plan_EN ? String(riskData.Treatment_Plan_EN) : null,
+          followUpDate: parseDate(riskData.Due_Date),
+          nextReviewDate: parseDate(riskData.Review_Date),
+          processText: riskData.Process ? String(riskData.Process) : null,
+          subProcessText: riskData.Sub_Process ? String(riskData.Sub_Process) : null,
+          approvalStatus: riskData.Approval_Status ? String(riskData.Approval_Status) : 'Draft',
+        };
+
         // إضافة الخطر
         await prisma.risk.create({
-          data: riskPayload,
+          data: createPayload,
         });
         results.added++;
       }

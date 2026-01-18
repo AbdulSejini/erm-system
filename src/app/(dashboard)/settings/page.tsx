@@ -1242,8 +1242,25 @@ export default function SettingsPage() {
   // File input ref for CSV/Excel import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Existing risk IDs for duplicate detection (simulated)
-  const existingRiskIds = ['HR-001', 'HR-002', 'FIN-001', 'OPS-001', 'IT-001'];
+  // Existing risk IDs for duplicate detection (fetched from API)
+  const [existingRiskIds, setExistingRiskIds] = useState<string[]>([]);
+
+  // Fetch existing risk IDs when component mounts
+  useEffect(() => {
+    const fetchExistingRiskIds = async () => {
+      try {
+        const response = await fetch('/api/risks?fields=riskNumber');
+        const result = await response.json();
+        if (result.success && result.data) {
+          const ids = result.data.map((r: { riskNumber: string }) => r.riskNumber);
+          setExistingRiskIds(ids);
+        }
+      } catch (error) {
+        console.error('Failed to fetch existing risk IDs:', error);
+      }
+    };
+    fetchExistingRiskIds();
+  }, []);
 
   // Download import template
   const handleDownloadTemplate = () => {
@@ -1375,6 +1392,44 @@ export default function SettingsPage() {
     return result;
   };
 
+  // Parse CSV content handling multiline values inside quotes
+  const parseCSVContent = (content: string): string[] => {
+    const rows: string[] = [];
+    let currentRow = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+
+      if (char === '"') {
+        // Check for escaped quote
+        if (inQuotes && content[i + 1] === '"') {
+          currentRow += '""';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+          currentRow += char;
+        }
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        // End of row (outside quotes)
+        if (char === '\r' && content[i + 1] === '\n') {
+          i++; // Skip \n after \r
+        }
+        if (currentRow.trim()) {
+          rows.push(currentRow);
+        }
+        currentRow = '';
+      } else {
+        currentRow += char;
+      }
+    }
+    // Add last row if exists
+    if (currentRow.trim()) {
+      rows.push(currentRow);
+    }
+    return rows;
+  };
+
   // Handle file selection for import
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1391,7 +1446,7 @@ export default function SettingsPage() {
             content = content.substring(1);
           }
 
-          const lines = content.split('\n').filter(line => line.trim());
+          const lines = parseCSVContent(content);
 
           // Get headers from first row
           const headers = parseCSVRow(lines[0]);

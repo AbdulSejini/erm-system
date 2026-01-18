@@ -331,18 +331,28 @@ interface APIRisk {
   residualRating: string | null;
   status: string;
   issuedBy: string | null;
+  approvalStatus: string | null;
   mitigationActionsAr: string | null;
   mitigationActionsEn: string | null;
   potentialCauseAr: string | null;
   potentialCauseEn: string | null;
   potentialImpactAr: string | null;
   potentialImpactEn: string | null;
+  layersOfProtectionAr: string | null;
+  layersOfProtectionEn: string | null;
+  krisAr: string | null;
+  krisEn: string | null;
   processText: string | null;
   subProcessText: string | null;
+  followUpDate: string | null;
+  nextReviewDate: string | null;
   identifiedDate: string;
   category?: { id: string; code: string; nameAr: string; nameEn: string } | null;
   department?: { id: string; code: string; nameAr: string; nameEn: string };
+  source?: { id: string; code: string; nameAr: string; nameEn: string } | null;
   owner?: { id: string; fullName: string; fullNameEn: string | null };
+  champion?: { id: string; fullName: string; fullNameEn: string | null };
+  riskOwner?: { id: string; fullName: string; fullNameEn: string | null };
 }
 
 export default function RisksPage() {
@@ -354,6 +364,7 @@ export default function RisksPage() {
   const [filterRating, setFilterRating] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('');
   const [showWizard, setShowWizard] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
@@ -538,6 +549,26 @@ export default function RisksPage() {
     ];
   }, [riskStatuses, isAr, t]);
 
+  // Department options for filter
+  const departmentOptions = useMemo(() => {
+    const uniqueDepts = new Map<string, { nameAr: string; nameEn: string }>();
+    risks.forEach(risk => {
+      if (risk.departmentAr && risk.departmentEn) {
+        const key = risk.departmentAr;
+        if (!uniqueDepts.has(key)) {
+          uniqueDepts.set(key, { nameAr: risk.departmentAr, nameEn: risk.departmentEn });
+        }
+      }
+    });
+    return [
+      { value: '', label: isAr ? 'جميع الإدارات' : 'All Departments' },
+      ...Array.from(uniqueDepts.entries()).map(([key, val]) => ({
+        value: key,
+        label: isAr ? val.nameAr : val.nameEn
+      }))
+    ];
+  }, [risks, isAr]);
+
   const filteredRisks = useMemo(() => {
     return risks.filter((risk) => {
       const matchesSearch =
@@ -547,9 +578,10 @@ export default function RisksPage() {
       const matchesRating = !filterRating || risk.inherentRating === filterRating;
       const matchesCategory = !filterCategory || risk.categoryCode === filterCategory;
       const matchesStatus = !filterStatus || risk.status === filterStatus;
-      return matchesSearch && matchesRating && matchesCategory && matchesStatus;
+      const matchesDepartment = !filterDepartment || risk.departmentAr === filterDepartment;
+      return matchesSearch && matchesRating && matchesCategory && matchesStatus && matchesDepartment;
     });
-  }, [risks, searchQuery, filterRating, filterCategory, filterStatus]);
+  }, [risks, searchQuery, filterRating, filterCategory, filterStatus, filterDepartment]);
 
   // Statistics
   const stats = useMemo(() => ({
@@ -624,38 +656,96 @@ export default function RisksPage() {
     }
   };
 
-  // Handle Export
+  // Handle Export - متوافق مع قالب الاستيراد
   const handleExport = () => {
-    // Create CSV content
+    // أعمدة متوافقة مع قالب الاستيراد
     const headers = [
-      'Risk Number',
-      'Title (AR)',
-      'Title (EN)',
-      'Category',
+      'Risk_ID',
+      'Source_Code',
+      'Category_Code',
+      'Department_Code',
+      'Process',
+      'Sub_Process',
+      'Title_AR',
+      'Title_EN',
+      'Description_AR',
+      'Description_EN',
+      'Approval_Status',
+      'Likelihood',
+      'Impact',
+      'Risk_Rating',
       'Status',
-      'Inherent Score',
-      'Inherent Rating',
-      'Residual Score',
-      'Residual Rating',
-      'Owner'
+      'Risk_Owner',
+      'Risk_Champion',
+      'Potential_Cause_AR',
+      'Potential_Cause_EN',
+      'Potential_Impact_AR',
+      'Potential_Impact_EN',
+      'Layers_Of_Protection_AR',
+      'Layers_Of_Protection_EN',
+      'KRIs_AR',
+      'KRIs_EN',
+      'Treatment_Plan_AR',
+      'Treatment_Plan_EN',
+      'Due_Date',
+      'Review_Date',
+      'Comments'
     ];
 
-    const rows = filteredRisks.map(risk => [
-      risk.riskNumber,
-      risk.titleAr,
-      risk.titleEn,
-      risk.categoryCode,
-      risk.status,
-      risk.inherentScore,
-      risk.inherentRating,
-      risk.residualScore || '',
-      risk.residualRating || '',
-      risk.ownerEn
-    ]);
+    // دالة لتنظيف وتهيئة القيمة للـ CSV
+    const escapeCSV = (value: string | number | null | undefined): string => {
+      if (value === null || value === undefined) return '';
+      const str = String(value);
+      // إذا كانت القيمة تحتوي على فاصلة أو علامة اقتباس أو سطر جديد، نحيطها بعلامات اقتباس
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
 
-    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const rows = filteredRisks.map(risk => {
+      // استخراج البيانات من الـ API risk أو mock risk
+      const apiRisk = risk as unknown as APIRisk;
 
-    // Download file
+      return [
+        escapeCSV(risk.riskNumber),
+        escapeCSV(apiRisk.source?.code || risk.issuedBy || ''),
+        escapeCSV(apiRisk.category?.code || risk.categoryCode || ''),
+        escapeCSV(apiRisk.department?.code || ''),
+        escapeCSV(apiRisk.processText || risk.processAr || ''),
+        escapeCSV(apiRisk.subProcessText || risk.subProcessAr || ''),
+        escapeCSV(risk.titleAr),
+        escapeCSV(risk.titleEn),
+        escapeCSV(risk.descriptionAr),
+        escapeCSV(risk.descriptionEn),
+        escapeCSV(apiRisk.approvalStatus || 'Draft'),
+        escapeCSV(risk.inherentLikelihood),
+        escapeCSV(risk.inherentImpact),
+        escapeCSV(risk.inherentRating),
+        escapeCSV(risk.status),
+        escapeCSV(apiRisk.riskOwner?.fullName || apiRisk.owner?.fullName || risk.ownerAr || ''),
+        escapeCSV(apiRisk.champion?.fullName || risk.championAr || ''),
+        escapeCSV(apiRisk.potentialCauseAr || risk.potentialCauseAr || ''),
+        escapeCSV(apiRisk.potentialCauseEn || risk.potentialCauseEn || ''),
+        escapeCSV(apiRisk.potentialImpactAr || risk.potentialImpactAr || ''),
+        escapeCSV(apiRisk.potentialImpactEn || risk.potentialImpactEn || ''),
+        escapeCSV(apiRisk.layersOfProtectionAr || ''),
+        escapeCSV(apiRisk.layersOfProtectionEn || ''),
+        escapeCSV(apiRisk.krisAr || ''),
+        escapeCSV(apiRisk.krisEn || ''),
+        escapeCSV(apiRisk.mitigationActionsAr || ''),
+        escapeCSV(apiRisk.mitigationActionsEn || ''),
+        escapeCSV(apiRisk.followUpDate ? new Date(apiRisk.followUpDate).toISOString().split('T')[0] : ''),
+        escapeCSV(apiRisk.nextReviewDate ? new Date(apiRisk.nextReviewDate).toISOString().split('T')[0] : ''),
+        '' // Comments
+      ];
+    });
+
+    // إضافة BOM للتوافق مع Excel العربي
+    const BOM = '\uFEFF';
+    const csvContent = BOM + [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+
+    // تحميل الملف
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -813,7 +903,7 @@ export default function RisksPage() {
           </div>
 
           {showFilters && (
-            <div className="mt-3 sm:mt-4 grid gap-2 sm:gap-3 md:gap-4 border-t border-[var(--border)] pt-3 sm:pt-4 grid-cols-1 sm:grid-cols-3">
+            <div className="mt-3 sm:mt-4 grid gap-2 sm:gap-3 md:gap-4 border-t border-[var(--border)] pt-3 sm:pt-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               <Select
                 label={t('risks.riskRating')}
                 options={ratingOptions}
@@ -831,6 +921,12 @@ export default function RisksPage() {
                 options={statusOptions}
                 value={filterStatus}
                 onChange={setFilterStatus}
+              />
+              <Select
+                label={isAr ? 'الإدارة' : 'Department'}
+                options={departmentOptions}
+                value={filterDepartment}
+                onChange={setFilterDepartment}
               />
             </div>
           )}
@@ -1344,15 +1440,19 @@ export default function RisksPage() {
       >
         {selectedRisk && (
           <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-            {/* Risk Number */}
+            {/* Risk Number - Read Only */}
             <div>
               <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
                 {isAr ? 'رقم الخطر' : 'Risk Number'}
               </label>
               <Input
                 value={selectedRisk.riskNumber}
-                onChange={(e) => setSelectedRisk({ ...selectedRisk, riskNumber: e.target.value })}
+                disabled
+                className="bg-[var(--background-secondary)] cursor-not-allowed opacity-70"
               />
+              <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+                {isAr ? 'رقم الخطر غير قابل للتعديل' : 'Risk ID cannot be modified'}
+              </p>
             </div>
 
             {/* Title AR/EN */}
