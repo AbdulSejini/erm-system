@@ -1069,22 +1069,30 @@ export default function SettingsPage() {
     const BOM = '\uFEFF';
     const headers = [
       'Risk_ID',
+      'Source_Code',
+      'Category_Code',
+      'Department_Code',
+      'Process',
+      'Sub_Process',
       'Title_AR',
       'Title_EN',
       'Description_AR',
       'Description_EN',
-      'Category_Code',
-      'Department_Code',
+      'Approval_Status',
       'Likelihood',
       'Impact',
       'Risk_Rating',
       'Status',
-      'Owner_AR',
-      'Owner_EN',
+      'Risk_Owner',
+      'Risk_Champion',
       'Potential_Cause_AR',
       'Potential_Cause_EN',
       'Potential_Impact_AR',
       'Potential_Impact_EN',
+      'Layers_Of_Protection_AR',
+      'Layers_Of_Protection_EN',
+      'KRIs_AR',
+      'KRIs_EN',
       'Treatment_Plan_AR',
       'Treatment_Plan_EN',
       'Due_Date',
@@ -1092,29 +1100,40 @@ export default function SettingsPage() {
       'Comments'
     ];
 
-    // Build category and department codes from database
+    // Build codes from database
     const categoryCodes = categories.map(c => c.code).join('/') || 'OPR/FIN/STR/LEG/TEC/REP';
     const departmentCodes = departments.map(d => d.code).join('/') || 'RM/FIN/OPS/IT/SC/HSE';
+    const sourceCodes = sources.map(s => s.code).join('/') || 'KPMG/INT/EXT/AUD';
+    const riskOwnerNames = riskOwners.map(o => o.fullName).slice(0, 3).join('/') || 'اسم المالك';
+    const championNames = users.filter(u => u.role === 'riskChampion').map(u => u.fullName).slice(0, 3).join('/') || 'اسم رائد الخطر';
 
     // Instructions row with dynamic codes
     const instructions = [
-      'رمز فريد (مطلوب)',
+      'رقم الخطر (فريد)',
+      sourceCodes,
+      categoryCodes,
+      departmentCodes,
+      'اسم العملية',
+      'اسم العملية الفرعية',
       'العنوان بالعربي',
       'العنوان بالإنجليزي',
       'الوصف بالعربي',
       'الوصف بالإنجليزي',
-      categoryCodes,
-      departmentCodes,
+      'Approved/Draft/Future/N/A/Sent/Under Discussing',
       '1-5 (1=نادر، 5=شبه مؤكد)',
       '1-5 (1=ضئيل، 5=كارثي)',
       'Critical/Major/Moderate/Minor/Negligible',
       'Open/In Progress/Resolved/Closed',
-      'اسم المسؤول بالعربي',
-      'اسم المسؤول بالإنجليزي',
+      riskOwnerNames,
+      championNames,
       'السبب المحتمل بالعربي',
       'السبب المحتمل بالإنجليزي',
       'التأثير المحتمل بالعربي',
       'التأثير المحتمل بالإنجليزي',
+      'طبقات الحماية بالعربي',
+      'طبقات الحماية بالإنجليزي',
+      'مؤشرات المخاطر بالعربي',
+      'مؤشرات المخاطر بالإنجليزي',
       'خطة المعالجة بالعربي',
       'خطة المعالجة بالإنجليزي',
       'YYYY-MM-DD',
@@ -1124,9 +1143,9 @@ export default function SettingsPage() {
 
     // Example rows
     const examples = [
-      ['HR-001', 'استقالة الموظفين الرئيسيين', 'Key Employee Turnover', 'خطر فقدان الموظفين ذوي الخبرة العالية', 'Risk of losing highly experienced employees', 'OPR', 'RM', '3', '4', 'Major', 'Open', 'أحمد محمد', 'Ahmed Mohammed', 'عدم وجود خطط تطوير وظيفي', 'Lack of career development plans', 'فقدان المعرفة المؤسسية وزيادة تكاليف التوظيف', 'Loss of institutional knowledge and increased hiring costs', 'تطوير خطط الاحتفاظ بالموظفين', 'Develop employee retention plans', '2026-03-31', '2026-02-28', 'يتطلب متابعة شهرية'],
-      ['FIN-002', 'تقلبات أسعار الصرف', 'Currency Exchange Fluctuations', 'التعرض لمخاطر تقلب العملات الأجنبية', 'Exposure to foreign currency volatility', 'FIN', 'FIN', '4', '3', 'Major', 'In Progress', 'سارة علي', 'Sarah Ali', 'تقلبات الأسواق العالمية', 'Global market volatility', 'خسائر مالية في العقود الدولية', 'Financial losses in international contracts', 'التحوط ضد مخاطر العملات', 'Currency hedging strategies', '2026-04-15', '2026-03-15', ''],
-      ['IT-003', 'اختراق أمني', 'Security Breach', 'احتمال حدوث اختراق للأنظمة', 'Potential system security breach', 'TEC', 'IT', '2', '5', 'Major', 'Open', 'خالد أحمد', 'Khalid Ahmed', 'ثغرات في الأنظمة الأمنية', 'Vulnerabilities in security systems', 'تسريب بيانات حساسة وتوقف الأعمال', 'Sensitive data leak and business disruption', 'تعزيز الأمن السيبراني', 'Enhance cybersecurity measures', '2026-02-28', '2026-01-31', 'أولوية قصوى'],
+      ['HR-R-001', 'KPMG', 'OPR', 'HR', 'التوظيف', 'استقطاب الكفاءات', 'استقالة الموظفين الرئيسيين', 'Key Employee Turnover', 'خطر فقدان الموظفين ذوي الخبرة العالية', 'Risk of losing highly experienced employees', 'Approved', '3', '4', 'Major', 'Open', 'أحمد محمد', 'سارة علي', 'عدم وجود خطط تطوير وظيفي', 'Lack of career development plans', 'فقدان المعرفة المؤسسية وزيادة تكاليف التوظيف', 'Loss of institutional knowledge and increased hiring costs', 'برامج التطوير الوظيفي', 'Career development programs', 'معدل دوران الموظفين', 'Employee turnover rate', 'تطوير خطط الاحتفاظ بالموظفين', 'Develop employee retention plans', '2026-03-31', '2026-02-28', 'يتطلب متابعة شهرية'],
+      ['FIN-R-002', 'INT', 'FIN', 'FIN', 'المالية', 'الخزينة', 'تقلبات أسعار الصرف', 'Currency Exchange Fluctuations', 'التعرض لمخاطر تقلب العملات الأجنبية', 'Exposure to foreign currency volatility', 'Draft', '4', '3', 'Major', 'In Progress', 'سارة علي', 'خالد أحمد', 'تقلبات الأسواق العالمية', 'Global market volatility', 'خسائر مالية في العقود الدولية', 'Financial losses in international contracts', 'سياسات التحوط', 'Hedging policies', 'نسبة التعرض للعملات', 'Currency exposure ratio', 'التحوط ضد مخاطر العملات', 'Currency hedging strategies', '2026-04-15', '2026-03-15', ''],
+      ['IT-R-003', 'EXT', 'TEC', 'IT', 'تقنية المعلومات', 'الأمن السيبراني', 'اختراق أمني', 'Security Breach', 'احتمال حدوث اختراق للأنظمة', 'Potential system security breach', 'Sent', '2', '5', 'Major', 'Open', 'خالد أحمد', 'محمد عبدالله', 'ثغرات في الأنظمة الأمنية', 'Vulnerabilities in security systems', 'تسريب بيانات حساسة وتوقف الأعمال', 'Sensitive data leak and business disruption', 'جدران الحماية والتشفير', 'Firewalls and encryption', 'عدد محاولات الاختراق', 'Intrusion attempts count', 'تعزيز الأمن السيبراني', 'Enhance cybersecurity measures', '2026-02-28', '2026-01-31', 'أولوية قصوى'],
     ];
 
     const csvContent = BOM + [
