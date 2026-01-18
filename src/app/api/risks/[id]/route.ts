@@ -16,7 +16,34 @@ export async function GET(
       include: {
         category: true,
         department: true,
+        source: true,
+        process: true,
+        riskOwner: {
+          include: {
+            department: {
+              select: {
+                id: true,
+                nameAr: true,
+                nameEn: true,
+              },
+            },
+          },
+        },
         owner: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        champion: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        createdBy: {
           select: {
             id: true,
             fullName: true,

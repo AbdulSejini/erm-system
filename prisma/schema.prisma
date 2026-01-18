@@ -42,6 +42,7 @@ model User {
   reportedIncidents     Incident[]             @relation("IncidentReporter")
   notifications         Notification[]
   auditLogs             AuditLog[]
+  riskComments          RiskComment[]          @relation("CommentAuthor")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -199,6 +200,7 @@ model Risk {
   assessments   RiskAssessment[]
   treatments    TreatmentPlan[]
   incidents     Incident[]
+  comments      RiskComment[]     // المحادثات والتعليقات على الخطر
 
   @@index([categoryId])
   @@index([departmentId])
@@ -452,4 +454,28 @@ model RiskRatingCriteria {
   actionRequiredEn String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// تعليقات ومحادثات المخاطر
+model RiskComment {
+  id          String    @id @default(cuid())
+  riskId      String
+  authorId    String
+  content     String    // محتوى التعليق
+  type        String    @default("comment") // comment, question, reply, statusUpdate, approval
+  parentId    String?   // للرد على تعليق آخر
+  isInternal  Boolean   @default(false) // تعليق داخلي لإدارة المخاطر فقط
+  attachments String?   // روابط المرفقات (JSON)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // العلاقات
+  risk        Risk          @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  author      User          @relation("CommentAuthor", fields: [authorId], references: [id])
+  parent      RiskComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     RiskComment[] @relation("CommentReplies")
+
+  @@index([riskId])
+  @@index([authorId])
+  @@index([parentId])
 }

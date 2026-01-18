@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { createAuditLog, getClientInfo } from '@/lib/audit';
 
-// GET - الحصول على جميع المخاطر
+// GET - الحصول على جميع المخاطر مع فلترة الصلاحيات
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -11,24 +11,103 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('categoryId');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const filterByAccess = searchParams.get('filterByAccess') !== 'false'; // افتراضياً يتم الفلترة
 
-    const where: Record<string, unknown> = {};
+    // الحصول على الجلسة للتحقق من صلاحيات المستخدم
+    const session = await auth();
+
+    // بناء شروط البحث الأساسية
+    const baseWhere: Record<string, unknown> = {};
 
     if (departmentId) {
-      where.departmentId = departmentId;
+      baseWhere.departmentId = departmentId;
     }
     if (categoryId) {
-      where.categoryId = categoryId;
+      baseWhere.categoryId = categoryId;
     }
     if (status) {
-      where.status = status;
+      baseWhere.status = status;
     }
     if (search) {
-      where.OR = [
+      baseWhere.OR = [
         { titleAr: { contains: search } },
         { titleEn: { contains: search } },
         { riskNumber: { contains: search } },
       ];
+    }
+
+    // تطبيق فلترة الصلاحيات حسب دور المستخدم
+    let where = baseWhere;
+
+    if (filterByAccess && session?.user?.id) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: {
+          accessibleDepartments: {
+            select: { departmentId: true },
+          },
+        },
+      });
+
+      if (user) {
+        // المسؤول ومدير المخاطر ومحلل المخاطر والتنفيذي يرون كل المخاطر
+        if (!['admin', 'riskManager', 'riskAnalyst', 'executive'].includes(user.role)) {
+          // بناء قائمة الإدارات المسموح بها
+          const allowedDepartmentIds = [
+            user.departmentId, // الإدارة الأساسية للمستخدم
+            ...user.accessibleDepartments.map(a => a.departmentId), // الإدارات الإضافية
+          ].filter(Boolean) as string[];
+
+          // إذا كان المستخدم مالك خطر (employee) - يرى فقط المخاطر التي هو مالكها
+          if (user.role === 'employee') {
+            where = {
+              ...baseWhere,
+              OR: [
+                { ownerId: user.id }, // مالك الخطر (User)
+                { championId: user.id }, // رائد الخطر
+              ],
+            };
+
+            // التحقق من وجود RiskOwner مرتبط بهذا المستخدم عبر البريد
+            const riskOwner = await prisma.riskOwner.findFirst({
+              where: { email: user.email },
+            });
+
+            if (riskOwner) {
+              where = {
+                ...baseWhere,
+                OR: [
+                  { ownerId: user.id },
+                  { championId: user.id },
+                  { riskOwnerId: riskOwner.id },
+                ],
+              };
+            }
+          }
+          // إذا كان رائد مخاطر - يرى مخاطر إداراته فقط
+          else if (user.role === 'riskChampion') {
+            if (allowedDepartmentIds.length > 0) {
+              where = {
+                ...baseWhere,
+                OR: [
+                  { departmentId: { in: allowedDepartmentIds } }, // مخاطر الإدارات المسموح بها
+                  { championId: user.id }, // أو المخاطر التي هو رائدها
+                  { ownerId: user.id }, // أو المخاطر التي هو مالكها
+                ],
+              };
+            } else {
+              // إذا لم يكن لديه إدارات، يرى فقط المخاطر المرتبطة به مباشرة
+              where = {
+                ...baseWhere,
+                OR: [
+                  { championId: user.id },
+                  { ownerId: user.id },
+                ],
+              };
+            }
+          }
+        }
+      }
     }
 
     const risks = await prisma.risk.findMany({
