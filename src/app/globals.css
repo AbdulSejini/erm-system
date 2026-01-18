@@ -48,11 +48,13 @@
   --status-error: #DC2626;
   --status-info: #3B82F6;
 
-  /* Sidebar */
-  --sidebar-bg: #2E2D2C;
-  --sidebar-text: #E5E7EB;
-  --sidebar-active: #F39200;
-  --sidebar-hover: #3D3C3B;
+  /* Sidebar - Light Gray Theme */
+  --sidebar-bg: #F8F9FA;
+  --sidebar-text: #4B5563;
+  --sidebar-text-active: #F39200;
+  --sidebar-active: #FEF3E2;
+  --sidebar-hover: #F3F4F6;
+  --sidebar-border: #E5E7EB;
 }
 
 /* Dark Mode */
@@ -79,7 +81,13 @@
   --risk-low-bg: #052E16;
   --risk-negligible-bg: #1E3A5A;
 
-  --sidebar-bg: #1A1A1A;
+  /* Sidebar - Dark Mode */
+  --sidebar-bg: #1F2937;
+  --sidebar-text: #9CA3AF;
+  --sidebar-text-active: #F39200;
+  --sidebar-active: #3D2E1A;
+  --sidebar-hover: #374151;
+  --sidebar-border: #374151;
 }
 
 @theme inline {

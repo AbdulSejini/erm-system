@@ -161,6 +161,7 @@
     },
     "ratings": {
       "Critical": "حرج",
+      "Catastrophic": "كارثي",
       "Major": "كبير",
       "Moderate": "متوسط",
       "Minor": "طفيف",
@@ -380,8 +381,50 @@
     "dataManagement": "إدارة البيانات",
     "importData": "استيراد البيانات",
     "exportData": "تصدير البيانات",
-    "auditLog": "سجل التدقيق",
-    "riskAppetite": "شهية المخاطر"
+    "auditLog": "سجل النشاط",
+    "riskAppetite": "شهية المخاطر",
+    "riskEditor": "محرر المخاطر"
+  },
+  "auditLog": {
+    "title": "سجل النشاط",
+    "description": "تتبع جميع العمليات والتغييرات في النظام",
+    "user": "المستخدم",
+    "action": "العملية",
+    "entity": "الكيان",
+    "details": "التفاصيل",
+    "ipAddress": "عنوان IP",
+    "timestamp": "الوقت",
+    "filterByAction": "فلترة حسب العملية",
+    "filterByEntity": "فلترة حسب الكيان",
+    "filterByUser": "فلترة حسب المستخدم",
+    "filterByDate": "فلترة حسب التاريخ",
+    "noLogs": "لا توجد سجلات",
+    "loadMore": "تحميل المزيد",
+    "exportLogs": "تصدير السجلات",
+    "oldValue": "القيمة السابقة",
+    "newValue": "القيمة الجديدة",
+    "allActions": "جميع العمليات",
+    "allEntities": "جميع الكيانات",
+    "actions": {
+      "create": "إنشاء",
+      "update": "تحديث",
+      "delete": "حذف",
+      "login": "تسجيل دخول",
+      "logout": "تسجيل خروج",
+      "export": "تصدير",
+      "import": "استيراد",
+      "view": "عرض"
+    },
+    "entities": {
+      "risk": "خطر",
+      "treatment": "معالجة",
+      "incident": "حادثة",
+      "user": "مستخدم",
+      "department": "إدارة",
+      "category": "فئة",
+      "settings": "إعدادات",
+      "session": "جلسة"
+    }
   },
   "users": {
     "title": "إدارة المستخدمين",

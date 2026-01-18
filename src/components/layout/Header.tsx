@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { useTranslation, useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
@@ -22,6 +24,8 @@ interface HeaderProps {
 }
 
 export function Header({ onMobileMenuClick }: HeaderProps) {
+  const { data: session } = useSession();
+  const router = useRouter();
   const { t, isRTL } = useTranslation();
   const { language, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
@@ -36,10 +40,18 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
-  // Mock user data
+  const handleSignOut = async () => {
+    await signOut({ redirect: false });
+    router.push('/login');
+  };
+
+  // User data from session
   const user = {
-    name: language === 'ar' ? 'عبدالإله سجيني' : 'Abdulelah Sejini',
-    role: language === 'ar' ? 'مدير المخاطر' : 'Risk Manager',
+    name: session?.user?.name || (language === 'ar' ? 'مستخدم' : 'User'),
+    role: session?.user?.role === 'admin'
+      ? (language === 'ar' ? 'مدير النظام' : 'Administrator')
+      : (language === 'ar' ? 'مستخدم' : 'User'),
+    email: session?.user?.email || '',
     avatar: null,
   };
 
@@ -191,7 +203,10 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                   </button>
                 </div>
                 <div className="border-t border-[var(--border)] py-1">
-                  <button className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[var(--status-error)] transition-colors hover:bg-[var(--background-secondary)]">
+                  <button
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[var(--status-error)] transition-colors hover:bg-[var(--background-secondary)]"
+                  >
                     <LogOut className="h-4 w-4" />
                     {t('auth.logout')}
                   </button>

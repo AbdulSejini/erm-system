@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,7 @@ import {
   Info,
   HelpCircle,
   Calculator,
+  Loader2,
 } from 'lucide-react';
 import {
   type RiskRating,
@@ -30,100 +31,71 @@ import {
   DEFAULT_RISK_RATING_CRITERIA,
 } from '@/types';
 
-// Mock data with new rating system
-const mockAssessments = [
-  {
-    id: '1',
-    riskNumber: 'FIN-R-001',
-    titleAr: 'خطر تقلبات أسعار النحاس',
-    titleEn: 'Copper Price Fluctuation Risk',
-    categoryCode: 'FIN',
-    departmentAr: 'المالية',
-    departmentEn: 'Finance',
-    inherent: { likelihood: 5, impact: 5, score: 25, rating: 'Critical' as RiskRating },
-    residual: { likelihood: 4, impact: 4, score: 16, rating: 'Major' as RiskRating },
-    assessedDate: '2026-01-14',
-    assessedByAr: 'سارة علي',
-    assessedByEn: 'Sarah Ali',
-    lastReviewDate: '2026-01-14',
-    nextReviewDate: '2026-04-14',
-  },
-  {
-    id: '2',
-    riskNumber: 'OPS-R-001',
-    titleAr: 'خطر تأخر توريد المواد الخام',
-    titleEn: 'Raw Material Supply Delay Risk',
-    categoryCode: 'OPS',
-    departmentAr: 'سلسلة التوريد',
-    departmentEn: 'Supply Chain',
-    inherent: { likelihood: 4, impact: 4, score: 16, rating: 'Major' as RiskRating },
-    residual: { likelihood: 3, impact: 3, score: 9, rating: 'Moderate' as RiskRating },
-    assessedDate: '2026-01-15',
-    assessedByAr: 'أحمد محمد',
-    assessedByEn: 'Ahmed Mohammed',
-    lastReviewDate: '2026-01-15',
-    nextReviewDate: '2026-04-15',
-  },
-  {
-    id: '3',
-    riskNumber: 'OPS-R-002',
-    titleAr: 'خطر انقطاع الكهرباء',
-    titleEn: 'Power Outage Risk',
-    categoryCode: 'OPS',
-    departmentAr: 'العمليات',
-    departmentEn: 'Operations',
-    inherent: { likelihood: 3, impact: 4, score: 12, rating: 'Moderate' as RiskRating },
-    residual: { likelihood: 2, impact: 3, score: 6, rating: 'Minor' as RiskRating },
-    assessedDate: '2026-01-13',
-    assessedByAr: 'خالد أحمد',
-    assessedByEn: 'Khalid Ahmed',
-    lastReviewDate: '2026-01-13',
-    nextReviewDate: '2026-04-13',
-  },
-  {
-    id: '4',
-    riskNumber: 'TECH-R-001',
-    titleAr: 'خطر الأمن السيبراني',
-    titleEn: 'Cybersecurity Risk',
-    categoryCode: 'TECH',
-    departmentAr: 'تقنية المعلومات',
-    departmentEn: 'IT',
-    inherent: { likelihood: 4, impact: 5, score: 20, rating: 'Critical' as RiskRating },
-    residual: { likelihood: 3, impact: 4, score: 12, rating: 'Moderate' as RiskRating },
-    assessedDate: '2026-01-10',
-    assessedByAr: 'محمد عبدالله',
-    assessedByEn: 'Mohammed Abdullah',
-    lastReviewDate: '2026-01-10',
-    nextReviewDate: '2026-04-10',
-  },
-  {
-    id: '5',
-    riskNumber: 'COMP-R-001',
-    titleAr: 'خطر الامتثال البيئي',
-    titleEn: 'Environmental Compliance Risk',
-    categoryCode: 'COMP',
-    departmentAr: 'السلامة والبيئة',
-    departmentEn: 'HSE',
-    inherent: { likelihood: 2, impact: 3, score: 6, rating: 'Minor' as RiskRating },
-    residual: { likelihood: 2, impact: 2, score: 4, rating: 'Negligible' as RiskRating },
-    assessedDate: '2026-01-12',
-    assessedByAr: 'فاطمة حسن',
-    assessedByEn: 'Fatima Hassan',
-    lastReviewDate: '2026-01-12',
-    nextReviewDate: '2026-04-12',
-  },
-];
+// Interface for API Risk data
+interface APIRisk {
+  id: string;
+  riskNumber: string;
+  titleAr: string;
+  titleEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  inherentLikelihood: number;
+  inherentImpact: number;
+  inherentScore: number;
+  inherentRating: string;
+  residualLikelihood: number | null;
+  residualImpact: number | null;
+  residualScore: number | null;
+  residualRating: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  nextReviewDate: string | null;
+  category?: {
+    id: string;
+    code: string;
+    nameAr: string;
+    nameEn: string;
+  } | null;
+  department?: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+  };
+  owner?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+  };
+}
 
-// Matrix data for visualization
-const mockMatrixData = [
-  { likelihood: 5, impact: 5, count: 1 },
-  { likelihood: 4, impact: 5, count: 1 },
-  { likelihood: 4, impact: 4, count: 1 },
-  { likelihood: 3, impact: 4, count: 1 },
-  { likelihood: 3, impact: 3, count: 1 },
-  { likelihood: 2, impact: 3, count: 1 },
-  { likelihood: 2, impact: 2, count: 1 },
-];
+// Assessment data structure
+interface Assessment {
+  id: string;
+  riskNumber: string;
+  titleAr: string;
+  titleEn: string;
+  categoryCode: string;
+  departmentAr: string;
+  departmentEn: string;
+  inherent: { likelihood: number; impact: number; score: number; rating: RiskRating };
+  residual: { likelihood: number; impact: number; score: number; rating: RiskRating };
+  assessedDate: string;
+  assessedByAr: string;
+  assessedByEn: string;
+  lastReviewDate: string;
+  nextReviewDate: string;
+}
+
+// Normalize rating function
+const normalizeRating = (rating: string | null | undefined): RiskRating => {
+  if (!rating) return 'Moderate';
+  if (rating === 'Catastrophic') return 'Critical';
+  if (['Critical', 'Major', 'Moderate', 'Minor', 'Negligible'].includes(rating)) {
+    return rating as RiskRating;
+  }
+  return 'Moderate';
+};
 
 export default function AssessmentPage() {
   const { t, language } = useTranslation();
@@ -133,27 +105,100 @@ export default function AssessmentPage() {
   const [showCriteriaPanel, setShowCriteriaPanel] = useState(false);
   const [selectedCriteriaTab, setSelectedCriteriaTab] = useState<'likelihood' | 'impact' | 'rating'>('likelihood');
 
+  // State for API data
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch risks from API
+  useEffect(() => {
+    const fetchRisks = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/risks');
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          // Transform API data to Assessment format
+          const transformedData: Assessment[] = result.data.map((risk: APIRisk) => ({
+            id: risk.id,
+            riskNumber: risk.riskNumber,
+            titleAr: risk.titleAr,
+            titleEn: risk.titleEn,
+            categoryCode: risk.category?.code || 'GEN',
+            departmentAr: risk.department?.nameAr || 'عام',
+            departmentEn: risk.department?.nameEn || 'General',
+            inherent: {
+              likelihood: risk.inherentLikelihood || 3,
+              impact: risk.inherentImpact || 3,
+              score: risk.inherentScore || 9,
+              rating: normalizeRating(risk.inherentRating),
+            },
+            residual: {
+              likelihood: risk.residualLikelihood || risk.inherentLikelihood || 3,
+              impact: risk.residualImpact || risk.inherentImpact || 3,
+              score: risk.residualScore || risk.inherentScore || 9,
+              rating: normalizeRating(risk.residualRating || risk.inherentRating),
+            },
+            assessedDate: risk.updatedAt ? new Date(risk.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            assessedByAr: risk.owner?.fullName || 'النظام',
+            assessedByEn: risk.owner?.fullNameEn || risk.owner?.fullName || 'System',
+            lastReviewDate: risk.updatedAt ? new Date(risk.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            nextReviewDate: risk.nextReviewDate
+              ? new Date(risk.nextReviewDate).toISOString().split('T')[0]
+              : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          }));
+
+          setAssessments(transformedData);
+        }
+      } catch (err) {
+        console.error('Error fetching risks:', err);
+        setError(isAr ? 'فشل في تحميل البيانات' : 'Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRisks();
+  }, [isAr]);
+
   // Filter assessments
   const filteredAssessments = useMemo(() => {
-    return mockAssessments.filter((a) =>
+    return assessments.filter((a) =>
       a.riskNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.titleAr.includes(searchQuery) ||
       a.titleEn.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [searchQuery, assessments]);
 
   // Statistics
   const stats = useMemo(() => ({
-    total: mockAssessments.length,
-    critical: mockAssessments.filter(a => a.inherent.rating === 'Critical').length,
-    major: mockAssessments.filter(a => a.inherent.rating === 'Major').length,
-    moderate: mockAssessments.filter(a => a.inherent.rating === 'Moderate').length,
-    minor: mockAssessments.filter(a => a.inherent.rating === 'Minor').length,
-    negligible: mockAssessments.filter(a => a.inherent.rating === 'Negligible').length,
-    avgReduction: Math.round(
-      mockAssessments.reduce((acc, a) => acc + (a.inherent.score - a.residual.score), 0) / mockAssessments.length
-    ),
-  }), []);
+    total: assessments.length,
+    critical: assessments.filter(a => a.inherent.rating === 'Critical').length,
+    major: assessments.filter(a => a.inherent.rating === 'Major').length,
+    moderate: assessments.filter(a => a.inherent.rating === 'Moderate').length,
+    minor: assessments.filter(a => a.inherent.rating === 'Minor').length,
+    negligible: assessments.filter(a => a.inherent.rating === 'Negligible').length,
+    avgReduction: assessments.length > 0
+      ? Math.round(assessments.reduce((acc, a) => acc + (a.inherent.score - a.residual.score), 0) / assessments.length)
+      : 0,
+  }), [assessments]);
+
+  // Generate matrix data from assessments
+  const matrixData = useMemo(() => {
+    const dataMap = new Map<string, number>();
+
+    assessments.forEach(a => {
+      const data = selectedType === 'inherent' ? a.inherent : a.residual;
+      const key = `${data.likelihood}-${data.impact}`;
+      dataMap.set(key, (dataMap.get(key) || 0) + 1);
+    });
+
+    return Array.from(dataMap.entries()).map(([key, count]) => {
+      const [likelihood, impact] = key.split('-').map(Number);
+      return { likelihood, impact, count };
+    });
+  }, [assessments, selectedType]);
 
   const getTrendIcon = (inherentScore: number, residualScore: number) => {
     const diff = inherentScore - residualScore;
@@ -184,6 +229,35 @@ export default function AssessmentPage() {
       default: return 'bg-gray-500';
     }
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+          <p className="text-sm text-[var(--foreground-secondary)]">
+            {isAr ? 'جاري تحميل البيانات...' : 'Loading data...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <AlertTriangle className="h-12 w-12 text-[var(--status-error)]" />
+          <p className="text-lg font-medium text-[var(--foreground)]">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            {isAr ? 'إعادة المحاولة' : 'Try Again'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -486,7 +560,7 @@ export default function AssessmentPage() {
           </CardHeader>
           <CardContent>
             <div className="flex justify-center py-2 sm:py-4">
-              <RiskMatrix data={mockMatrixData} size="lg" />
+              <RiskMatrix data={matrixData} size="lg" />
             </div>
             <div className="mt-2 sm:mt-4 flex flex-wrap items-center justify-center gap-2 sm:gap-4 md:gap-6 text-[10px] sm:text-xs">
               <div className="flex items-center gap-1">

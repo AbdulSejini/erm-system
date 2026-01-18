@@ -26,8 +26,12 @@ import {
   CheckCircle,
   AlertCircle,
   X,
+  Table2,
+  Activity,
 } from 'lucide-react';
 import { hrRisks, hrRisksSummary } from '@/data/hrRisks';
+import RiskEditor from '@/components/RiskEditor';
+import AuditLogTab from '@/components/AuditLogTab';
 
 const settingsTabs = [
   { id: 'users', icon: Users },
@@ -35,6 +39,8 @@ const settingsTabs = [
   { id: 'categories', icon: Tag },
   { id: 'notifications', icon: Bell },
   { id: 'dataManagement', icon: Database },
+  { id: 'auditLog', icon: Activity },
+  { id: 'riskEditor', icon: Table2 },
 ];
 
 const mockUsers = [
@@ -141,6 +147,10 @@ export default function SettingsPage() {
   const [users, setUsers] = useState(mockUsers);
   const [departments, setDepartments] = useState(mockDepartments);
   const [categories, setCategories] = useState(mockCategories);
+
+  // Parsed risks data for import
+  const [parsedRisksData, setParsedRisksData] = useState<Array<Record<string, string>>>([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Form states for editing
   const [editUserForm, setEditUserForm] = useState({
@@ -390,6 +400,10 @@ export default function SettingsPage() {
       'Status',
       'Owner_AR',
       'Owner_EN',
+      'Potential_Cause_AR',
+      'Potential_Cause_EN',
+      'Potential_Impact_AR',
+      'Potential_Impact_EN',
       'Treatment_Plan_AR',
       'Treatment_Plan_EN',
       'Due_Date',
@@ -412,6 +426,10 @@ export default function SettingsPage() {
       'Open/In Progress/Resolved/Closed',
       'اسم المسؤول بالعربي',
       'اسم المسؤول بالإنجليزي',
+      'السبب المحتمل بالعربي',
+      'السبب المحتمل بالإنجليزي',
+      'التأثير المحتمل بالعربي',
+      'التأثير المحتمل بالإنجليزي',
       'خطة المعالجة بالعربي',
       'خطة المعالجة بالإنجليزي',
       'YYYY-MM-DD',
@@ -421,9 +439,9 @@ export default function SettingsPage() {
 
     // Example rows
     const examples = [
-      ['HR-001', 'استقالة الموظفين الرئيسيين', 'Key Employee Turnover', 'خطر فقدان الموظفين ذوي الخبرة العالية', 'Risk of losing highly experienced employees', 'OPR', 'RM', '3', '4', 'Major', 'Open', 'أحمد محمد', 'Ahmed Mohammed', 'تطوير خطط الاحتفاظ بالموظفين', 'Develop employee retention plans', '2026-03-31', '2026-02-28', 'يتطلب متابعة شهرية'],
-      ['FIN-002', 'تقلبات أسعار الصرف', 'Currency Exchange Fluctuations', 'التعرض لمخاطر تقلب العملات الأجنبية', 'Exposure to foreign currency volatility', 'FIN', 'FIN', '4', '3', 'Major', 'In Progress', 'سارة علي', 'Sarah Ali', 'التحوط ضد مخاطر العملات', 'Currency hedging strategies', '2026-04-15', '2026-03-15', ''],
-      ['IT-003', 'اختراق أمني', 'Security Breach', 'احتمال حدوث اختراق للأنظمة', 'Potential system security breach', 'TEC', 'IT', '2', '5', 'Major', 'Open', 'خالد أحمد', 'Khalid Ahmed', 'تعزيز الأمن السيبراني', 'Enhance cybersecurity measures', '2026-02-28', '2026-01-31', 'أولوية قصوى'],
+      ['HR-001', 'استقالة الموظفين الرئيسيين', 'Key Employee Turnover', 'خطر فقدان الموظفين ذوي الخبرة العالية', 'Risk of losing highly experienced employees', 'OPR', 'RM', '3', '4', 'Major', 'Open', 'أحمد محمد', 'Ahmed Mohammed', 'عدم وجود خطط تطوير وظيفي', 'Lack of career development plans', 'فقدان المعرفة المؤسسية وزيادة تكاليف التوظيف', 'Loss of institutional knowledge and increased hiring costs', 'تطوير خطط الاحتفاظ بالموظفين', 'Develop employee retention plans', '2026-03-31', '2026-02-28', 'يتطلب متابعة شهرية'],
+      ['FIN-002', 'تقلبات أسعار الصرف', 'Currency Exchange Fluctuations', 'التعرض لمخاطر تقلب العملات الأجنبية', 'Exposure to foreign currency volatility', 'FIN', 'FIN', '4', '3', 'Major', 'In Progress', 'سارة علي', 'Sarah Ali', 'تقلبات الأسواق العالمية', 'Global market volatility', 'خسائر مالية في العقود الدولية', 'Financial losses in international contracts', 'التحوط ضد مخاطر العملات', 'Currency hedging strategies', '2026-04-15', '2026-03-15', ''],
+      ['IT-003', 'اختراق أمني', 'Security Breach', 'احتمال حدوث اختراق للأنظمة', 'Potential system security breach', 'TEC', 'IT', '2', '5', 'Major', 'Open', 'خالد أحمد', 'Khalid Ahmed', 'ثغرات في الأنظمة الأمنية', 'Vulnerabilities in security systems', 'تسريب بيانات حساسة وتوقف الأعمال', 'Sensitive data leak and business disruption', 'تعزيز الأمن السيبراني', 'Enhance cybersecurity measures', '2026-02-28', '2026-01-31', 'أولوية قصوى'],
     ];
 
     const csvContent = BOM + [
@@ -444,6 +462,33 @@ export default function SettingsPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Parse CSV row properly handling quoted values
+  const parseCSVRow = (row: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < row.length; i++) {
+      const char = row[i];
+
+      if (char === '"') {
+        if (inQuotes && row[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
   // Handle file selection for import
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -452,16 +497,23 @@ export default function SettingsPage() {
       const fileExtension = fileName.split('.').pop()?.toLowerCase();
 
       if (fileExtension === 'csv' || fileExtension === 'xlsx' || fileExtension === 'xls') {
-        // Simulate parsing and processing the file
         const reader = new FileReader();
         reader.onload = (e) => {
-          const content = e.target?.result as string;
-          // Simulate parsing CSV - in real app, use a CSV parser library
+          let content = e.target?.result as string;
+          // Remove BOM if present
+          if (content.charCodeAt(0) === 0xFEFF) {
+            content = content.substring(1);
+          }
+
           const lines = content.split('\n').filter(line => line.trim());
 
-          // Skip header and instruction rows
+          // Get headers from first row
+          const headers = parseCSVRow(lines[0]);
+
+          // Skip header and instruction rows (lines 0, 1, 2)
           const dataRows = lines.slice(3);
 
+          const parsedData: Array<Record<string, string>> = [];
           const results = {
             added: [] as string[],
             updated: [] as string[],
@@ -470,14 +522,23 @@ export default function SettingsPage() {
           };
 
           dataRows.forEach((row, index) => {
-            // Simple CSV parsing (in real app, use proper parser)
-            const cells = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-            const riskId = cells[0]?.replace(/"/g, '').trim();
+            if (!row.trim()) return;
+
+            const cells = parseCSVRow(row);
+            const riskId = cells[0]?.trim();
 
             if (!riskId) {
               results.errors.push({ riskId: `Row ${index + 4}`, error: isAr ? 'رمز الخطر مفقود' : 'Missing Risk ID' });
               return;
             }
+
+            // Create risk object from parsed data
+            const riskData: Record<string, string> = {};
+            headers.forEach((header, i) => {
+              riskData[header] = cells[i] || '';
+            });
+
+            parsedData.push(riskData);
 
             const isExisting = existingRiskIds.includes(riskId);
 
@@ -496,9 +557,10 @@ export default function SettingsPage() {
             }
           });
 
+          setParsedRisksData(parsedData);
           setImportResults(results);
           setImportStats({
-            total: dataRows.length,
+            total: dataRows.filter(r => r.trim()).length,
             added: results.added.length,
             updated: results.updated.length,
             skipped: results.skipped.length,
@@ -506,7 +568,7 @@ export default function SettingsPage() {
           });
           setShowImportResultModal(true);
         };
-        reader.readAsText(file);
+        reader.readAsText(file, 'UTF-8');
       } else {
         alert(isAr
           ? 'صيغة الملف غير مدعومة. يرجى استخدام CSV أو Excel.'
@@ -522,12 +584,50 @@ export default function SettingsPage() {
     fileInputRef.current?.click();
   };
 
-  // Confirm import
-  const confirmImport = () => {
-    // In real app, this would save to database
-    setImportedRisks(prev => [...prev, ...hrRisks.slice(0, importStats.added)]);
-    setShowImportSuccess(true);
-    setShowImportResultModal(false);
+  // Confirm import - send to API
+  const confirmImport = async () => {
+    if (parsedRisksData.length === 0) {
+      alert(isAr ? 'لا توجد بيانات للاستيراد' : 'No data to import');
+      return;
+    }
+
+    setIsImporting(true);
+
+    try {
+      const response = await fetch('/api/risks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bulkImport: true,
+          risks: parsedRisksData,
+          mode: importMode,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setImportStats({
+          total: parsedRisksData.length,
+          added: result.results.added,
+          updated: result.results.updated,
+          skipped: result.results.skipped,
+          errors: result.results.errors.length,
+        });
+        setShowImportSuccess(true);
+        setShowImportResultModal(false);
+        setParsedRisksData([]);
+      } else {
+        alert(isAr ? `فشل الاستيراد: ${result.error}` : `Import failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      alert(isAr ? 'حدث خطأ أثناء الاستيراد' : 'An error occurred during import');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   // Handle export risk register
@@ -1174,6 +1274,22 @@ export default function SettingsPage() {
       {activeTab === 'departments' && renderDepartmentsTab()}
       {activeTab === 'notifications' && renderNotificationsTab()}
       {activeTab === 'dataManagement' && renderDataManagementTab()}
+      {activeTab === 'auditLog' && <AuditLogTab />}
+      {activeTab === 'riskEditor' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--foreground)]">
+                {isAr ? 'محرر المخاطر' : 'Risk Editor'}
+              </h2>
+              <p className="text-sm text-[var(--foreground-secondary)]">
+                {isAr ? 'تعديل وإدارة جميع المخاطر في جدول شبيه بالإكسل' : 'Edit and manage all risks in an Excel-like table'}
+              </p>
+            </div>
+          </div>
+          <RiskEditor />
+        </div>
+      )}
       {activeTab === 'categories' && (
         <div className="space-y-3 sm:space-y-4">
           <div className="flex justify-end">
@@ -1742,12 +1858,21 @@ export default function SettingsPage() {
         </div>
 
         <ModalFooter>
-          <Button variant="outline" onClick={() => setShowImportResultModal(false)}>
+          <Button variant="outline" onClick={() => setShowImportResultModal(false)} disabled={isImporting}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={confirmImport} disabled={importStats.added === 0 && importStats.updated === 0}>
-            <CheckCircle className="me-2 h-4 w-4" />
-            {isAr ? 'تأكيد الاستيراد' : 'Confirm Import'}
+          <Button onClick={confirmImport} disabled={isImporting || (importStats.added === 0 && importStats.updated === 0)}>
+            {isImporting ? (
+              <>
+                <span className="me-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                {isAr ? 'جاري الاستيراد...' : 'Importing...'}
+              </>
+            ) : (
+              <>
+                <CheckCircle className="me-2 h-4 w-4" />
+                {isAr ? 'تأكيد الاستيراد' : 'Confirm Import'}
+              </>
+            )}
           </Button>
         </ModalFooter>
       </Modal>

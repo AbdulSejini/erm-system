@@ -161,6 +161,7 @@
     },
     "ratings": {
       "Critical": "Critical",
+      "Catastrophic": "Catastrophic",
       "Major": "Major",
       "Moderate": "Moderate",
       "Minor": "Minor",
@@ -380,8 +381,50 @@
     "dataManagement": "Data Management",
     "importData": "Import Data",
     "exportData": "Export Data",
-    "auditLog": "Audit Log",
-    "riskAppetite": "Risk Appetite"
+    "auditLog": "Activity Log",
+    "riskAppetite": "Risk Appetite",
+    "riskEditor": "Risk Editor"
+  },
+  "auditLog": {
+    "title": "Activity Log",
+    "description": "Track all operations and changes in the system",
+    "user": "User",
+    "action": "Action",
+    "entity": "Entity",
+    "details": "Details",
+    "ipAddress": "IP Address",
+    "timestamp": "Timestamp",
+    "filterByAction": "Filter by Action",
+    "filterByEntity": "Filter by Entity",
+    "filterByUser": "Filter by User",
+    "filterByDate": "Filter by Date",
+    "noLogs": "No logs found",
+    "loadMore": "Load More",
+    "exportLogs": "Export Logs",
+    "oldValue": "Old Value",
+    "newValue": "New Value",
+    "allActions": "All Actions",
+    "allEntities": "All Entities",
+    "actions": {
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "login": "Login",
+      "logout": "Logout",
+      "export": "Export",
+      "import": "Import",
+      "view": "View"
+    },
+    "entities": {
+      "risk": "Risk",
+      "treatment": "Treatment",
+      "incident": "Incident",
+      "user": "User",
+      "department": "Department",
+      "category": "Category",
+      "settings": "Settings",
+      "session": "Session"
+    }
   },
   "users": {
     "title": "User Management",

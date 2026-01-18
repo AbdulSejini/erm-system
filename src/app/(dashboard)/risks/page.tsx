@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -31,6 +31,7 @@ import {
   Calendar,
   Building2,
   Shield,
+  RefreshCw,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import {
@@ -70,6 +71,10 @@ const convertedHRRisks = hrRisks.map((hr) => ({
   residualScore: hr.residualScore || hr.inherentScore,
   residualRating: hr.residualRating || hr.inherentRating,
   issuedBy: 'Risk Register',
+  potentialCauseAr: '',
+  potentialCauseEn: '',
+  potentialImpactAr: '',
+  potentialImpactEn: '',
 }));
 
 // Mock data matching actual risk register structure
@@ -101,6 +106,10 @@ const mockRisks = [
     residualScore: 16,
     residualRating: 'Major' as RiskRating,
     issuedBy: 'KPMG',
+    potentialCauseAr: 'تغيرات في أسعار السوق العالمية للنحاس',
+    potentialCauseEn: 'Changes in global copper market prices',
+    potentialImpactAr: 'انخفاض هوامش الربح وزيادة تكاليف الإنتاج',
+    potentialImpactEn: 'Reduced profit margins and increased production costs',
   },
   {
     id: '2',
@@ -129,6 +138,10 @@ const mockRisks = [
     residualScore: 9,
     residualRating: 'Moderate' as RiskRating,
     issuedBy: 'Internal',
+    potentialCauseAr: '',
+    potentialCauseEn: '',
+    potentialImpactAr: '',
+    potentialImpactEn: '',
   },
   {
     id: '3',
@@ -157,6 +170,10 @@ const mockRisks = [
     residualScore: 6,
     residualRating: 'Minor' as RiskRating,
     issuedBy: 'Internal',
+    potentialCauseAr: '',
+    potentialCauseEn: '',
+    potentialImpactAr: '',
+    potentialImpactEn: '',
   },
   {
     id: '4',
@@ -185,6 +202,10 @@ const mockRisks = [
     residualScore: 12,
     residualRating: 'Moderate' as RiskRating,
     issuedBy: 'KPMG',
+    potentialCauseAr: '',
+    potentialCauseEn: '',
+    potentialImpactAr: '',
+    potentialImpactEn: '',
   },
   {
     id: '5',
@@ -213,6 +234,10 @@ const mockRisks = [
     residualScore: 4,
     residualRating: 'Negligible' as RiskRating,
     issuedBy: 'Internal',
+    potentialCauseAr: '',
+    potentialCauseEn: '',
+    potentialImpactAr: '',
+    potentialImpactEn: '',
   },
   {
     id: '6',
@@ -241,13 +266,49 @@ const mockRisks = [
     residualScore: 4,
     residualRating: 'Negligible' as RiskRating,
     issuedBy: 'Internal',
+    potentialCauseAr: '',
+    potentialCauseEn: '',
+    potentialImpactAr: '',
+    potentialImpactEn: '',
   },
   // Include converted HR risks
   ...convertedHRRisks,
 ];
 
-// Combined all risks
+// Combined all risks (fallback data)
 const allRisks = mockRisks;
+
+// Risk type for API response
+interface APIRisk {
+  id: string;
+  riskNumber: string;
+  titleAr: string;
+  titleEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  categoryId: string | null;
+  departmentId: string;
+  inherentLikelihood: number;
+  inherentImpact: number;
+  inherentScore: number;
+  inherentRating: RiskRating;
+  residualLikelihood: number | null;
+  residualImpact: number | null;
+  residualScore: number | null;
+  residualRating: string | null;
+  status: string;
+  issuedBy: string | null;
+  mitigationActionsAr: string | null;
+  mitigationActionsEn: string | null;
+  potentialCauseAr: string | null;
+  potentialCauseEn: string | null;
+  potentialImpactAr: string | null;
+  potentialImpactEn: string | null;
+  identifiedDate: string;
+  category?: { id: string; code: string; nameAr: string; nameEn: string } | null;
+  department?: { id: string; code: string; nameAr: string; nameEn: string };
+  owner?: { id: string; fullName: string; fullNameEn: string | null };
+}
 
 export default function RisksPage() {
   const { t, language } = useTranslation();
@@ -265,6 +326,89 @@ export default function RisksPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [risks, setRisks] = useState(allRisks);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Normalize rating to valid values
+  const normalizeRating = (rating: string | null | undefined): RiskRating => {
+    if (!rating) return 'Moderate';
+    // Map Catastrophic to Critical for consistency
+    if (rating === 'Catastrophic') return 'Critical';
+    if (['Critical', 'Major', 'Moderate', 'Minor', 'Negligible'].includes(rating)) {
+      return rating as RiskRating;
+    }
+    return 'Moderate';
+  };
+
+  // Fetch risks from API
+  const fetchRisks = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) {
+      setIsRefreshing(true);
+    }
+
+    try {
+      const response = await fetch('/api/risks');
+      const result = await response.json();
+
+      if (result.success && result.data.length > 0) {
+        // Transform API data to match the existing structure
+        const transformedRisks = result.data.map((risk: APIRisk) => ({
+          id: risk.id,
+          riskNumber: risk.riskNumber,
+          titleAr: risk.titleAr,
+          titleEn: risk.titleEn,
+          descriptionAr: risk.descriptionAr,
+          descriptionEn: risk.descriptionEn,
+          categoryCode: risk.category?.code || 'OPS',
+          status: (risk.status || 'open') as RiskStatus,
+          departmentAr: risk.department?.nameAr || 'عام',
+          departmentEn: risk.department?.nameEn || 'General',
+          processAr: risk.department?.nameAr || 'عام',
+          processEn: risk.department?.nameEn || 'General',
+          ownerAr: risk.owner?.fullName || 'غير محدد',
+          ownerEn: risk.owner?.fullNameEn || risk.owner?.fullName || 'Not Assigned',
+          championAr: risk.owner?.fullName || 'غير محدد',
+          championEn: risk.owner?.fullNameEn || risk.owner?.fullName || 'Not Assigned',
+          identifiedDate: risk.identifiedDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+          inherentLikelihood: risk.inherentLikelihood || 3,
+          inherentImpact: risk.inherentImpact || 3,
+          inherentScore: risk.inherentScore || 9,
+          inherentRating: normalizeRating(risk.inherentRating),
+          residualLikelihood: risk.residualLikelihood || risk.inherentLikelihood || 3,
+          residualImpact: risk.residualImpact || risk.inherentImpact || 3,
+          residualScore: risk.residualScore || risk.inherentScore || 9,
+          residualRating: normalizeRating(risk.residualRating || risk.inherentRating),
+          issuedBy: risk.issuedBy || 'Internal',
+          potentialCauseAr: risk.potentialCauseAr || '',
+          potentialCauseEn: risk.potentialCauseEn || '',
+          potentialImpactAr: risk.potentialImpactAr || '',
+          potentialImpactEn: risk.potentialImpactEn || '',
+        }));
+
+        setRisks(transformedRisks);
+      } else {
+        // Use fallback data if API returns empty
+        setRisks(allRisks);
+      }
+    } catch (error) {
+      console.error('Error fetching risks:', error);
+      // Use fallback data on error
+      setRisks(allRisks);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // Fetch risks on component mount
+  useEffect(() => {
+    fetchRisks();
+  }, [fetchRisks]);
+
+  // Handle refresh button click
+  const handleRefresh = () => {
+    fetchRisks(true);
+  };
 
   // Rating options based on new rating system
   const ratingOptions = [
@@ -427,6 +571,15 @@ export default function RisksPage() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''}`} />}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <span className="text-xs sm:text-sm">{isAr ? 'تحديث' : 'Refresh'}</span>
+          </Button>
           <Button variant="outline" size="sm" leftIcon={<Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} onClick={handleExport}>
             <span className="text-xs sm:text-sm">{t('common.export')}</span>
           </Button>
@@ -574,7 +727,19 @@ export default function RisksPage() {
       </Card>
 
       {/* Risks Display */}
-      {viewMode === 'table' ? (
+      {isLoading ? (
+        /* Loading State */
+        <Card>
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <RefreshCw className="h-8 w-8 animate-spin text-[var(--primary)]" />
+              <p className="text-sm text-[var(--foreground-secondary)]">
+                {isAr ? 'جاري تحميل المخاطر...' : 'Loading risks...'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : viewMode === 'table' ? (
         /* Table View */
         <Card>
           <CardContent className="p-0">
@@ -941,6 +1106,32 @@ export default function RisksPage() {
               </div>
             </div>
 
+            {/* Potential Cause & Impact */}
+            {(selectedRisk.potentialCauseAr || selectedRisk.potentialCauseEn || selectedRisk.potentialImpactAr || selectedRisk.potentialImpactEn) && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {(selectedRisk.potentialCauseAr || selectedRisk.potentialCauseEn) && (
+                  <div className="rounded-lg bg-[var(--background-secondary)] p-4">
+                    <h4 className="mb-2 text-sm font-medium text-[var(--foreground-secondary)]">
+                      {t('risks.potentialCause')}
+                    </h4>
+                    <p className="text-sm text-[var(--foreground)]">
+                      {isAr ? (selectedRisk.potentialCauseAr || selectedRisk.potentialCauseEn) : (selectedRisk.potentialCauseEn || selectedRisk.potentialCauseAr)}
+                    </p>
+                  </div>
+                )}
+                {(selectedRisk.potentialImpactAr || selectedRisk.potentialImpactEn) && (
+                  <div className="rounded-lg bg-[var(--background-secondary)] p-4">
+                    <h4 className="mb-2 text-sm font-medium text-[var(--foreground-secondary)]">
+                      {t('risks.potentialImpact')}
+                    </h4>
+                    <p className="text-sm text-[var(--foreground)]">
+                      {isAr ? (selectedRisk.potentialImpactAr || selectedRisk.potentialImpactEn) : (selectedRisk.potentialImpactEn || selectedRisk.potentialImpactAr)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Date */}
             <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
               <Calendar className="h-4 w-4" />
@@ -971,43 +1162,275 @@ export default function RisksPage() {
           setSelectedRisk(null);
         }}
         title={isAr ? 'تعديل الخطر' : 'Edit Risk'}
-        size="lg"
+        size="xl"
       >
         {selectedRisk && (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-[var(--primary)]/30 bg-[var(--primary-light)] p-4">
-              <p className="text-sm text-[var(--foreground-secondary)]">
-                {isAr
-                  ? 'لتعديل الخطر بشكل كامل، استخدم معالج إضافة الخطر. يمكنك هنا تعديل الحالة فقط.'
-                  : 'To fully edit the risk, use the Add Risk wizard. Here you can only update the status.'}
-              </p>
-            </div>
-
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+            {/* Risk Number */}
             <div>
               <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
                 {isAr ? 'رقم الخطر' : 'Risk Number'}
               </label>
-              <Input value={selectedRisk.riskNumber} disabled />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
-                {t('risks.riskTitle')}
-              </label>
-              <Input value={isAr ? selectedRisk.titleAr : selectedRisk.titleEn} disabled />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
-                {t('risks.riskStatus')}
-              </label>
-              <Select
-                options={statusOptions.filter(o => o.value !== '')}
-                value={selectedRisk.status}
-                onChange={(value) => {
-                  setSelectedRisk({ ...selectedRisk, status: value as RiskStatus });
-                }}
+              <Input
+                value={selectedRisk.riskNumber}
+                onChange={(e) => setSelectedRisk({ ...selectedRisk, riskNumber: e.target.value })}
               />
+            </div>
+
+            {/* Title AR/EN */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}
+                </label>
+                <Input
+                  value={selectedRisk.titleAr}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, titleAr: e.target.value })}
+                  dir="rtl"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {isAr ? 'العنوان (إنجليزي)' : 'Title (English)'}
+                </label>
+                <Input
+                  value={selectedRisk.titleEn}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, titleEn: e.target.value })}
+                  dir="ltr"
+                />
+              </div>
+            </div>
+
+            {/* Description AR/EN */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {isAr ? 'الوصف (عربي)' : 'Description (Arabic)'}
+                </label>
+                <textarea
+                  value={selectedRisk.descriptionAr}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, descriptionAr: e.target.value })}
+                  dir="rtl"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {isAr ? 'الوصف (إنجليزي)' : 'Description (English)'}
+                </label>
+                <textarea
+                  value={selectedRisk.descriptionEn}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, descriptionEn: e.target.value })}
+                  dir="ltr"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              </div>
+            </div>
+
+            {/* Category & Status */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.riskCategory')}
+                </label>
+                <Select
+                  options={categoryOptions.filter(o => o.value !== '')}
+                  value={selectedRisk.categoryCode}
+                  onChange={(value) => setSelectedRisk({ ...selectedRisk, categoryCode: value })}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.riskStatus')}
+                </label>
+                <Select
+                  options={statusOptions.filter(o => o.value !== '')}
+                  value={selectedRisk.status}
+                  onChange={(value) => setSelectedRisk({ ...selectedRisk, status: value as RiskStatus })}
+                />
+              </div>
+            </div>
+
+            {/* Inherent Risk Assessment */}
+            <div className="rounded-lg border border-[var(--border)] p-4 bg-[var(--background-secondary)]">
+              <h4 className="font-medium text-[var(--foreground)] mb-3">
+                {t('risks.inherentRisk')}
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                    {t('risks.likelihood')}
+                  </label>
+                  <Select
+                    options={[1,2,3,4,5].map(n => ({ value: String(n), label: `${n} - ${t(`assessment.likelihood.${n}`)}` }))}
+                    value={String(selectedRisk.inherentLikelihood)}
+                    onChange={(value) => {
+                      const likelihood = parseInt(value);
+                      const score = likelihood * selectedRisk.inherentImpact;
+                      const rating = getRiskRating(score);
+                      setSelectedRisk({
+                        ...selectedRisk,
+                        inherentLikelihood: likelihood,
+                        inherentScore: score,
+                        inherentRating: rating
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                    {t('risks.impact')}
+                  </label>
+                  <Select
+                    options={[1,2,3,4,5].map(n => ({ value: String(n), label: `${n} - ${t(`assessment.impact.${n}`)}` }))}
+                    value={String(selectedRisk.inherentImpact)}
+                    onChange={(value) => {
+                      const impact = parseInt(value);
+                      const score = selectedRisk.inherentLikelihood * impact;
+                      const rating = getRiskRating(score);
+                      setSelectedRisk({
+                        ...selectedRisk,
+                        inherentImpact: impact,
+                        inherentScore: score,
+                        inherentRating: rating
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                    {t('risks.riskScore')} / {t('risks.riskRating')}
+                  </label>
+                  <div className="flex items-center gap-2 h-10">
+                    <span className="text-lg font-bold">{selectedRisk.inherentScore}</span>
+                    <Badge variant={getRatingBadgeVariant(selectedRisk.inherentRating)}>
+                      {t(`risks.ratings.${selectedRisk.inherentRating}`)}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Residual Risk Assessment */}
+            <div className="rounded-lg border border-[var(--border)] p-4 bg-[var(--background-secondary)]">
+              <h4 className="font-medium text-[var(--foreground)] mb-3">
+                {t('risks.residualRisk')}
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                    {t('risks.likelihood')}
+                  </label>
+                  <Select
+                    options={[1,2,3,4,5].map(n => ({ value: String(n), label: `${n} - ${t(`assessment.likelihood.${n}`)}` }))}
+                    value={String(selectedRisk.residualLikelihood)}
+                    onChange={(value) => {
+                      const likelihood = parseInt(value);
+                      const score = likelihood * selectedRisk.residualImpact;
+                      const rating = getRiskRating(score);
+                      setSelectedRisk({
+                        ...selectedRisk,
+                        residualLikelihood: likelihood,
+                        residualScore: score,
+                        residualRating: rating
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                    {t('risks.impact')}
+                  </label>
+                  <Select
+                    options={[1,2,3,4,5].map(n => ({ value: String(n), label: `${n} - ${t(`assessment.impact.${n}`)}` }))}
+                    value={String(selectedRisk.residualImpact)}
+                    onChange={(value) => {
+                      const impact = parseInt(value);
+                      const score = selectedRisk.residualLikelihood * impact;
+                      const rating = getRiskRating(score);
+                      setSelectedRisk({
+                        ...selectedRisk,
+                        residualImpact: impact,
+                        residualScore: score,
+                        residualRating: rating
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                    {t('risks.riskScore')} / {t('risks.riskRating')}
+                  </label>
+                  <div className="flex items-center gap-2 h-10">
+                    <span className="text-lg font-bold">{selectedRisk.residualScore}</span>
+                    <Badge variant={getRatingBadgeVariant(selectedRisk.residualRating)}>
+                      {t(`risks.ratings.${selectedRisk.residualRating}`)}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Potential Cause */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.potentialCause')} ({isAr ? 'عربي' : 'Arabic'})
+                </label>
+                <textarea
+                  value={selectedRisk.potentialCauseAr || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, potentialCauseAr: e.target.value })}
+                  dir="rtl"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder={isAr ? 'أدخل السبب المحتمل...' : 'Enter potential cause...'}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.potentialCause')} ({isAr ? 'إنجليزي' : 'English'})
+                </label>
+                <textarea
+                  value={selectedRisk.potentialCauseEn || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, potentialCauseEn: e.target.value })}
+                  dir="ltr"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder="Enter potential cause..."
+                />
+              </div>
+            </div>
+
+            {/* Potential Impact */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.potentialImpact')} ({isAr ? 'عربي' : 'Arabic'})
+                </label>
+                <textarea
+                  value={selectedRisk.potentialImpactAr || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, potentialImpactAr: e.target.value })}
+                  dir="rtl"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder={isAr ? 'أدخل التأثير المحتمل...' : 'Enter potential impact...'}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.potentialImpact')} ({isAr ? 'إنجليزي' : 'English'})
+                </label>
+                <textarea
+                  value={selectedRisk.potentialImpactEn || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, potentialImpactEn: e.target.value })}
+                  dir="ltr"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder="Enter potential impact..."
+                />
+              </div>
             </div>
           </div>
         )}
@@ -1015,11 +1438,50 @@ export default function RisksPage() {
           <Button variant="outline" onClick={() => setShowEditModal(false)}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={() => {
+          <Button onClick={async () => {
             if (selectedRisk) {
-              setRisks(prev => prev.map(r => r.id === selectedRisk.id ? selectedRisk : r));
-              setShowEditModal(false);
-              setSelectedRisk(null);
+              try {
+                // Send update to API
+                const response = await fetch(`/api/risks/${selectedRisk.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    riskNumber: selectedRisk.riskNumber,
+                    titleAr: selectedRisk.titleAr,
+                    titleEn: selectedRisk.titleEn,
+                    descriptionAr: selectedRisk.descriptionAr,
+                    descriptionEn: selectedRisk.descriptionEn,
+                    status: selectedRisk.status,
+                    inherentLikelihood: selectedRisk.inherentLikelihood,
+                    inherentImpact: selectedRisk.inherentImpact,
+                    inherentScore: selectedRisk.inherentScore,
+                    inherentRating: selectedRisk.inherentRating,
+                    residualLikelihood: selectedRisk.residualLikelihood,
+                    residualImpact: selectedRisk.residualImpact,
+                    residualScore: selectedRisk.residualScore,
+                    residualRating: selectedRisk.residualRating,
+                    potentialCauseAr: selectedRisk.potentialCauseAr,
+                    potentialCauseEn: selectedRisk.potentialCauseEn,
+                    potentialImpactAr: selectedRisk.potentialImpactAr,
+                    potentialImpactEn: selectedRisk.potentialImpactEn,
+                  }),
+                });
+
+                if (response.ok) {
+                  // Update local state
+                  setRisks(prev => prev.map(r => r.id === selectedRisk.id ? selectedRisk : r));
+                  setShowEditModal(false);
+                  setSelectedRisk(null);
+                  // Refresh from API
+                  fetchRisks(false);
+                }
+              } catch (error) {
+                console.error('Error updating risk:', error);
+                // Still update local state as fallback
+                setRisks(prev => prev.map(r => r.id === selectedRisk.id ? selectedRisk : r));
+                setShowEditModal(false);
+                setSelectedRisk(null);
+              }
             }
           }}>
             {t('common.save')}

@@ -2,11 +2,10 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { useTranslation, useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Card, CardContent } from '@/components/ui/Card';
-import { Eye, EyeOff, Mail, Lock, Languages, Sun, Moon } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Languages, Sun, Moon, Shield, BarChart3, ClipboardCheck, FileText } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
@@ -19,6 +18,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,13 +28,17 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Mock login - في الإنتاج سيتم استبداله بـ API حقيقي
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
 
-      if (email === 'admin@saudicable.com' && password === 'admin123') {
-        router.push('/dashboard');
-      } else {
+      if (result?.error) {
         setError(t('auth.invalidCredentials'));
+      } else {
+        router.push('/dashboard');
+        router.refresh();
       }
     } catch {
       setError(t('common.errorOccurred'));
@@ -50,209 +55,380 @@ export default function LoginPage() {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setIsGoogleLoading(true);
+    try {
+      await signIn('google', { callbackUrl: '/dashboard' });
+    } catch {
+      setError(t('common.errorOccurred'));
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleMicrosoftSignIn = async () => {
+    setError('');
+    setIsMicrosoftLoading(true);
+    try {
+      await signIn('microsoft-entra-id', { callbackUrl: '/dashboard' });
+    } catch {
+      setError(t('common.errorOccurred'));
+      setIsMicrosoftLoading(false);
+    }
+  };
+
+  const features = [
+    {
+      icon: Shield,
+      labelAr: 'تتبع المخاطر',
+      labelEn: 'Risk Tracking',
+      descAr: 'مراقبة شاملة للمخاطر',
+      descEn: 'Comprehensive risk monitoring'
+    },
+    {
+      icon: BarChart3,
+      labelAr: 'التقييم والتحليل',
+      labelEn: 'Assessment',
+      descAr: 'تقييم دقيق للمخاطر',
+      descEn: 'Accurate risk assessment'
+    },
+    {
+      icon: ClipboardCheck,
+      labelAr: 'خطط المعالجة',
+      labelEn: 'Treatment',
+      descAr: 'متابعة خطط المعالجة',
+      descEn: 'Treatment plan tracking'
+    },
+    {
+      icon: FileText,
+      labelAr: 'التقارير',
+      labelEn: 'Reports',
+      descAr: 'تقارير تفصيلية',
+      descEn: 'Detailed reports'
+    },
+  ];
+
   return (
-    <div className="flex min-h-screen">
-      {/* Left Side - Form */}
-      <div className="flex w-full flex-col justify-center px-8 lg:w-1/2 lg:px-16">
-        {/* Header Actions */}
-        <div className="absolute end-4 top-4 flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={toggleLanguage}>
-            <Languages className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={toggleTheme}>
-            {theme === 'dark' ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[var(--background)] via-[var(--background)] to-[var(--background-secondary)]">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-[0.02]">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }} />
+      </div>
 
-        <div className="mx-auto w-full max-w-md">
-          {/* Logo */}
-          <div className="mb-8 flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--primary)]">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                className="h-8 w-8 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-                <circle cx="12" cy="8" r="2" fill="currentColor" />
-                <circle cx="8" cy="12" r="2" fill="currentColor" />
-                <circle cx="16" cy="12" r="2" fill="currentColor" />
-                <circle cx="12" cy="16" r="2" fill="currentColor" />
-                <circle cx="9" cy="10" r="1.5" fill="currentColor" />
-                <circle cx="15" cy="10" r="1.5" fill="currentColor" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-              </svg>
+      {/* Decorative Gradient Circles */}
+      <div className="absolute -top-40 -end-40 h-80 w-80 rounded-full bg-[var(--primary)] opacity-10 blur-3xl" />
+      <div className="absolute -bottom-40 -start-40 h-80 w-80 rounded-full bg-[var(--primary)] opacity-10 blur-3xl" />
+
+      {/* Header Actions */}
+      <div className="absolute end-6 top-6 z-50 flex items-center gap-2">
+        <button
+          onClick={toggleLanguage}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--card)] text-[var(--foreground-secondary)] shadow-sm transition-all hover:bg-[var(--background-secondary)] hover:text-[var(--foreground)]"
+          title={language === 'ar' ? 'Switch to English' : 'التبديل للعربية'}
+        >
+          <Languages className="h-5 w-5" />
+        </button>
+        <button
+          onClick={toggleTheme}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--card)] text-[var(--foreground-secondary)] shadow-sm transition-all hover:bg-[var(--background-secondary)] hover:text-[var(--foreground)]"
+          title={theme === 'dark' ? t('common.lightMode') : t('common.darkMode')}
+        >
+          {theme === 'dark' ? (
+            <Sun className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
+          )}
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-16">
+        <div className="w-full max-w-5xl">
+          <div className="grid gap-8 lg:grid-cols-2 lg:gap-16">
+
+            {/* Left Side - Branding & Features */}
+            <div className="flex flex-col justify-center">
+              {/* Logo & Company */}
+              <div className="mb-8 flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[#1e40af] shadow-lg">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-9 w-9 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                    <circle cx="12" cy="8" r="2" fill="currentColor" />
+                    <circle cx="8" cy="12" r="2" fill="currentColor" />
+                    <circle cx="16" cy="12" r="2" fill="currentColor" />
+                    <circle cx="12" cy="16" r="2" fill="currentColor" />
+                    <circle cx="9" cy="10" r="1.5" fill="currentColor" />
+                    <circle cx="15" cy="10" r="1.5" fill="currentColor" />
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-[var(--foreground)]">
+                    {t('common.companyName')}
+                  </h1>
+                  <p className="text-sm text-[var(--foreground-secondary)]">
+                    {t('common.appName')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Welcome Text */}
+              <div className="mb-10">
+                <h2 className="text-3xl font-bold leading-tight text-[var(--foreground)] lg:text-4xl">
+                  {language === 'ar' ? (
+                    <>
+                      إدارة المخاطر
+                      <br />
+                      <span className="text-[var(--primary)]">بكل سهولة</span>
+                    </>
+                  ) : (
+                    <>
+                      Risk Management
+                      <br />
+                      <span className="text-[var(--primary)]">Made Simple</span>
+                    </>
+                  )}
+                </h2>
+                <p className="mt-4 text-lg text-[var(--foreground-secondary)]">
+                  {language === 'ar'
+                    ? 'نظام متكامل لإدارة المخاطر المؤسسية وتتبعها ومعالجتها'
+                    : 'A comprehensive system for enterprise risk management, tracking, and treatment'}
+                </p>
+              </div>
+
+              {/* Features Grid */}
+              <div className="hidden grid-cols-2 gap-4 lg:grid">
+                {features.map((feature, index) => {
+                  const Icon = feature.icon;
+                  return (
+                    <div
+                      key={index}
+                      className="group rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 transition-all hover:border-[var(--primary)] hover:shadow-md"
+                    >
+                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] transition-colors group-hover:bg-[var(--primary)] group-hover:text-white">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <h3 className="font-semibold text-[var(--foreground)]">
+                        {language === 'ar' ? feature.labelAr : feature.labelEn}
+                      </h3>
+                      <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+                        {language === 'ar' ? feature.descAr : feature.descEn}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-[var(--foreground)]">
-                {t('common.companyName')}
-              </h1>
-              <p className="text-sm text-[var(--foreground-secondary)]">
-                {t('common.appName')}
-              </p>
-            </div>
-          </div>
 
-          {/* Welcome Text */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-[var(--foreground)]">
-              {t('auth.welcomeBack')}
-            </h2>
-            <p className="mt-2 text-[var(--foreground-secondary)]">
-              {t('auth.loginSubtitle')}
-            </p>
-          </div>
-
-          {/* Login Form */}
-          <Card className="border-0 bg-transparent p-0 shadow-none">
-            <CardContent className="p-0">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {error && (
-                  <div className="rounded-lg bg-[var(--risk-critical-bg)] p-3 text-sm text-[var(--risk-critical)]">
-                    {error}
+            {/* Right Side - Login Form */}
+            <div className="flex items-center justify-center">
+              <div className="w-full max-w-md">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-xl">
+                  {/* Form Header */}
+                  <div className="mb-8 text-center">
+                    <h3 className="text-2xl font-bold text-[var(--foreground)]">
+                      {t('auth.welcomeBack')}
+                    </h3>
+                    <p className="mt-2 text-[var(--foreground-secondary)]">
+                      {t('auth.loginSubtitle')}
+                    </p>
                   </div>
-                )}
 
-                <Input
-                  type="email"
-                  label={t('auth.email')}
-                  placeholder="example@saudicable.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  leftIcon={<Mail className="h-5 w-5" />}
-                  required
-                  autoComplete="email"
-                />
+                  {/* Error Message */}
+                  {error && (
+                    <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                      <div className="flex items-center gap-2">
+                        <svg className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        {error}
+                      </div>
+                    </div>
+                  )}
 
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  label={t('auth.password')}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  leftIcon={<Lock className="h-5 w-5" />}
-                  rightIcon={
+                  {/* Login Form */}
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Email Field */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                        {t('auth.email')}
+                      </label>
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-4">
+                          <Mail className="h-5 w-5 text-[var(--foreground-muted)]" />
+                        </div>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="example@company.com"
+                          required
+                          autoComplete="email"
+                          className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] py-3 pe-4 ps-12 text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password Field */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                        {t('auth.password')}
+                      </label>
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-4">
+                          <Lock className="h-5 w-5 text-[var(--foreground-muted)]" />
+                        </div>
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          required
+                          autoComplete="current-password"
+                          className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] py-3 pe-12 ps-12 text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 end-0 flex items-center pe-4 text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)]"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-5 w-5" />
+                          ) : (
+                            <Eye className="h-5 w-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Remember Me & Forgot Password */}
+                    <div className="flex items-center justify-between">
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                        />
+                        <span className="text-sm text-[var(--foreground-secondary)]">
+                          {t('auth.rememberMe')}
+                        </span>
+                      </label>
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-[var(--primary)] transition-colors hover:text-[var(--primary)]/80"
+                      >
+                        {t('auth.forgotPassword')}
+                      </button>
+                    </div>
+
+                    {/* Submit Button */}
+                    <Button
+                      type="submit"
+                      className="w-full py-3 text-base font-semibold"
+                      size="lg"
+                      isLoading={isLoading}
+                    >
+                      {t('auth.login')}
+                    </Button>
+                  </form>
+
+                  {/* OAuth Divider */}
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-[var(--border)]" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="bg-[var(--card)] px-4 text-[var(--foreground-secondary)]">
+                        {language === 'ar' ? 'أو تسجيل الدخول عبر' : 'or continue with'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* OAuth Buttons */}
+                  <div className="flex flex-col gap-3">
+                    {/* Google Button */}
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="transition-colors hover:text-[var(--foreground)]"
+                      onClick={handleGoogleSignIn}
+                      disabled={isGoogleLoading || isMicrosoftLoading}
+                      className="flex w-full items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-[var(--foreground)] transition-all hover:bg-[var(--background-secondary)] hover:border-[var(--border-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
+                      {isGoogleLoading ? (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--foreground-muted)] border-t-transparent" />
                       ) : (
-                        <Eye className="h-5 w-5" />
+                        <svg className="h-5 w-5" viewBox="0 0 24 24">
+                          <path
+                            fill="#4285F4"
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                          />
+                          <path
+                            fill="#34A853"
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                          />
+                          <path
+                            fill="#FBBC05"
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                          />
+                          <path
+                            fill="#EA4335"
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                          />
+                        </svg>
                       )}
+                      <span className="font-medium">
+                        {language === 'ar' ? 'Google' : 'Google'}
+                      </span>
                     </button>
-                  }
-                  required
-                  autoComplete="current-password"
-                />
 
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
-                    />
-                    <span className="text-sm text-[var(--foreground-secondary)]">
-                      {t('auth.rememberMe')}
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    className="text-sm text-[var(--primary)] hover:underline"
-                  >
-                    {t('auth.forgotPassword')}
-                  </button>
+                    {/* Microsoft Button */}
+                    <button
+                      type="button"
+                      onClick={handleMicrosoftSignIn}
+                      disabled={isGoogleLoading || isMicrosoftLoading}
+                      className="flex w-full items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-[var(--foreground)] transition-all hover:bg-[var(--background-secondary)] hover:border-[var(--border-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isMicrosoftLoading ? (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--foreground-muted)] border-t-transparent" />
+                      ) : (
+                        <svg className="h-5 w-5" viewBox="0 0 24 24">
+                          <path fill="#F25022" d="M1 1h10v10H1z" />
+                          <path fill="#00A4EF" d="M1 13h10v10H1z" />
+                          <path fill="#7FBA00" d="M13 1h10v10H13z" />
+                          <path fill="#FFB900" d="M13 13h10v10H13z" />
+                        </svg>
+                      )}
+                      <span className="font-medium">
+                        {language === 'ar' ? 'Microsoft' : 'Microsoft'}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Help Text */}
+                  <div className="mt-8 rounded-lg bg-[var(--background-secondary)] p-4 text-center">
+                    <p className="text-sm text-[var(--foreground-secondary)]">
+                      {language === 'ar'
+                        ? 'تواصل مع مسؤول النظام للحصول على بيانات الدخول'
+                        : 'Contact system administrator for login credentials'}
+                    </p>
+                  </div>
                 </div>
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  isLoading={isLoading}
-                >
-                  {t('auth.login')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Demo Credentials */}
-          <div className="mt-8 rounded-lg bg-[var(--background-secondary)] p-4">
-            <p className="mb-2 text-sm font-medium text-[var(--foreground)]">
-              {language === 'ar' ? 'بيانات الدخول التجريبية:' : 'Demo Credentials:'}
-            </p>
-            <p className="text-sm text-[var(--foreground-secondary)]">
-              {language === 'ar' ? 'البريد: ' : 'Email: '}
-              <code className="rounded bg-[var(--background-tertiary)] px-1.5 py-0.5">
-                admin@saudicable.com
-              </code>
-            </p>
-            <p className="text-sm text-[var(--foreground-secondary)]">
-              {language === 'ar' ? 'كلمة المرور: ' : 'Password: '}
-              <code className="rounded bg-[var(--background-tertiary)] px-1.5 py-0.5">
-                admin123
-              </code>
-            </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Right Side - Branding */}
-      <div className="hidden bg-[var(--secondary)] lg:flex lg:w-1/2 lg:flex-col lg:items-center lg:justify-center lg:p-16">
-        <div className="max-w-lg text-center">
-          {/* Large Logo */}
-          <div className="mb-8 flex justify-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-[var(--primary)]">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                className="h-14 w-14 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-                <circle cx="12" cy="8" r="2" fill="currentColor" />
-                <circle cx="8" cy="12" r="2" fill="currentColor" />
-                <circle cx="16" cy="12" r="2" fill="currentColor" />
-                <circle cx="12" cy="16" r="2" fill="currentColor" />
-                <circle cx="9" cy="10" r="1.5" fill="currentColor" />
-                <circle cx="15" cy="10" r="1.5" fill="currentColor" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-              </svg>
-            </div>
-          </div>
-
-          <h2 className="mb-4 text-3xl font-bold text-white">
-            {t('common.companyName')}
-          </h2>
-          <p className="text-lg text-gray-300">
-            {t('common.appName')}
-          </p>
-
-          {/* Features */}
-          <div className="mt-12 grid grid-cols-2 gap-6 text-start">
-            {[
-              { icon: '📊', label: language === 'ar' ? 'تتبع المخاطر' : 'Risk Tracking' },
-              { icon: '📈', label: language === 'ar' ? 'التقييم والتحليل' : 'Assessment & Analysis' },
-              { icon: '🛠️', label: language === 'ar' ? 'خطط المعالجة' : 'Treatment Plans' },
-              { icon: '📋', label: language === 'ar' ? 'التقارير' : 'Reports' },
-            ].map((feature, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 rounded-lg bg-white/10 p-4"
-              >
-                <span className="text-2xl">{feature.icon}</span>
-                <span className="text-sm font-medium text-white">{feature.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Footer */}
+      <div className="absolute bottom-4 start-0 end-0 text-center">
+        <p className="text-sm text-[var(--foreground-muted)]">
+          {language === 'ar' ? '© 2024 شركة الكابلات السعودية. جميع الحقوق محفوظة.' : '© 2024 Saudi Cable Company. All rights reserved.'}
+        </p>
       </div>
     </div>
   );

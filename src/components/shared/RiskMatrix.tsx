@@ -27,18 +27,19 @@ const getCellLevel = (likelihood: number, impact: number): RiskLevel => {
   return 'negligible';
 };
 
+// Colors matching the ERM reference system
 const getCellColor = (level: RiskLevel): string => {
   switch (level) {
     case 'critical':
-      return 'bg-red-600 hover:bg-red-700';
+      return 'bg-[#dc2626] hover:bg-[#b91c1c]'; // Red
     case 'high':
-      return 'bg-orange-500 hover:bg-orange-600';
+      return 'bg-[#f97316] hover:bg-[#ea580c]'; // Orange
     case 'medium':
-      return 'bg-yellow-400 hover:bg-yellow-500';
+      return 'bg-[#eab308] hover:bg-[#ca8a04]'; // Yellow
     case 'low':
-      return 'bg-green-500 hover:bg-green-600';
+      return 'bg-[#22c55e] hover:bg-[#16a34a]'; // Green
     case 'negligible':
-      return 'bg-blue-500 hover:bg-blue-600';
+      return 'bg-[#3b82f6] hover:bg-[#2563eb]'; // Blue
     default:
       return 'bg-gray-400';
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -31,10 +31,79 @@ import {
   AlertTriangle,
   FileText,
   Zap,
+  Loader2,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 
-// Mock data with new rating system
+// Interface for API Risk data
+interface APIRisk {
+  id: string;
+  riskNumber: string;
+  titleAr: string;
+  titleEn: string;
+  inherentLikelihood: number;
+  inherentImpact: number;
+  inherentScore: number;
+  inherentRating: string;
+  residualLikelihood: number | null;
+  residualImpact: number | null;
+  residualScore: number | null;
+  residualRating: string | null;
+  status: string;
+  mitigationActionsAr: string | null;
+  mitigationActionsEn: string | null;
+  createdAt: string;
+  updatedAt: string;
+  followUpDate: string | null;
+  department?: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+  };
+  owner?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+  };
+}
+
+// Normalize rating function
+const normalizeRating = (rating: string | null | undefined): RiskRating => {
+  if (!rating) return 'Moderate';
+  if (rating === 'Catastrophic') return 'Critical';
+  if (['Critical', 'Major', 'Moderate', 'Minor', 'Negligible'].includes(rating)) {
+    return rating as RiskRating;
+  }
+  return 'Moderate';
+};
+
+// Determine treatment strategy based on risk
+const determineStrategy = (status: string, inherentScore: number): TreatmentStrategy => {
+  if (status === 'accepted') return 'accept';
+  if (inherentScore >= 20) return 'reduce';
+  if (inherentScore >= 12) return 'transfer';
+  if (inherentScore >= 6) return 'reduce';
+  return 'accept';
+};
+
+// Determine treatment status
+const determineTreatmentStatus = (status: string, followUpDate: string | null): TreatmentStatus => {
+  if (status === 'closed' || status === 'mitigated') return 'completed';
+  if (followUpDate && new Date(followUpDate) < new Date()) return 'overdue';
+  if (status === 'inProgress') return 'inProgress';
+  return 'notStarted';
+};
+
+// Calculate progress based on status
+const calculateProgress = (status: string, residualScore: number | null, inherentScore: number): number => {
+  if (status === 'closed' || status === 'mitigated') return 100;
+  if (status === 'accepted') return 100;
+  if (!residualScore) return 0;
+  const reduction = ((inherentScore - residualScore) / inherentScore) * 100;
+  return Math.min(Math.max(Math.round(reduction), 0), 95);
+};
+
+// Keep for fallback when no API data
 const mockTreatments = [
   {
     id: '1',
@@ -255,6 +324,91 @@ export default function TreatmentPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
+  // State for API data
+  const [risks, setRisks] = useState<APIRisk[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch risks from API
+  useEffect(() => {
+    const fetchRisks = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/risks');
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          setRisks(result.data);
+        }
+      } catch (err) {
+        console.error('Error fetching risks:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRisks();
+  }, []);
+
+  // Generate treatments from risks
+  const treatments = useMemo(() => {
+    if (risks.length === 0) return mockTreatments;
+
+    return risks.map(risk => {
+      const strategy = determineStrategy(risk.status, risk.inherentScore || 9);
+      const treatmentStatus = determineTreatmentStatus(risk.status, risk.followUpDate);
+      const progress = calculateProgress(risk.status, risk.residualScore, risk.inherentScore || 9);
+
+      // Generate pseudo tasks based on mitigation actions
+      const tasks = risk.mitigationActionsAr || risk.mitigationActionsEn
+        ? [
+            { id: '1', titleAr: 'تحليل الخطر', titleEn: 'Analyze risk', completed: true },
+            { id: '2', titleAr: 'تحديد خطة المعالجة', titleEn: 'Define treatment plan', completed: progress > 20 },
+            { id: '3', titleAr: 'تنفيذ الإجراءات', titleEn: 'Implement actions', completed: progress > 50 },
+            { id: '4', titleAr: 'مراجعة الفعالية', titleEn: 'Review effectiveness', completed: progress > 80 },
+          ]
+        : [
+            { id: '1', titleAr: 'تحليل الخطر', titleEn: 'Analyze risk', completed: false },
+            { id: '2', titleAr: 'تحديد خطة المعالجة', titleEn: 'Define treatment plan', completed: false },
+          ];
+
+      return {
+        id: risk.id,
+        riskNumber: risk.riskNumber,
+        riskTitleAr: risk.titleAr,
+        riskTitleEn: risk.titleEn,
+        riskRating: normalizeRating(risk.inherentRating),
+        inherentScore: risk.inherentScore || 9,
+        currentResidualScore: risk.residualScore || risk.inherentScore || 9,
+        targetResidualScore: Math.max(4, Math.floor((risk.inherentScore || 9) * 0.4)),
+        titleAr: risk.mitigationActionsAr || 'خطة معالجة الخطر',
+        titleEn: risk.mitigationActionsEn || 'Risk Treatment Plan',
+        descriptionAr: risk.mitigationActionsAr || 'إجراءات التخفيف من الخطر',
+        descriptionEn: risk.mitigationActionsEn || 'Risk mitigation actions',
+        strategy: strategy,
+        status: treatmentStatus,
+        progress: progress,
+        responsibleAr: risk.owner?.fullName || 'غير محدد',
+        responsibleEn: risk.owner?.fullNameEn || risk.owner?.fullName || 'Not assigned',
+        departmentAr: risk.department?.nameAr || 'عام',
+        departmentEn: risk.department?.nameEn || 'General',
+        startDate: risk.createdAt ? new Date(risk.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        dueDate: risk.followUpDate
+          ? new Date(risk.followUpDate).toISOString().split('T')[0]
+          : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        tasks: tasks,
+        kris: [
+          {
+            nameAr: 'نسبة التخفيض',
+            nameEn: 'Reduction percentage',
+            current: risk.residualScore ? Math.round(((risk.inherentScore || 9) - risk.residualScore) / (risk.inherentScore || 9) * 100) : 0,
+            target: 60,
+            unit: () => '%'
+          },
+        ],
+      };
+    });
+  }, [risks]);
+
   const getRatingColor = (rating: RiskRating) => {
     switch (rating) {
       case 'Critical':
@@ -336,7 +490,7 @@ export default function TreatmentPage() {
     setExpandedCards(newExpanded);
   };
 
-  const filteredTreatments = mockTreatments.filter((treatment) => {
+  const filteredTreatments = treatments.filter((treatment) => {
     const matchesSearch =
       treatment.riskNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       treatment.titleAr.includes(searchQuery) ||
@@ -348,19 +502,33 @@ export default function TreatmentPage() {
 
   // Stats
   const stats = {
-    total: mockTreatments.length,
-    completed: mockTreatments.filter((t) => t.status === 'completed').length,
-    inProgress: mockTreatments.filter((t) => t.status === 'inProgress').length,
-    overdue: mockTreatments.filter((t) => t.status === 'overdue').length,
-    notStarted: mockTreatments.filter((t) => t.status === 'notStarted').length,
-    avgProgress: Math.round(mockTreatments.reduce((sum, t) => sum + t.progress, 0) / mockTreatments.length),
+    total: treatments.length,
+    completed: treatments.filter((t) => t.status === 'completed').length,
+    inProgress: treatments.filter((t) => t.status === 'inProgress').length,
+    overdue: treatments.filter((t) => t.status === 'overdue').length,
+    notStarted: treatments.filter((t) => t.status === 'notStarted').length,
+    avgProgress: treatments.length > 0 ? Math.round(treatments.reduce((sum, t) => sum + t.progress, 0) / treatments.length) : 0,
   };
 
   // Calculate effectiveness
-  const effectiveness = mockTreatments
+  const effectiveness = treatments
     .filter((t) => t.status === 'completed')
     .map((t) => ((t.inherentScore - t.currentResidualScore) / t.inherentScore) * 100);
   const avgEffectiveness = effectiveness.length > 0 ? Math.round(effectiveness.reduce((a, b) => a + b, 0) / effectiveness.length) : 0;
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+          <p className="text-sm text-[var(--foreground-secondary)]">
+            {isAr ? 'جاري تحميل البيانات...' : 'Loading data...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Wizard steps for adding treatment
   const wizardSteps = [
