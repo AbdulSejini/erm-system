@@ -69,7 +69,8 @@
     "profile": "Profile",
     "champions": "Risk Champions",
     "processes": "Processes",
-    "criteria": "Assessment Criteria"
+    "criteria": "Assessment Criteria",
+    "discussions": "Discussions"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -389,6 +390,7 @@
     "ratingCriteria": "Rating Criteria",
     "notifications": "Notifications",
     "dataManagement": "Data Management",
+    "backup": "Backup",
     "importData": "Import Data",
     "exportData": "Export Data",
     "auditLog": "Activity Log",

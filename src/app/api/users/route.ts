@@ -3,9 +3,19 @@ import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
 // GET - الحصول على جميع المستخدمين
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get('role');
+
+    // بناء شروط البحث
+    const where: Record<string, unknown> = {};
+    if (role) {
+      where.role = role;
+    }
+
     const users = await prisma.user.findMany({
+      where,
       select: {
         id: true,
         fullName: true,

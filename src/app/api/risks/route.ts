@@ -308,8 +308,10 @@ async function handleBulkImport(
   // إنشاء خرائط للبحث السريع
   const deptMap = new Map(departments.map(d => [d.nameAr.toLowerCase(), d.id]));
   const deptMapEn = new Map(departments.map(d => [d.nameEn.toLowerCase(), d.id]));
+  const deptMapCode = new Map(departments.map(d => [d.code.toLowerCase(), d.id])); // خريطة بالرمز
   const catMap = new Map(categories.map(c => [c.nameAr.toLowerCase(), c.id]));
   const catMapEn = new Map(categories.map(c => [c.nameEn.toLowerCase(), c.id]));
+  const catMapCode = new Map(categories.map(c => [c.code.toLowerCase(), c.id])); // خريطة بالرمز
   const userMap = new Map(users.map(u => [u.fullName.toLowerCase(), u.id]));
   const userMapEn = new Map(users.filter(u => u.fullNameEn).map(u => [u.fullNameEn!.toLowerCase(), u.id]));
 
@@ -344,7 +346,8 @@ async function handleBulkImport(
 
   for (const riskData of risks) {
     try {
-      const riskNumber = String(riskData.Risk_ID || riskData.riskNumber || '').trim();
+      // دعم أسماء الأعمدة المختلفة (بمسافة أو شرطة سفلية)
+      const riskNumber = String(riskData.Risk_ID || riskData['Risk ID'] || riskData.riskNumber || '').trim();
 
       if (!riskNumber) {
         results.errors.push('خطر بدون رقم تعريفي');
@@ -357,13 +360,16 @@ async function handleBulkImport(
         where: { riskNumber },
       });
 
-      // تحديد الإدارة
+      // تحديد الإدارة (بالاسم أو الرمز) - دعم أسماء الأعمدة المختلفة
+      const deptCode = String(riskData.Department_Code || riskData['Department Code'] || '').toLowerCase().trim();
       const deptName = String(riskData.Department || '').toLowerCase().trim();
-      let departmentId = deptMap.get(deptName) || deptMapEn.get(deptName) || defaultDeptId;
 
-      // تحديد الفئة
+      let departmentId = deptMapCode.get(deptCode) || deptMap.get(deptName) || deptMapEn.get(deptName) || defaultDeptId;
+
+      // تحديد الفئة (بالاسم أو الرمز) - دعم أسماء الأعمدة المختلفة
+      const catCode = String(riskData.Category_Code || riskData['Category Code'] || '').toLowerCase().trim();
       const catName = String(riskData.Category || '').toLowerCase().trim();
-      const categoryId = catMap.get(catName) || catMapEn.get(catName) || null;
+      const categoryId = catMapCode.get(catCode) || catMap.get(catName) || catMapEn.get(catName) || null;
 
       // تحديد المالك
       const ownerName = String(riskData.Owner_AR || riskData.Owner_EN || '').toLowerCase().trim();
@@ -390,8 +396,8 @@ async function handleBulkImport(
         if (riskData.Title_EN || riskData.titleEn) updatePayload.titleEn = String(riskData.Title_EN || riskData.titleEn);
         if (riskData.Description_AR || riskData.descriptionAr) updatePayload.descriptionAr = String(riskData.Description_AR || riskData.descriptionAr);
         if (riskData.Description_EN || riskData.descriptionEn) updatePayload.descriptionEn = String(riskData.Description_EN || riskData.descriptionEn);
-        if (riskData.Category) updatePayload.categoryId = categoryId;
-        if (riskData.Department) updatePayload.departmentId = departmentId;
+        if (riskData.Category || riskData.Category_Code || riskData['Category Code']) updatePayload.categoryId = categoryId;
+        if (riskData.Department || riskData.Department_Code || riskData['Department Code']) updatePayload.departmentId = departmentId;
         if (riskData.Likelihood) {
           updatePayload.inherentLikelihood = likelihood;
           updatePayload.inherentImpact = impact;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -35,138 +35,47 @@ import {
   Shield,
   GraduationCap,
   Briefcase,
+  RefreshCw,
 } from 'lucide-react';
 
 // Champion performance levels
 type PerformanceLevel = 'excellent' | 'good' | 'needsImprovement' | 'new';
 
-// Mock data for risk champions
-const mockChampions = [
-  {
-    id: '1',
-    nameAr: 'أحمد محمد السعيد',
-    nameEn: 'Ahmed Mohammed Al-Saeed',
-    email: 'ahmed.alsaeed@saudcable.com',
-    phone: '+966 50 123 4567',
-    departmentAr: 'المالية',
-    departmentEn: 'Finance',
-    roleAr: 'مدير المخاطر المالية',
-    roleEn: 'Financial Risk Manager',
-    assignedDate: '2025-03-15',
-    risksAssigned: 8,
-    risksResolved: 5,
-    treatmentPlansActive: 3,
-    treatmentPlansCompleted: 4,
-    lastActivityDate: '2026-01-15',
-    performanceLevel: 'excellent' as PerformanceLevel,
-    trainingCompleted: true,
-    certifications: [
-      { nameAr: 'أساسيات إدارة المخاطر', nameEn: 'Risk Management Fundamentals', date: '2025-04-01' },
-      { nameAr: 'تقييم المخاطر المتقدم', nameEn: 'Advanced Risk Assessment', date: '2025-06-15' },
-    ],
-    recentActivities: [
-      { typeAr: 'تحديث خطر', typeEn: 'Updated risk', riskNumber: 'FIN-R-001', date: '2026-01-15' },
-      { typeAr: 'أكمل معالجة', typeEn: 'Completed treatment', riskNumber: 'FIN-R-003', date: '2026-01-10' },
-    ],
-  },
-  {
-    id: '2',
-    nameAr: 'سارة علي الفهد',
-    nameEn: 'Sarah Ali Al-Fahad',
-    email: 'sarah.alfahad@saudcable.com',
-    phone: '+966 55 234 5678',
-    departmentAr: 'العمليات',
-    departmentEn: 'Operations',
-    roleAr: 'رائدة المخاطر التشغيلية',
-    roleEn: 'Operational Risk Champion',
-    assignedDate: '2025-05-20',
-    risksAssigned: 12,
-    risksResolved: 8,
-    treatmentPlansActive: 4,
-    treatmentPlansCompleted: 6,
-    lastActivityDate: '2026-01-14',
-    performanceLevel: 'good' as PerformanceLevel,
-    trainingCompleted: true,
-    certifications: [
-      { nameAr: 'أساسيات إدارة المخاطر', nameEn: 'Risk Management Fundamentals', date: '2025-05-25' },
-    ],
-    recentActivities: [
-      { typeAr: 'أضاف خطر جديد', typeEn: 'Added new risk', riskNumber: 'OPS-R-005', date: '2026-01-14' },
-      { typeAr: 'بدأ معالجة', typeEn: 'Started treatment', riskNumber: 'OPS-R-003', date: '2026-01-12' },
-    ],
-  },
-  {
-    id: '3',
-    nameAr: 'خالد عبدالرحمن',
-    nameEn: 'Khalid Abdulrahman',
-    email: 'khalid.abdulrahman@saudcable.com',
-    phone: '+966 56 345 6789',
-    departmentAr: 'تقنية المعلومات',
-    departmentEn: 'IT',
-    roleAr: 'رائد مخاطر الأمن السيبراني',
-    roleEn: 'Cybersecurity Risk Champion',
-    assignedDate: '2025-08-10',
-    risksAssigned: 6,
-    risksResolved: 2,
-    treatmentPlansActive: 3,
-    treatmentPlansCompleted: 1,
-    lastActivityDate: '2026-01-05',
-    performanceLevel: 'needsImprovement' as PerformanceLevel,
-    trainingCompleted: false,
-    certifications: [],
-    recentActivities: [
-      { typeAr: 'تأخر في معالجة', typeEn: 'Treatment delayed', riskNumber: 'TECH-R-001', date: '2026-01-05' },
-    ],
-  },
-  {
-    id: '4',
-    nameAr: 'فاطمة حسن العتيبي',
-    nameEn: 'Fatima Hassan Al-Otaibi',
-    email: 'fatima.alotaibi@saudcable.com',
-    phone: '+966 54 456 7890',
-    departmentAr: 'السلامة والصحة المهنية',
-    departmentEn: 'HSE',
-    roleAr: 'رائدة مخاطر السلامة',
-    roleEn: 'Safety Risk Champion',
-    assignedDate: '2025-11-01',
-    risksAssigned: 4,
-    risksResolved: 1,
-    treatmentPlansActive: 2,
-    treatmentPlansCompleted: 1,
-    lastActivityDate: '2026-01-16',
-    performanceLevel: 'new' as PerformanceLevel,
-    trainingCompleted: false,
-    certifications: [],
-    recentActivities: [
-      { typeAr: 'أضاف خطر جديد', typeEn: 'Added new risk', riskNumber: 'HSE-R-002', date: '2026-01-16' },
-    ],
-  },
-  {
-    id: '5',
-    nameAr: 'محمد عبدالله القحطاني',
-    nameEn: 'Mohammed Abdullah Al-Qahtani',
-    email: 'mohammed.alqahtani@saudcable.com',
-    phone: '+966 59 567 8901',
-    departmentAr: 'الموارد البشرية',
-    departmentEn: 'HR',
-    roleAr: 'رائد مخاطر الموارد البشرية',
-    roleEn: 'HR Risk Champion',
-    assignedDate: '2025-06-15',
-    risksAssigned: 5,
-    risksResolved: 4,
-    treatmentPlansActive: 1,
-    treatmentPlansCompleted: 3,
-    lastActivityDate: '2026-01-13',
-    performanceLevel: 'good' as PerformanceLevel,
-    trainingCompleted: true,
-    certifications: [
-      { nameAr: 'أساسيات إدارة المخاطر', nameEn: 'Risk Management Fundamentals', date: '2025-07-01' },
-    ],
-    recentActivities: [
-      { typeAr: 'أكمل معالجة', typeEn: 'Completed treatment', riskNumber: 'HR-R-002', date: '2026-01-13' },
-    ],
-  },
-];
+// API Types
+interface APIChampion {
+  id: string;
+  fullName: string;
+  fullNameEn: string | null;
+  email: string;
+  phone: string | null;
+  role: string;
+  status: string;
+  createdAt: string;
+  department: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+    code: string;
+  } | null;
+  accessibleDepartments: Array<{
+    departmentId: string;
+    department: {
+      id: string;
+      nameAr: string;
+      nameEn: string;
+      code: string;
+    };
+  }>;
+  _count?: {
+    ownedRisks: number;
+    championedRisks: number;
+  };
+  // Stats from risks
+  risksAssigned?: number;
+  risksResolved?: number;
+  treatmentPlansActive?: number;
+  treatmentPlansCompleted?: number;
+}
 
 // Training modules for champions
 const trainingModules = [
@@ -178,8 +87,6 @@ const trainingModules = [
     descriptionEn: 'Comprehensive introduction to enterprise risk management principles',
     duration: '4 hours',
     required: true,
-    completedBy: 3,
-    totalChampions: 5,
   },
   {
     id: '2',
@@ -189,8 +96,6 @@ const trainingModules = [
     descriptionEn: 'Advanced techniques for identifying and assessing risks',
     duration: '6 hours',
     required: false,
-    completedBy: 1,
-    totalChampions: 5,
   },
   {
     id: '3',
@@ -200,8 +105,6 @@ const trainingModules = [
     descriptionEn: 'Practical guide to using the risk management system',
     duration: '2 hours',
     required: true,
-    completedBy: 4,
-    totalChampions: 5,
   },
 ];
 
@@ -210,12 +113,94 @@ export default function ChampionsPage() {
   const isAr = language === 'ar';
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedChampion, setSelectedChampion] = useState<string | null>(null);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [filterPerformance, setFilterPerformance] = useState<PerformanceLevel | 'all'>('all');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
+  // Data states
+  const [champions, setChampions] = useState<APIChampion[]>([]);
+  const [departments, setDepartments] = useState<Array<{ id: string; nameAr: string; nameEn: string; code: string }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fetch champions (users with role riskChampion)
+  const fetchChampions = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setIsRefreshing(true);
+
+    try {
+      // Fetch users with role riskChampion
+      const usersRes = await fetch('/api/users?role=riskChampion');
+      const usersData = await usersRes.json();
+
+      if (usersData.success) {
+        // Fetch risks to calculate stats for each champion
+        const risksRes = await fetch('/api/risks?filterByAccess=false');
+        const risksData = await risksRes.json();
+
+        const risks = risksData.success ? risksData.data : [];
+
+        // Calculate stats for each champion
+        const championsWithStats = usersData.data.map((user: APIChampion) => {
+          const championRisks = risks.filter((r: { championId?: string; ownerId?: string }) =>
+            r.championId === user.id || r.ownerId === user.id
+          );
+
+          const resolved = championRisks.filter((r: { status: string }) =>
+            r.status === 'mitigated' || r.status === 'closed'
+          ).length;
+
+          return {
+            ...user,
+            risksAssigned: championRisks.length,
+            risksResolved: resolved,
+            treatmentPlansActive: championRisks.filter((r: { status: string }) => r.status === 'inProgress').length,
+            treatmentPlansCompleted: resolved,
+          };
+        });
+
+        setChampions(championsWithStats);
+      }
+    } catch (error) {
+      console.error('Error fetching champions:', error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // Fetch departments
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/departments');
+      const data = await res.json();
+      if (data.success) {
+        setDepartments(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChampions();
+    fetchDepartments();
+  }, [fetchChampions, fetchDepartments]);
+
+  const getPerformanceLevel = (champion: APIChampion): PerformanceLevel => {
+    const daysActive = Math.floor((Date.now() - new Date(champion.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysActive < 30) return 'new';
+
+    const resolutionRate = champion.risksAssigned && champion.risksAssigned > 0
+      ? (champion.risksResolved || 0) / champion.risksAssigned
+      : 0;
+
+    if (resolutionRate >= 0.7) return 'excellent';
+    if (resolutionRate >= 0.4) return 'good';
+    return 'needsImprovement';
+  };
 
   const getPerformanceColor = (level: PerformanceLevel) => {
     switch (level) {
@@ -272,32 +257,56 @@ export default function ChampionsPage() {
     setExpandedCards(newExpanded);
   };
 
-  const departments = [...new Set(mockChampions.map((c) => (isAr ? c.departmentAr : c.departmentEn)))];
+  // Get unique departments from champions
+  const uniqueDepartments = [...new Set(champions.map((c) =>
+    c.department ? (isAr ? c.department.nameAr : c.department.nameEn) : ''
+  ).filter(Boolean))];
 
-  const filteredChampions = mockChampions.filter((champion) => {
+  const filteredChampions = champions.filter((champion) => {
+    const name = isAr ? champion.fullName : (champion.fullNameEn || champion.fullName);
     const matchesSearch =
-      champion.nameAr.includes(searchQuery) ||
-      champion.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      champion.fullName.includes(searchQuery) ||
+      (champion.fullNameEn || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       champion.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesPerformance = filterPerformance === 'all' || champion.performanceLevel === filterPerformance;
-    const matchesDepartment =
-      filterDepartment === 'all' ||
-      (isAr ? champion.departmentAr : champion.departmentEn) === filterDepartment;
+
+    const performanceLevel = getPerformanceLevel(champion);
+    const matchesPerformance = filterPerformance === 'all' || performanceLevel === filterPerformance;
+
+    const deptName = champion.department
+      ? (isAr ? champion.department.nameAr : champion.department.nameEn)
+      : '';
+    const matchesDepartment = filterDepartment === 'all' || deptName === filterDepartment;
+
     return matchesSearch && matchesPerformance && matchesDepartment;
   });
 
   // Stats
   const stats = {
-    total: mockChampions.length,
-    excellent: mockChampions.filter((c) => c.performanceLevel === 'excellent').length,
-    needsTraining: mockChampions.filter((c) => !c.trainingCompleted).length,
-    totalRisksManaged: mockChampions.reduce((sum, c) => sum + c.risksAssigned, 0),
-    avgResolutionRate: Math.round(
-      (mockChampions.reduce((sum, c) => sum + c.risksResolved, 0) /
-        mockChampions.reduce((sum, c) => sum + c.risksAssigned, 0)) *
-        100
-    ),
+    total: champions.length,
+    excellent: champions.filter((c) => getPerformanceLevel(c) === 'excellent').length,
+    needsTraining: champions.filter((c) => getPerformanceLevel(c) === 'new' || getPerformanceLevel(c) === 'needsImprovement').length,
+    totalRisksManaged: champions.reduce((sum, c) => sum + (c.risksAssigned || 0), 0),
+    avgResolutionRate: champions.length > 0
+      ? Math.round(
+          (champions.reduce((sum, c) => sum + (c.risksResolved || 0), 0) /
+            Math.max(champions.reduce((sum, c) => sum + (c.risksAssigned || 0), 0), 1)) *
+            100
+        )
+      : 0,
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-[var(--primary)] mx-auto mb-4" />
+          <p className="text-sm text-[var(--foreground-secondary)]">
+            {isAr ? 'جاري تحميل رواد المخاطر...' : 'Loading risk champions...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -317,6 +326,15 @@ export default function ChampionsPage() {
           <Button
             variant="outline"
             size="sm"
+            leftIcon={<RefreshCw className={`h-4 w-4 sm:h-5 sm:w-5 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />}
+            onClick={() => fetchChampions(true)}
+            disabled={isRefreshing}
+          >
+            <span className="text-xs sm:text-sm">{isAr ? 'تحديث' : 'Refresh'}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             leftIcon={<HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
             onClick={() => setShowGuideModal(true)}
           >
@@ -329,9 +347,6 @@ export default function ChampionsPage() {
             onClick={() => setShowTrainingModal(true)}
           >
             <span className="text-xs sm:text-sm">{isAr ? 'برنامج التدريب' : 'Training Program'}</span>
-          </Button>
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />} onClick={() => setShowAddModal(true)}>
-            <span className="text-xs sm:text-sm">{isAr ? 'إضافة رائد' : 'Add Champion'}</span>
           </Button>
         </div>
       </div>
@@ -435,7 +450,7 @@ export default function ChampionsPage() {
                 onChange={(e) => setFilterDepartment(e.target.value)}
               >
                 <option value="all">{isAr ? 'جميع الإدارات' : 'All Departments'}</option>
-                {departments.map((dept) => (
+                {uniqueDepartments.map((dept) => (
                   <option key={dept} value={dept}>
                     {dept}
                   </option>
@@ -450,7 +465,10 @@ export default function ChampionsPage() {
       <div className="grid gap-2 sm:gap-3 md:gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredChampions.map((champion) => {
           const isExpanded = expandedCards.has(champion.id);
-          const resolutionRate = Math.round((champion.risksResolved / champion.risksAssigned) * 100);
+          const performanceLevel = getPerformanceLevel(champion);
+          const resolutionRate = champion.risksAssigned && champion.risksAssigned > 0
+            ? Math.round((champion.risksResolved || 0) / champion.risksAssigned * 100)
+            : 0;
 
           return (
             <Card key={champion.id} className="overflow-hidden">
@@ -459,42 +477,38 @@ export default function ChampionsPage() {
                 <div className="mb-3 sm:mb-4 flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[var(--primary-light)] text-base sm:text-lg font-bold text-[var(--primary)] shrink-0">
-                      {(isAr ? champion.nameAr : champion.nameEn).charAt(0)}
+                      {(isAr ? champion.fullName : (champion.fullNameEn || champion.fullName)).charAt(0)}
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-semibold text-[var(--foreground)] text-sm sm:text-base truncate">
-                        {isAr ? champion.nameAr : champion.nameEn}
+                        {isAr ? champion.fullName : (champion.fullNameEn || champion.fullName)}
                       </h3>
                       <p className="text-xs sm:text-sm text-[var(--foreground-secondary)] truncate">
-                        {isAr ? champion.roleAr : champion.roleEn}
+                        {isAr ? 'رائد مخاطر' : 'Risk Champion'}
                       </p>
                     </div>
                   </div>
                   <span
                     className={`flex items-center gap-1 rounded-full px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium shrink-0 ${getPerformanceColor(
-                      champion.performanceLevel
+                      performanceLevel
                     )}`}
                   >
-                    <span className="shrink-0">{getPerformanceIcon(champion.performanceLevel)}</span>
-                    <span className="truncate">{getPerformanceLabel(champion.performanceLevel)}</span>
+                    <span className="shrink-0">{getPerformanceIcon(performanceLevel)}</span>
+                    <span className="truncate">{getPerformanceLabel(performanceLevel)}</span>
                   </span>
                 </div>
 
-                {/* Department & Training */}
+                {/* Department & Accessible Departments */}
                 <div className="mb-3 sm:mb-4 flex flex-wrap items-center gap-1 sm:gap-2">
-                  <Badge variant="default">
-                    <Building2 className="me-1 h-3 w-3 shrink-0" />
-                    <span className="truncate">{isAr ? champion.departmentAr : champion.departmentEn}</span>
-                  </Badge>
-                  {champion.trainingCompleted ? (
-                    <Badge variant="success">
-                      <GraduationCap className="me-1 h-3 w-3 shrink-0" />
-                      <span className="truncate">{isAr ? 'مدرّب' : 'Trained'}</span>
+                  {champion.department && (
+                    <Badge variant="default">
+                      <Building2 className="me-1 h-3 w-3 shrink-0" />
+                      <span className="truncate">{isAr ? champion.department.nameAr : champion.department.nameEn}</span>
                     </Badge>
-                  ) : (
-                    <Badge variant="warning">
-                      <BookOpen className="me-1 h-3 w-3 shrink-0" />
-                      <span className="truncate">{isAr ? 'بحاجة لتدريب' : 'Needs Training'}</span>
+                  )}
+                  {champion.accessibleDepartments && champion.accessibleDepartments.length > 0 && (
+                    <Badge variant="success">
+                      <span className="truncate">+{champion.accessibleDepartments.length} {isAr ? 'وظائف' : 'depts'}</span>
                     </Badge>
                   )}
                 </div>
@@ -502,7 +516,7 @@ export default function ChampionsPage() {
                 {/* Stats Row */}
                 <div className="mb-3 sm:mb-4 grid grid-cols-2 gap-2 sm:gap-3">
                   <div className="rounded-lg bg-[var(--background-secondary)] p-2 sm:p-3 text-center">
-                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{champion.risksAssigned}</p>
+                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{champion.risksAssigned || 0}</p>
                     <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
                       {isAr ? 'المخاطر المسندة' : 'Assigned Risks'}
                     </p>
@@ -519,46 +533,39 @@ export default function ChampionsPage() {
                 <div className="mb-3 sm:mb-4">
                   <div className="mb-1 flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-[var(--foreground-secondary)] truncate min-w-0">
-                      {isAr ? 'خطط المعالجة' : 'Treatment Plans'}
+                      {isAr ? 'المخاطر المحلولة' : 'Resolved Risks'}
                     </span>
                     <span className="font-medium text-[var(--foreground)] shrink-0">
-                      {champion.treatmentPlansCompleted}/{champion.treatmentPlansActive + champion.treatmentPlansCompleted}
+                      {champion.risksResolved || 0}/{champion.risksAssigned || 0}
                     </span>
                   </div>
                   <div className="h-1.5 sm:h-2 overflow-hidden rounded-full bg-[var(--background-tertiary)]">
                     <div
                       className="h-full rounded-full bg-[var(--status-success)]"
                       style={{
-                        width: `${
-                          (champion.treatmentPlansCompleted /
-                            (champion.treatmentPlansActive + champion.treatmentPlansCompleted)) *
-                          100
-                        }%`,
+                        width: `${resolutionRate}%`,
                       }}
                     />
                   </div>
                 </div>
 
-                {/* Last Activity */}
+                {/* Join Date */}
                 <div className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                  <span className="truncate">{isAr ? 'آخر نشاط:' : 'Last activity:'}</span>
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="truncate">{isAr ? 'تاريخ الانضمام:' : 'Joined:'}</span>
                   <span className="font-medium shrink-0">
-                    {new Date(champion.lastActivityDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                    {new Date(champion.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
                   </span>
                 </div>
 
                 {/* Actions */}
                 <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 sm:pt-4">
                   <div className="flex gap-1 sm:gap-2">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" title={isAr ? 'عرض' : 'View'}>
                       <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
-                    <Button variant="ghost" size="sm">
-                      <Edit className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <Button variant="ghost" size="sm" title={isAr ? 'مراسلة' : 'Message'}>
+                      <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
                   </div>
                   <Button
@@ -584,69 +591,29 @@ export default function ChampionsPage() {
                       <Mail className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                       <span className="truncate min-w-0">{champion.email}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                      <Phone className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                      <span dir="ltr" className="truncate min-w-0">{champion.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                      <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                      <span className="truncate min-w-0">
-                        {isAr ? 'تاريخ التعيين:' : 'Assigned on:'}{' '}
-                        {new Date(champion.assignedDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
-                      </span>
-                    </div>
+                    {champion.phone && (
+                      <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                        <Phone className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                        <span dir="ltr" className="truncate min-w-0">{champion.phone}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Certifications */}
-                  {champion.certifications.length > 0 && (
-                    <div className="mb-3 sm:mb-4">
+                  {/* Accessible Departments */}
+                  {champion.accessibleDepartments && champion.accessibleDepartments.length > 0 && (
+                    <div>
                       <h4 className="mb-1.5 sm:mb-2 text-xs sm:text-sm font-semibold text-[var(--foreground)]">
-                        {isAr ? 'الشهادات' : 'Certifications'}
+                        {isAr ? 'الوظائف التي يمكنه الاطلاع عليها' : 'Accessible Departments'}
                       </h4>
-                      <div className="space-y-1.5 sm:space-y-2">
-                        {champion.certifications.map((cert, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between rounded-lg bg-[var(--background)] p-1.5 sm:p-2 text-xs sm:text-sm gap-2"
-                          >
-                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                              <Award className="h-3 w-3 sm:h-4 sm:w-4 text-[var(--primary)] shrink-0" />
-                              <span className="truncate">{isAr ? cert.nameAr : cert.nameEn}</span>
-                            </div>
-                            <span className="text-[10px] sm:text-xs text-[var(--foreground-muted)] shrink-0">
-                              {new Date(cert.date).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
-                            </span>
-                          </div>
+                      <div className="flex flex-wrap gap-1">
+                        {champion.accessibleDepartments.map((access) => (
+                          <Badge key={access.departmentId} variant="default" size="sm">
+                            {isAr ? access.department.nameAr : access.department.nameEn}
+                          </Badge>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  {/* Recent Activities */}
-                  <div>
-                    <h4 className="mb-1.5 sm:mb-2 text-xs sm:text-sm font-semibold text-[var(--foreground)]">
-                      {isAr ? 'النشاطات الأخيرة' : 'Recent Activities'}
-                    </h4>
-                    <div className="space-y-1.5 sm:space-y-2">
-                      {champion.recentActivities.map((activity, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between rounded-lg bg-[var(--background)] p-1.5 sm:p-2 text-xs sm:text-sm gap-2"
-                        >
-                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                            <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-[var(--foreground-muted)] shrink-0" />
-                            <span className="truncate">{isAr ? activity.typeAr : activity.typeEn}</span>
-                            <code className="rounded bg-[var(--background-tertiary)] px-1 text-[10px] sm:text-xs shrink-0">
-                              {activity.riskNumber}
-                            </code>
-                          </div>
-                          <span className="text-[10px] sm:text-xs text-[var(--foreground-muted)] shrink-0">
-                            {new Date(activity.date).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               )}
             </Card>
@@ -663,96 +630,11 @@ export default function ChampionsPage() {
           </h3>
           <p className="mt-1 text-xs sm:text-sm text-[var(--foreground-secondary)]">
             {isAr
-              ? 'لم يتم العثور على رواد مخاطر تطابق البحث'
-              : 'No risk champions found matching your search'}
+              ? 'لم يتم العثور على رواد مخاطر. يمكنك إضافة رواد من صفحة الإعدادات > المستخدمين'
+              : 'No risk champions found. You can add champions from Settings > Users'}
           </p>
         </Card>
       )}
-
-      {/* Add Champion Modal */}
-      <Modal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        title={isAr ? 'إضافة رائد مخاطر' : 'Add Risk Champion'}
-        size="lg"
-      >
-        <div className="space-y-3 sm:space-y-4">
-          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                {isAr ? 'الاسم بالعربية' : 'Name (Arabic)'}
-              </label>
-              <Input placeholder={isAr ? 'أدخل الاسم' : 'Enter name'} />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                {isAr ? 'الاسم بالإنجليزية' : 'Name (English)'}
-              </label>
-              <Input placeholder="Enter name" />
-            </div>
-          </div>
-          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                {isAr ? 'البريد الإلكتروني' : 'Email'}
-              </label>
-              <Input type="email" placeholder="email@saudcable.com" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                {isAr ? 'رقم الهاتف' : 'Phone'}
-              </label>
-              <Input placeholder="+966 5X XXX XXXX" />
-            </div>
-          </div>
-          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                {isAr ? 'الإدارة' : 'Department'}
-              </label>
-              <select className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
-                <option value="">{isAr ? 'اختر الإدارة' : 'Select department'}</option>
-                <option value="finance">{isAr ? 'المالية' : 'Finance'}</option>
-                <option value="operations">{isAr ? 'العمليات' : 'Operations'}</option>
-                <option value="it">{isAr ? 'تقنية المعلومات' : 'IT'}</option>
-                <option value="hse">{isAr ? 'السلامة' : 'HSE'}</option>
-                <option value="hr">{isAr ? 'الموارد البشرية' : 'HR'}</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                {isAr ? 'الدور' : 'Role'}
-              </label>
-              <Input placeholder={isAr ? 'أدخل الدور' : 'Enter role'} />
-            </div>
-          </div>
-
-          {/* Guidance */}
-          <div className="rounded-lg border border-[var(--primary)]/30 bg-[var(--primary-light)] p-2 sm:p-3 md:p-4">
-            <div className="flex gap-2 sm:gap-3">
-              <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-[var(--primary)]" />
-              <div className="min-w-0">
-                <h5 className="font-medium text-xs sm:text-sm text-[var(--foreground)]">
-                  {isAr ? 'ما هو رائد المخاطر؟' : 'What is a Risk Champion?'}
-                </h5>
-                <p className="mt-1 text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? 'رائد المخاطر هو الشخص المسؤول عن إدارة ومتابعة المخاطر في إدارته. يقوم بتحديد المخاطر وتقييمها ومتابعة خطط المعالجة.'
-                    : 'A Risk Champion is responsible for managing and monitoring risks in their department. They identify risks, assess them, and track treatment plans.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <ModalFooter>
-          <Button variant="outline" size="sm" onClick={() => setShowAddModal(false)}>
-            <span className="text-xs sm:text-sm">{t('common.cancel')}</span>
-          </Button>
-          <Button size="sm" onClick={() => setShowAddModal(false)}>
-            <span className="text-xs sm:text-sm">{isAr ? 'إضافة الرائد' : 'Add Champion'}</span>
-          </Button>
-        </ModalFooter>
-      </Modal>
 
       {/* Training Program Modal */}
       <Modal
@@ -797,19 +679,7 @@ export default function ChampionsPage() {
                         <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
                         {module.duration}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
-                        {module.completedBy}/{module.totalChampions} {isAr ? 'أكملوا' : 'completed'}
-                      </span>
                     </div>
-                  </div>
-                </div>
-                <div className="text-center shrink-0">
-                  <div className="text-base sm:text-lg md:text-xl font-bold text-[var(--foreground)]">
-                    {Math.round((module.completedBy / module.totalChampions) * 100)}%
-                  </div>
-                  <div className="text-[10px] sm:text-xs text-[var(--foreground-muted)]">
-                    {isAr ? 'الإكمال' : 'Completion'}
                   </div>
                 </div>
               </div>

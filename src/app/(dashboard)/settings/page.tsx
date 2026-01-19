@@ -36,6 +36,14 @@ import {
   ShieldAlert,
   FileText,
   UserCheck,
+  HardDrive,
+  RefreshCw,
+  Calendar,
+  FileJson,
+  UploadCloud,
+  DownloadCloud,
+  AlertTriangle,
+  Clock,
 } from 'lucide-react';
 import { hrRisks, hrRisksSummary } from '@/data/hrRisks';
 import RiskEditor from '@/components/RiskEditor';
@@ -51,6 +59,7 @@ const allSettingsTabs = [
   { id: 'riskOwners', icon: UserCheck },
   { id: 'notifications', icon: Bell },
   { id: 'dataManagement', icon: Database },
+  { id: 'backup', icon: HardDrive },
   { id: 'auditLog', icon: Activity },
   { id: 'riskEditor', icon: Table2 },
 ];
@@ -63,8 +72,8 @@ const allSettingsTabs = [
 // executive: only notifications
 // employee: only notifications
 const roleTabAccess: Record<string, string[]> = {
-  admin: ['users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
-  riskManager: ['users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'auditLog', 'riskEditor'],
+  admin: ['users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
+  riskManager: ['users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
   riskAnalyst: ['notifications'],
   riskChampion: ['notifications'],
   executive: ['notifications'],
@@ -291,6 +300,19 @@ export default function SettingsPage() {
   const [importStats, setImportStats] = useState({ total: 0, added: 0, updated: 0, skipped: 0, errors: 0 });
   const [importMode, setImportMode] = useState<'addOnly' | 'updateOnly' | 'addAndUpdate'>('addAndUpdate');
   const [showImportResultModal, setShowImportResultModal] = useState(false);
+
+  // Backup states
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [backupFile, setBackupFile] = useState<File | null>(null);
+  const [restoreResults, setRestoreResults] = useState<{
+    success: boolean;
+    message: string;
+    results?: Record<string, number>;
+    errors?: string[];
+  } | null>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<{
     added: string[];
     updated: string[];
@@ -2329,6 +2351,281 @@ export default function SettingsPage() {
     </div>
   );
 
+  // Backup handlers
+  const handleCreateBackup = async () => {
+    setIsCreatingBackup(true);
+    try {
+      const response = await fetch('/api/backup');
+      if (!response.ok) {
+        throw new Error('فشل في إنشاء النسخة الاحتياطية');
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `erm-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      alert(isAr ? 'تم إنشاء النسخة الاحتياطية بنجاح!' : 'Backup created successfully!');
+    } catch (error) {
+      console.error('Error creating backup:', error);
+      alert(isAr ? 'فشل في إنشاء النسخة الاحتياطية' : 'Failed to create backup');
+    } finally {
+      setIsCreatingBackup(false);
+    }
+  };
+
+  const handleBackupFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.name.endsWith('.json')) {
+        alert(isAr ? 'يرجى اختيار ملف JSON' : 'Please select a JSON file');
+        return;
+      }
+      setBackupFile(file);
+      setShowRestoreModal(true);
+    }
+  };
+
+  const handleRestoreBackup = async () => {
+    if (!backupFile) return;
+
+    setIsRestoringBackup(true);
+    setRestoreResults(null);
+
+    try {
+      const fileContent = await backupFile.text();
+      const backupData = JSON.parse(fileContent);
+
+      const response = await fetch('/api/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backupData),
+      });
+
+      const result = await response.json();
+
+      setRestoreResults({
+        success: result.success,
+        message: result.message || (result.success ? 'تمت الاستعادة بنجاح' : 'فشلت الاستعادة'),
+        results: result.results,
+        errors: result.results?.errors,
+      });
+
+      if (result.success) {
+        // Refresh the page data
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error restoring backup:', error);
+      setRestoreResults({
+        success: false,
+        message: isAr ? 'فشل في قراءة ملف النسخة الاحتياطية' : 'Failed to read backup file',
+      });
+    } finally {
+      setIsRestoringBackup(false);
+    }
+  };
+
+  // Render Backup Tab
+  const renderBackupTab = () => (
+    <div className="space-y-4 sm:space-y-6">
+      {/* Backup Info */}
+      <Card>
+        <CardHeader className="p-3 sm:p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
+            <HardDrive className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)]" />
+            {isAr ? 'النسخ الاحتياطي واستعادة البيانات' : 'Backup & Restore'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  {isAr ? 'معلومات هامة' : 'Important Information'}
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  {isAr
+                    ? 'النسخة الاحتياطية تشمل: المستخدمين، الإدارات، التصنيفات، المخاطر، الحالات، المصادر، التعليقات، وصلاحيات الوصول. لا تتضمن كلمات المرور لأسباب أمنية.'
+                    : 'Backup includes: Users, Departments, Categories, Risks, Statuses, Sources, Comments, and Access Permissions. Passwords are not included for security reasons.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Create Backup */}
+      <Card>
+        <CardHeader className="p-3 sm:p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
+            <DownloadCloud className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+            {isAr ? 'إنشاء نسخة احتياطية' : 'Create Backup'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+          <p className="text-sm text-[var(--foreground-secondary)] mb-4">
+            {isAr
+              ? 'قم بتحميل نسخة احتياطية كاملة من قاعدة البيانات بتنسيق JSON. يمكنك استخدام هذا الملف لاستعادة البيانات لاحقاً.'
+              : 'Download a complete backup of the database in JSON format. You can use this file to restore data later.'}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={handleCreateBackup}
+              disabled={isCreatingBackup}
+              leftIcon={isCreatingBackup ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              className="flex-1 sm:flex-none"
+            >
+              {isCreatingBackup
+                ? (isAr ? 'جاري إنشاء النسخة...' : 'Creating backup...')
+                : (isAr ? 'تحميل النسخة الاحتياطية' : 'Download Backup')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Restore Backup */}
+      <Card>
+        <CardHeader className="p-3 sm:p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
+            <UploadCloud className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+            {isAr ? 'استعادة من نسخة احتياطية' : 'Restore from Backup'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+          <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20 p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                  {isAr ? 'تحذير' : 'Warning'}
+                </p>
+                <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                  {isAr
+                    ? 'استعادة النسخة الاحتياطية ستقوم بتحديث أو إضافة البيانات الموجودة. تأكد من أنك تريد المتابعة.'
+                    : 'Restoring backup will update or add existing data. Make sure you want to proceed.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <input
+            type="file"
+            accept=".json"
+            ref={backupFileInputRef}
+            onChange={handleBackupFileSelect}
+            className="hidden"
+          />
+
+          <Button
+            variant="outline"
+            onClick={() => backupFileInputRef.current?.click()}
+            leftIcon={<Upload className="h-4 w-4" />}
+          >
+            {isAr ? 'اختيار ملف النسخة الاحتياطية' : 'Select Backup File'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Restore Confirmation Modal */}
+      <Modal
+        isOpen={showRestoreModal}
+        onClose={() => {
+          setShowRestoreModal(false);
+          setBackupFile(null);
+          setRestoreResults(null);
+        }}
+        title={isAr ? 'تأكيد الاستعادة' : 'Confirm Restore'}
+        size="md"
+      >
+        {restoreResults ? (
+          <div className="space-y-4">
+            <div className={`rounded-lg p-4 ${restoreResults.success ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+              <div className="flex items-center gap-2">
+                {restoreResults.success ? (
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                )}
+                <p className={`font-medium ${restoreResults.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                  {restoreResults.message}
+                </p>
+              </div>
+            </div>
+
+            {restoreResults.results && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-[var(--foreground)]">
+                  {isAr ? 'نتائج الاستعادة:' : 'Restore Results:'}
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {Object.entries(restoreResults.results)
+                    .filter(([key]) => key !== 'errors')
+                    .map(([key, value]) => (
+                      <div key={key} className="flex justify-between p-2 bg-[var(--background-secondary)] rounded">
+                        <span className="text-[var(--foreground-secondary)]">{key}:</span>
+                        <span className="font-medium">{value as number}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-[var(--background-secondary)] rounded-lg">
+              <FileJson className="h-8 w-8 text-[var(--primary)]" />
+              <div>
+                <p className="font-medium text-[var(--foreground)]">{backupFile?.name}</p>
+                <p className="text-sm text-[var(--foreground-secondary)]">
+                  {backupFile && `${(backupFile.size / 1024).toFixed(2)} KB`}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-[var(--foreground-secondary)]">
+              {isAr
+                ? 'هل أنت متأكد من أنك تريد استعادة البيانات من هذا الملف؟ سيتم تحديث أو إضافة البيانات الموجودة.'
+                : 'Are you sure you want to restore data from this file? Existing data will be updated or added.'}
+            </p>
+          </div>
+        )}
+        <ModalFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowRestoreModal(false);
+              setBackupFile(null);
+              setRestoreResults(null);
+            }}
+          >
+            {restoreResults ? (isAr ? 'إغلاق' : 'Close') : (isAr ? 'إلغاء' : 'Cancel')}
+          </Button>
+          {!restoreResults && (
+            <Button
+              variant="danger"
+              onClick={handleRestoreBackup}
+              disabled={isRestoringBackup}
+              leftIcon={isRestoringBackup ? <RefreshCw className="h-4 w-4 animate-spin" /> : undefined}
+            >
+              {isRestoringBackup
+                ? (isAr ? 'جاري الاستعادة...' : 'Restoring...')
+                : (isAr ? 'استعادة البيانات' : 'Restore Data')}
+            </Button>
+          )}
+        </ModalFooter>
+      </Modal>
+    </div>
+  );
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Page Header */}
@@ -2386,6 +2683,7 @@ export default function SettingsPage() {
       {activeTab === 'departments' && canAccessTab('departments') && renderDepartmentsTab()}
       {activeTab === 'notifications' && canAccessTab('notifications') && renderNotificationsTab()}
       {activeTab === 'dataManagement' && canAccessTab('dataManagement') && renderDataManagementTab()}
+      {activeTab === 'backup' && canAccessTab('backup') && renderBackupTab()}
       {activeTab === 'auditLog' && canAccessTab('auditLog') && <AuditLogTab />}
       {activeTab === 'riskEditor' && canAccessTab('riskEditor') && (
         <div className="space-y-4">

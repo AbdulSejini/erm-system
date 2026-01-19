@@ -104,6 +104,16 @@ const convertedHRRisks = hrRisks.map((hr) => ({
   potentialCauseEn: '',
   potentialImpactAr: '',
   potentialImpactEn: '',
+  layersOfProtectionAr: '',
+  layersOfProtectionEn: '',
+  krisAr: '',
+  krisEn: '',
+  mitigationActionsAr: '',
+  mitigationActionsEn: '',
+  processText: '',
+  subProcessText: '',
+  followUpDate: '',
+  nextReviewDate: '',
 }));
 
 // Mock data matching actual risk register structure
@@ -121,13 +131,17 @@ const mockRisks = [
     departmentEn: 'Finance',
     processAr: 'المشتريات',
     processEn: 'Procurement',
+    processText: 'المشتريات',
     subProcessAr: 'إدارة العقود',
     subProcessEn: 'Contract Management',
+    subProcessText: 'إدارة العقود',
     ownerAr: 'سارة علي',
     ownerEn: 'Sarah Ali',
     championAr: 'أحمد محمد',
     championEn: 'Ahmed Mohammed',
     identifiedDate: '2026-01-14',
+    followUpDate: '',
+    nextReviewDate: '',
     inherentLikelihood: 5,
     inherentImpact: 5,
     inherentScore: 25,
@@ -141,6 +155,12 @@ const mockRisks = [
     potentialCauseEn: 'Changes in global copper market prices',
     potentialImpactAr: 'انخفاض هوامش الربح وزيادة تكاليف الإنتاج',
     potentialImpactEn: 'Reduced profit margins and increased production costs',
+    layersOfProtectionAr: '',
+    layersOfProtectionEn: '',
+    krisAr: '',
+    krisEn: '',
+    mitigationActionsAr: '',
+    mitigationActionsEn: '',
   },
   {
     id: '2',
@@ -175,6 +195,16 @@ const mockRisks = [
     potentialCauseEn: '',
     potentialImpactAr: '',
     potentialImpactEn: '',
+    layersOfProtectionAr: '',
+    layersOfProtectionEn: '',
+    krisAr: '',
+    krisEn: '',
+    mitigationActionsAr: '',
+    mitigationActionsEn: '',
+    processText: '',
+    subProcessText: '',
+    followUpDate: '',
+    nextReviewDate: '',
   },
   {
     id: '3',
@@ -207,6 +237,16 @@ const mockRisks = [
     potentialCauseEn: '',
     potentialImpactAr: '',
     potentialImpactEn: '',
+    layersOfProtectionAr: '',
+    layersOfProtectionEn: '',
+    krisAr: '',
+    krisEn: '',
+    mitigationActionsAr: '',
+    mitigationActionsEn: '',
+    processText: '',
+    subProcessText: '',
+    followUpDate: '',
+    nextReviewDate: '',
   },
   {
     id: '4',
@@ -239,6 +279,16 @@ const mockRisks = [
     potentialCauseEn: '',
     potentialImpactAr: '',
     potentialImpactEn: '',
+    layersOfProtectionAr: '',
+    layersOfProtectionEn: '',
+    krisAr: '',
+    krisEn: '',
+    mitigationActionsAr: '',
+    mitigationActionsEn: '',
+    processText: '',
+    subProcessText: '',
+    followUpDate: '',
+    nextReviewDate: '',
   },
   {
     id: '5',
@@ -271,6 +321,16 @@ const mockRisks = [
     potentialCauseEn: '',
     potentialImpactAr: '',
     potentialImpactEn: '',
+    layersOfProtectionAr: '',
+    layersOfProtectionEn: '',
+    krisAr: '',
+    krisEn: '',
+    mitigationActionsAr: '',
+    mitigationActionsEn: '',
+    processText: '',
+    subProcessText: '',
+    followUpDate: '',
+    nextReviewDate: '',
   },
   {
     id: '6',
@@ -303,6 +363,16 @@ const mockRisks = [
     potentialCauseEn: '',
     potentialImpactAr: '',
     potentialImpactEn: '',
+    layersOfProtectionAr: '',
+    layersOfProtectionEn: '',
+    krisAr: '',
+    krisEn: '',
+    mitigationActionsAr: '',
+    mitigationActionsEn: '',
+    processText: '',
+    subProcessText: '',
+    followUpDate: '',
+    nextReviewDate: '',
   },
   // Include converted HR risks
   ...convertedHRRisks,
@@ -411,18 +481,27 @@ export default function RisksPage() {
           descriptionAr: risk.descriptionAr,
           descriptionEn: risk.descriptionEn,
           categoryCode: risk.category?.code || 'OPS',
+          categoryId: risk.categoryId,
+          departmentId: risk.departmentId,
           status: (risk.status || 'open') as RiskStatus,
+          approvalStatus: risk.approvalStatus || 'Draft',
           departmentAr: risk.department?.nameAr || 'عام',
           departmentEn: risk.department?.nameEn || 'General',
-          processAr: risk.processText || 'عام',
-          processEn: risk.processText || 'General',
+          processAr: risk.processText || '',
+          processEn: risk.processText || '',
+          processText: risk.processText || '',
           subProcessAr: risk.subProcessText || '',
           subProcessEn: risk.subProcessText || '',
-          ownerAr: risk.owner?.fullName || 'غير محدد',
-          ownerEn: risk.owner?.fullNameEn || risk.owner?.fullName || 'Not Assigned',
-          championAr: risk.owner?.fullName || 'غير محدد',
-          championEn: risk.owner?.fullNameEn || risk.owner?.fullName || 'Not Assigned',
+          subProcessText: risk.subProcessText || '',
+          ownerAr: risk.owner?.fullName || risk.riskOwner?.fullName || 'غير محدد',
+          ownerEn: risk.owner?.fullNameEn || risk.owner?.fullName || risk.riskOwner?.fullNameEn || risk.riskOwner?.fullName || 'Not Assigned',
+          ownerId: risk.owner?.id,
+          championAr: risk.champion?.fullName || 'غير محدد',
+          championEn: risk.champion?.fullNameEn || risk.champion?.fullName || 'Not Assigned',
+          championId: risk.champion?.id,
           identifiedDate: risk.identifiedDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+          followUpDate: risk.followUpDate?.split('T')[0] || '',
+          nextReviewDate: risk.nextReviewDate?.split('T')[0] || '',
           inherentLikelihood: risk.inherentLikelihood || 3,
           inherentImpact: risk.inherentImpact || 3,
           inherentScore: risk.inherentScore || 9,
@@ -431,11 +510,18 @@ export default function RisksPage() {
           residualImpact: risk.residualImpact || risk.inherentImpact || 3,
           residualScore: risk.residualScore || risk.inherentScore || 9,
           residualRating: normalizeRating(risk.residualRating || risk.inherentRating),
-          issuedBy: risk.issuedBy || 'Internal',
+          issuedBy: risk.issuedBy || risk.source?.code || 'Internal',
+          sourceId: risk.source?.id,
           potentialCauseAr: risk.potentialCauseAr || '',
           potentialCauseEn: risk.potentialCauseEn || '',
           potentialImpactAr: risk.potentialImpactAr || '',
           potentialImpactEn: risk.potentialImpactEn || '',
+          layersOfProtectionAr: risk.layersOfProtectionAr || '',
+          layersOfProtectionEn: risk.layersOfProtectionEn || '',
+          krisAr: risk.krisAr || '',
+          krisEn: risk.krisEn || '',
+          mitigationActionsAr: risk.mitigationActionsAr || '',
+          mitigationActionsEn: risk.mitigationActionsEn || '',
         }));
 
         setRisks(transformedRisks);
@@ -1710,6 +1796,144 @@ export default function RisksPage() {
                 />
               </div>
             </div>
+
+            {/* Layers of Protection */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.layersOfProtection')} ({isAr ? 'عربي' : 'Arabic'})
+                </label>
+                <textarea
+                  value={selectedRisk.layersOfProtectionAr || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, layersOfProtectionAr: e.target.value })}
+                  dir="rtl"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder={isAr ? 'أدخل طبقات الحماية...' : 'Enter layers of protection...'}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.layersOfProtection')} ({isAr ? 'إنجليزي' : 'English'})
+                </label>
+                <textarea
+                  value={selectedRisk.layersOfProtectionEn || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, layersOfProtectionEn: e.target.value })}
+                  dir="ltr"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder="Enter layers of protection..."
+                />
+              </div>
+            </div>
+
+            {/* KRIs */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.kris')} ({isAr ? 'عربي' : 'Arabic'})
+                </label>
+                <textarea
+                  value={selectedRisk.krisAr || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, krisAr: e.target.value })}
+                  dir="rtl"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder={isAr ? 'أدخل مؤشرات المخاطر الرئيسية...' : 'Enter KRIs...'}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.kris')} ({isAr ? 'إنجليزي' : 'English'})
+                </label>
+                <textarea
+                  value={selectedRisk.krisEn || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, krisEn: e.target.value })}
+                  dir="ltr"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder="Enter KRIs..."
+                />
+              </div>
+            </div>
+
+            {/* Mitigation Actions */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.mitigationActions')} ({isAr ? 'عربي' : 'Arabic'})
+                </label>
+                <textarea
+                  value={selectedRisk.mitigationActionsAr || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, mitigationActionsAr: e.target.value })}
+                  dir="rtl"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder={isAr ? 'أدخل إجراءات التخفيف...' : 'Enter mitigation actions...'}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.mitigationActions')} ({isAr ? 'إنجليزي' : 'English'})
+                </label>
+                <textarea
+                  value={selectedRisk.mitigationActionsEn || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, mitigationActionsEn: e.target.value })}
+                  dir="ltr"
+                  rows={3}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  placeholder="Enter mitigation actions..."
+                />
+              </div>
+            </div>
+
+            {/* Process & Sub-Process */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.process')}
+                </label>
+                <Input
+                  value={selectedRisk.processText || selectedRisk.processAr || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, processText: e.target.value, processAr: e.target.value, processEn: e.target.value })}
+                  placeholder={isAr ? 'أدخل العملية...' : 'Enter process...'}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.subProcess')}
+                </label>
+                <Input
+                  value={selectedRisk.subProcessText || selectedRisk.subProcessAr || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, subProcessText: e.target.value, subProcessAr: e.target.value, subProcessEn: e.target.value })}
+                  placeholder={isAr ? 'أدخل العملية الفرعية...' : 'Enter sub-process...'}
+                />
+              </div>
+            </div>
+
+            {/* Dates */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.followUpDate')}
+                </label>
+                <Input
+                  type="date"
+                  value={selectedRisk.followUpDate || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, followUpDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  {t('risks.nextReviewDate')}
+                </label>
+                <Input
+                  type="date"
+                  value={selectedRisk.nextReviewDate || ''}
+                  onChange={(e) => setSelectedRisk({ ...selectedRisk, nextReviewDate: e.target.value })}
+                />
+              </div>
+            </div>
           </div>
         )}
         <ModalFooter>
@@ -1742,6 +1966,16 @@ export default function RisksPage() {
                     potentialCauseEn: selectedRisk.potentialCauseEn,
                     potentialImpactAr: selectedRisk.potentialImpactAr,
                     potentialImpactEn: selectedRisk.potentialImpactEn,
+                    layersOfProtectionAr: selectedRisk.layersOfProtectionAr,
+                    layersOfProtectionEn: selectedRisk.layersOfProtectionEn,
+                    krisAr: selectedRisk.krisAr,
+                    krisEn: selectedRisk.krisEn,
+                    mitigationActionsAr: selectedRisk.mitigationActionsAr,
+                    mitigationActionsEn: selectedRisk.mitigationActionsEn,
+                    processText: selectedRisk.processText,
+                    subProcessText: selectedRisk.subProcessText,
+                    followUpDate: selectedRisk.followUpDate || null,
+                    nextReviewDate: selectedRisk.nextReviewDate || null,
                   }),
                 });
 

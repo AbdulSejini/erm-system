@@ -69,7 +69,8 @@
     "profile": "الملف الشخصي",
     "champions": "رواد المخاطر",
     "processes": "العمليات",
-    "criteria": "معايير التقييم"
+    "criteria": "معايير التقييم",
+    "discussions": "المناقشات"
   },
   "dashboard": {
     "title": "لوحة المعلومات",
@@ -389,6 +390,7 @@
     "ratingCriteria": "معايير التصنيف",
     "notifications": "الإشعارات",
     "dataManagement": "إدارة البيانات",
+    "backup": "النسخ الاحتياطي",
     "importData": "استيراد البيانات",
     "exportData": "تصدير البيانات",
     "auditLog": "سجل النشاط",

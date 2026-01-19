@@ -103,7 +103,8 @@ export async function PATCH(
       'potentialCauseAr', 'potentialCauseEn', 'potentialImpactAr', 'potentialImpactEn',
       'layersOfProtectionAr', 'layersOfProtectionEn', 'krisAr', 'krisEn',
       'mitigationActionsAr', 'mitigationActionsEn', 'complianceNoteAr', 'complianceNoteEn',
-      'iaRef', 'issuedBy', 'status', 'inherentRating', 'residualRating'
+      'iaRef', 'issuedBy', 'status', 'inherentRating', 'residualRating',
+      'processText', 'subProcessText', 'approvalStatus'
     ];
 
     textFields.forEach(field => {
