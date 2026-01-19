@@ -19,6 +19,7 @@ import {
   Users,
   X,
   MessageSquare,
+  Target,
 } from 'lucide-react';
 
 interface NavItem {
@@ -58,6 +59,11 @@ const navItems: NavItem[] = [
     href: '/discussions',
     labelKey: 'navigation.discussions',
     icon: MessageSquare,
+  },
+  {
+    href: '/tracking',
+    labelKey: 'navigation.tracking',
+    icon: Target,
   },
   {
     href: '/incidents',
