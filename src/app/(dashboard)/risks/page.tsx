@@ -82,6 +82,7 @@ const convertedHRRisks = hrRisks.map((hr) => ({
   descriptionEn: hr.descriptionEn,
   categoryCode: 'HR' as const,
   status: (hr.status === 'Open' ? 'open' : hr.status === 'In Progress' ? 'inProgress' : 'closed') as RiskStatus,
+  departmentId: '',
   departmentAr: hr.departmentAr,
   departmentEn: hr.department,
   processAr: 'الموارد البشرية',
@@ -127,6 +128,7 @@ const mockRisks = [
     descriptionEn: 'Copper price fluctuations may negatively impact profit margins and production costs',
     categoryCode: 'FIN' as const,
     status: 'open' as RiskStatus,
+    departmentId: '',
     departmentAr: 'المالية',
     departmentEn: 'Finance',
     processAr: 'المشتريات',
@@ -171,6 +173,7 @@ const mockRisks = [
     descriptionEn: 'Delayed raw material supply may cause production line stoppage',
     categoryCode: 'OPS',
     status: 'inProgress' as RiskStatus,
+    departmentId: '',
     departmentAr: 'سلسلة التوريد',
     departmentEn: 'Supply Chain',
     processAr: 'المشتريات',
@@ -215,6 +218,7 @@ const mockRisks = [
     descriptionEn: 'Power outages may lead to production stoppage and material damage',
     categoryCode: 'OPS',
     status: 'mitigated' as RiskStatus,
+    departmentId: '',
     departmentAr: 'العمليات',
     departmentEn: 'Operations',
     processAr: 'الإنتاج',
@@ -257,6 +261,7 @@ const mockRisks = [
     descriptionEn: 'Risk of cyber attacks on IT systems',
     categoryCode: 'TECH',
     status: 'open' as RiskStatus,
+    departmentId: '',
     departmentAr: 'تقنية المعلومات',
     departmentEn: 'IT',
     processAr: 'الأمن السيبراني',
@@ -299,6 +304,7 @@ const mockRisks = [
     descriptionEn: 'Risk of non-compliance with local and international environmental regulations',
     categoryCode: 'COMP',
     status: 'open' as RiskStatus,
+    departmentId: '',
     departmentAr: 'السلامة والبيئة',
     departmentEn: 'HSE',
     processAr: 'البيئة',
@@ -341,6 +347,7 @@ const mockRisks = [
     descriptionEn: 'Risk of workplace injuries due to non-compliance with safety standards',
     categoryCode: 'HSE',
     status: 'accepted' as RiskStatus,
+    departmentId: '',
     departmentAr: 'السلامة والبيئة',
     departmentEn: 'HSE',
     processAr: 'السلامة المهنية',
@@ -447,6 +454,7 @@ export default function RisksPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [categories, setCategories] = useState<APICategory[]>([]);
   const [riskStatuses, setRiskStatuses] = useState<APIRiskStatus[]>([]);
+  const [allDepartments, setAllDepartments] = useState<{ id: string; code: string; nameAr: string; nameEn: string }[]>([]);
   const [viewModalTab, setViewModalTab] = useState<'details' | 'discussion'>('details');
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
 
@@ -565,12 +573,26 @@ export default function RisksPage() {
     }
   }, []);
 
-  // Fetch risks, categories, and statuses on component mount
+  // Fetch departments from API
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const response = await fetch('/api/departments');
+      const result = await response.json();
+      if (result.success && result.data.length > 0) {
+        setAllDepartments(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  }, []);
+
+  // Fetch risks, categories, statuses, and departments on component mount
   useEffect(() => {
     fetchRisks();
     fetchCategories();
     fetchRiskStatuses();
-  }, [fetchRisks, fetchCategories, fetchRiskStatuses]);
+    fetchDepartments();
+  }, [fetchRisks, fetchCategories, fetchRiskStatuses, fetchDepartments]);
 
   // Fetch current user
   useEffect(() => {
@@ -1593,6 +1615,39 @@ export default function RisksPage() {
               </div>
             </div>
 
+            {/* Department */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                {isAr ? 'الإدارة' : 'Department'}
+              </label>
+              <Select
+                options={allDepartments.map(dept => ({
+                  value: dept.id,
+                  label: isAr ? dept.nameAr : dept.nameEn
+                }))}
+                value={selectedRisk.departmentId || ''}
+                onChange={(value) => {
+                  const newDept = allDepartments.find(d => d.id === value);
+                  if (newDept) {
+                    // Extract sequence number from current risk number (e.g., PRO-R-761 -> 761)
+                    const sequenceMatch = selectedRisk.riskNumber.match(/(\d+)$/);
+                    const sequenceNumber = sequenceMatch ? sequenceMatch[1] : '001';
+                    const newRiskNumber = `${newDept.code}-${sequenceNumber}`;
+                    setSelectedRisk({
+                      ...selectedRisk,
+                      departmentId: value,
+                      departmentAr: newDept.nameAr,
+                      departmentEn: newDept.nameEn,
+                      riskNumber: newRiskNumber
+                    });
+                  }
+                }}
+              />
+              <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+                {isAr ? 'عند تغيير الإدارة سيتم تحديث رمز الخطر تلقائياً' : 'Changing department will auto-update the risk code'}
+              </p>
+            </div>
+
             {/* Category & Status */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -1949,6 +2004,7 @@ export default function RisksPage() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     riskNumber: selectedRisk.riskNumber,
+                    departmentId: selectedRisk.departmentId,
                     titleAr: selectedRisk.titleAr,
                     titleEn: selectedRisk.titleEn,
                     descriptionAr: selectedRisk.descriptionAr,
