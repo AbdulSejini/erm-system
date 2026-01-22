@@ -378,6 +378,8 @@
   "settings": {
     "title": "Settings",
     "general": "General",
+    "profile": "Profile",
+    "changePassword": "Change Password",
     "users": "Users",
     "departments": "Functions",
     "processes": "Processes",
@@ -396,7 +398,15 @@
     "exportData": "Export Data",
     "auditLog": "Activity Log",
     "riskAppetite": "Risk Appetite",
-    "riskEditor": "Risk Editor"
+    "riskEditor": "Risk Editor",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmNewPassword": "Confirm New Password",
+    "passwordChanged": "Password changed successfully",
+    "passwordMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "incorrectPassword": "Current password is incorrect",
+    "profileUpdated": "Profile updated successfully"
   },
   "auditLog": {
     "title": "Activity Log",

@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is admin
-    if (session.user.role !== 'admin') {
+    // Check if user is admin or riskManager
+    if (session.user.role !== 'admin' && session.user.role !== 'riskManager') {
       return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
+        { error: 'Forbidden - Admin or Risk Manager access required' },
         { status: 403 }
       );
     }

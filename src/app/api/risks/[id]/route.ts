@@ -148,6 +148,25 @@ export async function PATCH(
     }
     if (body.departmentId !== undefined) {
       updateData.departmentId = body.departmentId;
+
+      // إذا تغيرت الإدارة، نحدث رقم الخطر (نغير رمز الوظيفة فقط ونحافظ على الرقم التسلسلي)
+      if (body.departmentId !== existingRisk.departmentId) {
+        // جلب رمز الإدارة الجديدة
+        const newDepartment = await prisma.department.findUnique({
+          where: { id: body.departmentId },
+          select: { code: true }
+        });
+
+        if (newDepartment) {
+          // استخراج الرقم التسلسلي من رقم الخطر الحالي (مثل: IT-001 -> 001)
+          const currentRiskNumber = existingRisk.riskNumber;
+          const sequenceMatch = currentRiskNumber.match(/(\d+)$/);
+          const sequenceNumber = sequenceMatch ? sequenceMatch[1] : '001';
+
+          // إنشاء رقم الخطر الجديد برمز الوظيفة الجديد
+          updateData.riskNumber = `${newDepartment.code}-${sequenceNumber}`;
+        }
+      }
     }
     if (body.processId !== undefined) {
       updateData.processId = body.processId || null;

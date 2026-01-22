@@ -109,7 +109,8 @@ export default function AuditLogTab() {
       const response = await fetch(`/api/audit-logs?${params}`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch audit logs');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch audit logs');
       }
 
       const data: AuditLogResponse = await response.json();

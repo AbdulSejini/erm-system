@@ -283,7 +283,7 @@ export function RiskDiscussion({ riskId, currentUserId, currentUserRole }: RiskD
                   </button>
 
                   {showMenuId === comment.id && (
-                    <div className="absolute end-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-[var(--border)] py-1 z-10 min-w-[120px]">
+                    <div className="absolute end-0 top-full mt-1 bg-[var(--card)] rounded-lg shadow-lg border border-[var(--border)] py-1 z-10 min-w-[120px]">
                       <button
                         onClick={() => {
                           setEditingId(comment.id);
@@ -317,7 +317,7 @@ export function RiskDiscussion({ riskId, currentUserId, currentUserRole }: RiskD
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full p-3 border border-[var(--border)] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-white"
+                  className="w-full p-3 border border-[var(--border)] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-[var(--card)]"
                   rows={3}
                 />
                 <div className="flex gap-2 mt-2">
@@ -371,7 +371,7 @@ export function RiskDiscussion({ riskId, currentUserId, currentUserRole }: RiskD
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
+    <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-[var(--border)] bg-[var(--background-tertiary)]">
         <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -432,7 +432,7 @@ export function RiskDiscussion({ riskId, currentUserId, currentUserRole }: RiskD
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder={isAr ? 'اكتب تعليقك هنا...' : 'Write your comment here...'}
-              className="w-full p-3 border border-[var(--border)] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-white"
+              className="w-full p-3 border border-[var(--border)] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-[var(--card)]"
               rows={3}
             />
 

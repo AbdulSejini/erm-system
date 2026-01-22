@@ -17,6 +17,7 @@ import {
   Languages,
   Check,
   Loader2,
+  Key,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { MobileMenuButton } from './Sidebar';
@@ -150,7 +151,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--border)] bg-white px-4 lg:px-6 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 lg:px-6 shadow-sm">
       {/* Left Section */}
       <div className="flex items-center gap-4">
         <MobileMenuButton onClick={onMobileMenuClick} />
@@ -215,7 +216,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                 onClick={() => setShowNotifications(false)}
               />
               <div className={cn(
-                'absolute top-full z-50 mt-2 w-80 rounded-2xl border border-[var(--border)] bg-white shadow-xl',
+                'absolute top-full z-50 mt-2 w-80 rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xl',
                 isRTL ? 'left-0' : 'right-0'
               )}>
                 <div className="flex items-center justify-between border-b border-[var(--border)] p-4">
@@ -336,7 +337,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                 onClick={() => setShowUserMenu(false)}
               />
               <div className={cn(
-                'absolute top-full z-50 mt-2 w-56 rounded-2xl border border-[var(--border)] bg-white py-2 shadow-xl',
+                'absolute top-full z-50 mt-2 w-56 rounded-2xl border border-[var(--border)] bg-[var(--card)] py-2 shadow-xl',
                 isRTL ? 'left-0' : 'right-0'
               )}>
                 <div className="border-b border-[var(--border)] px-4 py-3">
@@ -348,11 +349,33 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                   </p>
                 </div>
                 <div className="py-1">
-                  <button className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-tertiary)]">
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      router.push('/settings?tab=profile');
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-tertiary)]"
+                  >
                     <User className="h-4 w-4 text-[var(--foreground-secondary)]" />
                     {t('navigation.profile')}
                   </button>
-                  <button className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-tertiary)]">
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      router.push('/settings?tab=changePassword');
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-tertiary)]"
+                  >
+                    <Key className="h-4 w-4 text-[var(--foreground-secondary)]" />
+                    {language === 'ar' ? 'تغيير كلمة المرور' : 'Change Password'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      router.push('/settings');
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-tertiary)]"
+                  >
                     <Settings className="h-4 w-4 text-[var(--foreground-secondary)]" />
                     {t('navigation.settings')}
                   </button>

@@ -378,6 +378,8 @@
   "settings": {
     "title": "الإعدادات",
     "general": "عام",
+    "profile": "الملف الشخصي",
+    "changePassword": "تغيير كلمة المرور",
     "users": "المستخدمين",
     "departments": "الوظائف",
     "processes": "العمليات",
@@ -396,7 +398,15 @@
     "exportData": "تصدير البيانات",
     "auditLog": "سجل النشاط",
     "riskAppetite": "شهية المخاطر",
-    "riskEditor": "محرر المخاطر"
+    "riskEditor": "محرر المخاطر",
+    "currentPassword": "كلمة المرور الحالية",
+    "newPassword": "كلمة المرور الجديدة",
+    "confirmNewPassword": "تأكيد كلمة المرور الجديدة",
+    "passwordChanged": "تم تغيير كلمة المرور بنجاح",
+    "passwordMismatch": "كلمات المرور غير متطابقة",
+    "passwordTooShort": "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+    "incorrectPassword": "كلمة المرور الحالية غير صحيحة",
+    "profileUpdated": "تم تحديث الملف الشخصي بنجاح"
   },
   "auditLog": {
     "title": "سجل النشاط",

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -51,6 +52,8 @@ import AuditLogTab from '@/components/AuditLogTab';
 
 // Define all settings tabs
 const allSettingsTabs = [
+  { id: 'profile', icon: UserCheck },
+  { id: 'changePassword', icon: Key },
   { id: 'users', icon: Users },
   { id: 'departments', icon: Building2 },
   { id: 'categories', icon: Tag },
@@ -72,12 +75,12 @@ const allSettingsTabs = [
 // executive: only notifications
 // employee: only notifications
 const roleTabAccess: Record<string, string[]> = {
-  admin: ['users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
-  riskManager: ['users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
-  riskAnalyst: ['notifications'],
-  riskChampion: ['notifications'],
-  executive: ['notifications'],
-  employee: ['notifications'],
+  admin: ['profile', 'changePassword', 'users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
+  riskManager: ['profile', 'changePassword', 'users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
+  riskAnalyst: ['profile', 'changePassword', 'notifications'],
+  riskChampion: ['profile', 'changePassword', 'notifications'],
+  executive: ['profile', 'changePassword', 'notifications'],
+  employee: ['profile', 'changePassword', 'notifications'],
 };
 
 const mockUsers = [
@@ -273,6 +276,7 @@ const statusIcons = [
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { t, language } = useTranslation();
+  const searchParams = useSearchParams();
   const isAr = language === 'ar';
 
   // Get user role from session, default to 'employee' if not found
@@ -290,9 +294,20 @@ export default function SettingsPage() {
     return allowedTabIds.includes(tabId);
   };
 
-  // Set default tab to first accessible tab
-  const defaultTab = accessibleTabs.length > 0 ? accessibleTabs[0].id : 'notifications';
+  // Get tab from URL or use first accessible tab
+  const tabFromUrl = searchParams.get('tab');
+  const defaultTab = (tabFromUrl && canAccessTab(tabFromUrl))
+    ? tabFromUrl
+    : (accessibleTabs.length > 0 ? accessibleTabs[0].id : 'profile');
   const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Update activeTab when URL changes
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && canAccessTab(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [importedRisks, setImportedRisks] = useState<typeof hrRisks>([]);
@@ -1760,6 +1775,224 @@ export default function SettingsPage() {
     }
   };
 
+  // Profile Tab
+  const renderProfileTab = () => {
+    const currentUser = users.find(u => u.email === session?.user?.email);
+
+    return (
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserCheck className="h-5 w-5" />
+            {t('settings.profile')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Avatar Section */}
+          <div className="flex items-center gap-4">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] text-2xl font-bold text-white">
+              {currentUser?.fullName?.charAt(0) || session?.user?.name?.charAt(0) || 'U'}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--foreground)]">
+                {currentUser?.fullName || session?.user?.name}
+              </h3>
+              <p className="text-sm text-[var(--foreground-secondary)]">
+                {session?.user?.email}
+              </p>
+              <Badge variant={currentUser?.status === 'active' ? 'success' : 'default'} className="mt-1">
+                {t(`users.roles.${session?.user?.role || 'employee'}`)}
+              </Badge>
+            </div>
+          </div>
+
+          {/* User Info */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {isAr ? 'الاسم الكامل (عربي)' : 'Full Name (Arabic)'}
+              </label>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-2.5 text-[var(--foreground)]">
+                {currentUser?.fullName || '-'}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {isAr ? 'الاسم الكامل (إنجليزي)' : 'Full Name (English)'}
+              </label>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-2.5 text-[var(--foreground)]">
+                {currentUser?.fullNameEn || '-'}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {t('users.email')}
+              </label>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-2.5 text-[var(--foreground)]">
+                {session?.user?.email || '-'}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {t('users.role')}
+              </label>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-2.5 text-[var(--foreground)]">
+                {t(`users.roles.${session?.user?.role || 'employee'}`)}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {t('users.department')}
+              </label>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-2.5 text-[var(--foreground)]">
+                {currentUser?.department
+                  ? (isAr ? currentUser.department.nameAr : currentUser.department.nameEn)
+                  : '-'}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {t('users.status')}
+              </label>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-2.5 text-[var(--foreground)]">
+                {t(`users.statuses.${currentUser?.status || 'active'}`)}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Change Password Tab
+  const renderChangePasswordTab = () => {
+    const handleChangePassword = async () => {
+      setPasswordError('');
+      setPasswordSuccess('');
+
+      if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
+        setPasswordError(t('settings.passwordMismatch'));
+        return;
+      }
+
+      if (changePasswordForm.newPassword.length < 6) {
+        setPasswordError(t('settings.passwordTooShort'));
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/users/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currentPassword: changePasswordForm.currentPassword,
+            newPassword: changePasswordForm.newPassword,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setPasswordSuccess(t('settings.passwordChanged'));
+          setChangePasswordForm({
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: '',
+          });
+        } else {
+          setPasswordError(result.error || t('settings.incorrectPassword'));
+        }
+      } catch (error) {
+        setPasswordError(isAr ? 'حدث خطأ في تغيير كلمة المرور' : 'Failed to change password');
+      }
+    };
+
+    return (
+      <Card className="max-w-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="h-5 w-5" />
+            {t('settings.changePassword')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {passwordError && (
+            <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              {passwordError}
+            </div>
+          )}
+
+          {passwordSuccess && (
+            <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+              {passwordSuccess}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-[var(--foreground)]">
+              {t('settings.currentPassword')}
+            </label>
+            <div className="relative">
+              <Input
+                type="password"
+                value={changePasswordForm.currentPassword}
+                onChange={(e) => setChangePasswordForm({
+                  ...changePasswordForm,
+                  currentPassword: e.target.value
+                })}
+                placeholder={isAr ? 'أدخل كلمة المرور الحالية' : 'Enter current password'}
+                leftIcon={<Lock className="h-4 w-4" />}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-[var(--foreground)]">
+              {t('settings.newPassword')}
+            </label>
+            <Input
+              type="password"
+              value={changePasswordForm.newPassword}
+              onChange={(e) => setChangePasswordForm({
+                ...changePasswordForm,
+                newPassword: e.target.value
+              })}
+              placeholder={isAr ? 'أدخل كلمة المرور الجديدة' : 'Enter new password'}
+              leftIcon={<Key className="h-4 w-4" />}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-[var(--foreground)]">
+              {t('settings.confirmNewPassword')}
+            </label>
+            <Input
+              type="password"
+              value={changePasswordForm.confirmPassword}
+              onChange={(e) => setChangePasswordForm({
+                ...changePasswordForm,
+                confirmPassword: e.target.value
+              })}
+              placeholder={isAr ? 'أعد إدخال كلمة المرور الجديدة' : 'Confirm new password'}
+              leftIcon={<Key className="h-4 w-4" />}
+            />
+          </div>
+
+          <Button
+            onClick={handleChangePassword}
+            className="w-full mt-4"
+            disabled={!changePasswordForm.currentPassword || !changePasswordForm.newPassword || !changePasswordForm.confirmPassword}
+          >
+            <Key className="h-4 w-4 me-2" />
+            {t('settings.changePassword')}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderUsersTab = () => (
     <div className="space-y-3 sm:space-y-4">
       <div className="flex flex-col gap-2 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -2679,6 +2912,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab Content - Only render if user has access */}
+      {activeTab === 'profile' && canAccessTab('profile') && renderProfileTab()}
+      {activeTab === 'changePassword' && canAccessTab('changePassword') && renderChangePasswordTab()}
       {activeTab === 'users' && canAccessTab('users') && renderUsersTab()}
       {activeTab === 'departments' && canAccessTab('departments') && renderDepartmentsTab()}
       {activeTab === 'notifications' && canAccessTab('notifications') && renderNotificationsTab()}

@@ -198,6 +198,16 @@ export default function RiskEditor() {
             updated.residualRating = calculateRating(updated.residualScore);
           }
         }
+        // Update risk number when department changes (change code, keep sequence number)
+        if (field === 'departmentId' && value) {
+          const newDepartment = departments.find(d => d.id === value);
+          if (newDepartment) {
+            // Extract sequence number from current risk number (e.g., IT-001 -> 001)
+            const sequenceMatch = risk.riskNumber.match(/(\d+)$/);
+            const sequenceNumber = sequenceMatch ? sequenceMatch[1] : '001';
+            updated.riskNumber = `${newDepartment.code}-${sequenceNumber}`;
+          }
+        }
         return updated;
       }
       return risk;
@@ -601,14 +611,9 @@ export default function RiskEditor() {
                   />
                 </td>
                 <td className="p-2 border-b border-[var(--border)]">
-                  <input
-                    type="text"
-                    value={risk.riskNumber}
-                    onChange={(e) => handleCellEdit(risk.id, 'riskNumber', e.target.value)}
-                    className={`w-full px-2 py-1 text-sm bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${
-                      isCellEdited(risk.id, 'riskNumber') ? 'border-orange-500 bg-orange-50' : 'border-transparent hover:border-[var(--border)]'
-                    }`}
-                  />
+                  <span className="px-2 py-1 text-sm font-medium text-[var(--foreground)]">
+                    {risk.riskNumber}
+                  </span>
                 </td>
                 <td className="p-2 border-b border-[var(--border)]">
                   <input

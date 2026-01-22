@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -79,6 +80,7 @@ const normalizeRating = (rating: string | null | undefined): RiskRating => {
 };
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
   const [showAlerts, setShowAlerts] = useState(false);
@@ -346,7 +348,7 @@ export default function DashboardPage() {
       case 'Negligible':
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-400';
     }
   };
 
@@ -364,14 +366,14 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Page Header - Clean Light Theme */}
-      <div className="rounded-2xl bg-white p-4 sm:p-6 shadow-sm border border-[var(--border)]">
+      <div className="rounded-2xl bg-[var(--card)] p-4 sm:p-6 shadow-sm border border-[var(--border)]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[var(--foreground)]">
               {t('dashboard.title')}
             </h1>
             <p className="mt-1 text-sm sm:text-base text-[var(--foreground-secondary)]">
-              {t('dashboard.welcome')}، {isAr ? 'عبدالإله سجيني' : 'Abdulelah Sejini'}
+              {t('dashboard.welcome')}، {session?.user?.name || (isAr ? 'مستخدم' : 'User')}
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -404,7 +406,7 @@ export default function DashboardPage() {
               {showAlerts && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowAlerts(false)} />
-                  <div className={`absolute top-full z-50 mt-2 w-80 sm:w-96 rounded-2xl border border-[var(--border)] bg-white shadow-xl ${isAr ? 'left-0' : 'right-0'}`}>
+                  <div className={`absolute top-full z-50 mt-2 w-80 sm:w-96 rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xl ${isAr ? 'left-0' : 'right-0'}`}>
                     <div className="flex items-center justify-between border-b border-[var(--border)] p-4">
                       <h3 className="font-semibold text-[var(--foreground)]">
                         {isAr ? 'التنبيهات' : 'Alerts'}
@@ -542,7 +544,7 @@ export default function DashboardPage() {
 
       {/* Secondary Stats - Clean Light Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-white">
+        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-[var(--card)]">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[var(--foreground-secondary)]">
@@ -562,7 +564,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-white">
+        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-[var(--card)]">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[var(--foreground-secondary)]">
@@ -576,7 +578,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-white">
+        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-[var(--card)]">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[var(--foreground-secondary)]">
@@ -590,7 +592,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-white">
+        <Card className="p-5 border border-[var(--border)] shadow-sm rounded-2xl bg-[var(--card)]">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[var(--foreground-secondary)]">
@@ -608,7 +610,7 @@ export default function DashboardPage() {
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Risk Matrix */}
-        <Card className="lg:col-span-2 border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+        <Card className="lg:col-span-2 border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-[var(--card)]">
           <div className="border-b border-[var(--border)] p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[var(--foreground)]">{t('dashboard.riskMatrix')}</h3>
@@ -627,7 +629,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Upcoming Deadlines */}
-        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-[var(--card)]">
           <div className="border-b border-[var(--border)] p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -692,7 +694,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Risks Table */}
-      <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+      <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-[var(--card)]">
         <div className="border-b border-[var(--border)] p-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-[var(--foreground)]">{t('dashboard.recentRisks')}</h3>
@@ -774,7 +776,7 @@ export default function DashboardPage() {
       {/* Bottom Grid: Recent Activity & Champion Performance */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent Activity */}
-        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-[var(--card)]">
           <div className="border-b border-[var(--border)] p-4">
             <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
               <Zap className="h-5 w-5 text-[var(--primary)]" />
@@ -810,7 +812,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Champion Performance */}
-        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-white">
+        <Card className="border border-[var(--border)] shadow-sm rounded-2xl overflow-hidden bg-[var(--card)]">
           <div className="border-b border-[var(--border)] p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">

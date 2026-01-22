@@ -106,7 +106,7 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
       {/* Sidebar - Clean Light Design */}
       <aside
         className={cn(
-          'fixed top-0 z-50 flex h-full flex-col bg-white border-e border-[var(--border)] shadow-sm transition-all duration-300 lg:relative lg:z-auto',
+          'fixed top-0 z-50 flex h-full flex-col bg-[var(--sidebar-bg)] border-e border-[var(--border)] shadow-sm transition-all duration-300 lg:relative lg:z-auto',
           isCollapsed ? 'w-20' : 'w-64',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           isRTL && isMobileOpen ? 'translate-x-0' : isRTL && 'translate-x-full lg:translate-x-0'
