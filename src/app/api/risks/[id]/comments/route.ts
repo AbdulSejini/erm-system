@@ -201,7 +201,14 @@ export async function POST(
         isInternal,
         attachments: body.attachments ? JSON.stringify(body.attachments) : null,
       },
-      include: {
+      select: {
+        id: true,
+        content: true,
+        type: true,
+        parentId: true,
+        isInternal: true,
+        attachments: true,
+        createdAt: true,
         author: {
           select: {
             id: true,
@@ -297,6 +304,8 @@ async function checkRiskAccess(
 }
 
 // دالة إرسال الإشعارات عند إضافة تعليق
+// الإشعارات تصل للمستخدمين حسب وظيفتهم والأقسام المتاحة لهم
+// من أضاف التعليق لا يستلم إشعار
 async function sendCommentNotifications(
   risk: {
     id: string;
@@ -305,11 +314,13 @@ async function sendCommentNotifications(
     titleEn: string;
     departmentId: string;
     ownerId: string;
+    riskOwnerId: string | null;
     championId: string | null;
   },
   comment: {
     id: string;
     content: string;
+    parentId?: string | null;
     author: {
       id: string;
       fullName: string;
@@ -325,53 +336,116 @@ async function sendCommentNotifications(
   try {
     const notificationRecipients = new Set<string>();
 
-    // 1. إضافة مالك الخطر (إذا لم يكن هو من كتب التعليق)
+    // 1. صاحب الخطر (ownerId - User)
     if (risk.ownerId !== currentUser.id) {
       notificationRecipients.add(risk.ownerId);
     }
 
-    // 2. إضافة رائد المخاطر للخطر (إذا لم يكن هو من كتب التعليق)
+    // 2. صاحب الخطر (riskOwnerId - RiskOwner) - البحث عن المستخدم المرتبط بالبريد
+    if (risk.riskOwnerId) {
+      const riskOwner = await prisma.riskOwner.findUnique({
+        where: { id: risk.riskOwnerId },
+        select: { email: true },
+      });
+
+      if (riskOwner?.email) {
+        const riskOwnerUser = await prisma.user.findUnique({
+          where: { email: riskOwner.email },
+          select: { id: true, status: true },
+        });
+
+        if (riskOwnerUser && riskOwnerUser.status === 'active' && riskOwnerUser.id !== currentUser.id) {
+          notificationRecipients.add(riskOwnerUser.id);
+        }
+      }
+    }
+
+    // 3. رائد المخاطر للخطر (championId)
     if (risk.championId && risk.championId !== currentUser.id) {
       notificationRecipients.add(risk.championId);
     }
 
-    // 3. إضافة رائد المخاطر المسؤول عن الإدارة
+    // 4. رائد المخاطر للوظيفة/القسم (department.riskChampionId)
     const department = await prisma.department.findUnique({
       where: { id: risk.departmentId },
-      select: { riskChampionId: true },
+      select: {
+        riskChampionId: true,
+        code: true,
+        nameAr: true,
+      },
     });
 
     if (department?.riskChampionId && department.riskChampionId !== currentUser.id) {
       notificationRecipients.add(department.riskChampionId);
     }
 
-    // 4. إضافة جميع العاملين في إدارة المخاطر (admin, riskManager, riskAnalyst)
-    // فقط إذا لم يكن التعليق داخلي أو إذا كان داخلي نرسل لهم أيضاً
-    const riskManagementStaff = await prisma.user.findMany({
+    // 5. المستخدمين في نفس الوظيفة/القسم (departmentId)
+    // مثال: جميع مستخدمي الصيانة MAI يستلمون إشعار للخطر MAI-R-643
+    const departmentUsers = await prisma.user.findMany({
       where: {
-        role: { in: ['admin', 'riskManager', 'riskAnalyst'] },
+        departmentId: risk.departmentId,
         status: 'active',
-        id: { not: currentUser.id }, // استثناء المستخدم الحالي
+        id: { not: currentUser.id },
       },
       select: { id: true },
     });
 
-    for (const staff of riskManagementStaff) {
-      notificationRecipients.add(staff.id);
+    for (const user of departmentUsers) {
+      notificationRecipients.add(user.id);
     }
 
-    // 5. إذا كان التعليق رداً، نرسل إشعار لصاحب التعليق الأصلي
-    if (comment.id) {
-      const originalComment = await prisma.riskComment.findFirst({
-        where: {
-          riskId: risk.id,
-          replies: { some: { id: comment.id } },
+    // 6. المستخدمين الذين لديهم صلاحية الوصول للوظيفة (UserDepartmentAccess)
+    // مثال: مستخدم لديه وصول لـ MAI يستلم إشعار للخطر MAI-R-643
+    const usersWithAccess = await prisma.userDepartmentAccess.findMany({
+      where: {
+        departmentId: risk.departmentId,
+        canView: true,
+        user: {
+          status: 'active',
+          id: { not: currentUser.id },
         },
+      },
+      select: { userId: true },
+    });
+
+    for (const access of usersWithAccess) {
+      notificationRecipients.add(access.userId);
+    }
+
+    // 7. رواد المخاطر الذين يديرون الوظيفة/القسم (championDepartments)
+    // البحث عن جميع رواد المخاطر المسؤولين عن هذا القسم
+    const championUsers = await prisma.user.findMany({
+      where: {
+        role: 'riskChampion',
+        status: 'active',
+        id: { not: currentUser.id },
+        championDepartments: {
+          some: { id: risk.departmentId },
+        },
+      },
+      select: { id: true },
+    });
+
+    for (const champion of championUsers) {
+      notificationRecipients.add(champion.id);
+    }
+
+    // 8. إذا كان التعليق رداً، نرسل إشعار لصاحب التعليق الأصلي
+    if (comment.parentId) {
+      const originalComment = await prisma.riskComment.findUnique({
+        where: { id: comment.parentId },
         select: { authorId: true },
       });
 
       if (originalComment && originalComment.authorId !== currentUser.id) {
-        notificationRecipients.add(originalComment.authorId);
+        // التحقق من أن المستخدم نشط
+        const originalAuthor = await prisma.user.findUnique({
+          where: { id: originalComment.authorId },
+          select: { status: true },
+        });
+        if (originalAuthor?.status === 'active') {
+          notificationRecipients.add(originalComment.authorId);
+        }
       }
     }
 
@@ -397,7 +471,7 @@ async function sendCommentNotifications(
       });
     }
 
-    console.log(`Sent ${notifications.length} notifications for comment on risk ${risk.riskNumber}`);
+    console.log(`Sent ${notifications.length} notifications for comment on risk ${risk.riskNumber} (${department?.code || 'N/A'})`);
   } catch (error) {
     console.error('Error sending comment notifications:', error);
     // لا نريد أن يفشل إنشاء التعليق بسبب فشل الإشعارات
