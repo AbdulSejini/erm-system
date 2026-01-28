@@ -32,6 +32,8 @@ import {
   FileText,
   Zap,
   Loader2,
+  X,
+  Pencil,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 
@@ -59,11 +61,27 @@ interface APIRisk {
     id: string;
     nameAr: string;
     nameEn: string;
+    riskChampion?: {
+      id: string;
+      fullName: string;
+      fullNameEn: string | null;
+    };
   };
   owner?: {
     id: string;
     fullName: string;
     fullNameEn: string | null;
+  };
+  champion?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+  };
+  riskOwner?: {
+    id: string;
+    nameAr: string;
+    nameEn: string | null;
+    email: string | null;
   };
 }
 
@@ -328,6 +346,26 @@ export default function TreatmentPage() {
   const [risks, setRisks] = useState<APIRisk[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // State for wizard form
+  const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<TreatmentStrategy | null>(null);
+  const [planTitle, setPlanTitle] = useState('');
+  const [responsibleId, setResponsibleId] = useState<string | null>(null);
+  const [dueDate, setDueDate] = useState('');
+  const [tasks, setTasks] = useState<{ id: string; titleAr: string; titleEn: string }[]>([]);
+  const [newTaskTitleAr, setNewTaskTitleAr] = useState('');
+  const [newTaskTitleEn, setNewTaskTitleEn] = useState('');
+  const [riskSearchQuery, setRiskSearchQuery] = useState('');
+  const [responsibleOptions, setResponsibleOptions] = useState<{ id: string; name: string; nameEn: string; role: string }[]>([]);
+  const [allResponsibleUsers, setAllResponsibleUsers] = useState<{ id: string; name: string; nameEn: string; role: string }[]>([]);
+  const [responsibleSearchQuery, setResponsibleSearchQuery] = useState('');
+  const [showResponsibleDropdown, setShowResponsibleDropdown] = useState(false);
+
+  // State for editing treatment
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null);
+  const [editWizardStep, setEditWizardStep] = useState(1);
+
   // Fetch risks from API
   useEffect(() => {
     const fetchRisks = async () => {
@@ -348,6 +386,237 @@ export default function TreatmentPage() {
 
     fetchRisks();
   }, []);
+
+  // Fetch all potential responsible users (riskManager, riskAnalyst, riskChampion, employee) + Risk Owners
+  useEffect(() => {
+    const fetchResponsibleUsers = async () => {
+      try {
+        // Fetch users with allowed roles
+        const usersResponse = await fetch('/api/users');
+        const usersResult = await usersResponse.json();
+
+        const allUsers: { id: string; name: string; nameEn: string; role: string }[] = [];
+
+        if (usersResult.success && usersResult.data) {
+          // Filter users: riskManager, riskAnalyst, riskChampion, employee (NOT admin)
+          const filteredUsers = usersResult.data
+            .filter((user: { role: string; status: string }) =>
+              ['riskManager', 'riskAnalyst', 'riskChampion', 'employee'].includes(user.role) &&
+              user.status === 'active'
+            )
+            .map((user: { id: string; fullName: string; fullNameEn: string | null; role: string }) => ({
+              id: user.id,
+              name: user.fullName,
+              nameEn: user.fullNameEn || user.fullName,
+              role: getRoleLabel(user.role, isAr),
+            }));
+          allUsers.push(...filteredUsers);
+        }
+
+        // Fetch Risk Owners
+        const riskOwnersResponse = await fetch('/api/risk-owners');
+        const riskOwnersResult = await riskOwnersResponse.json();
+
+        if (riskOwnersResult.success && riskOwnersResult.data) {
+          const riskOwners = riskOwnersResult.data.map((owner: { id: string; nameAr: string; nameEn: string | null }) => ({
+            id: `riskOwner_${owner.id}`, // Prefix to distinguish from users
+            name: owner.nameAr,
+            nameEn: owner.nameEn || owner.nameAr,
+            role: isAr ? 'مالك خطر' : 'Risk Owner',
+          }));
+          allUsers.push(...riskOwners);
+        }
+
+        setAllResponsibleUsers(allUsers);
+      } catch (err) {
+        console.error('Error fetching responsible users:', err);
+      }
+    };
+
+    fetchResponsibleUsers();
+  }, [isAr]);
+
+  // Helper function to get role label
+  const getRoleLabel = (role: string, isArabic: boolean): string => {
+    const roleLabels: Record<string, { ar: string; en: string }> = {
+      riskManager: { ar: 'مدير المخاطر', en: 'Risk Manager' },
+      riskAnalyst: { ar: 'محلل المخاطر', en: 'Risk Analyst' },
+      riskChampion: { ar: 'رائد المخاطر', en: 'Risk Champion' },
+      employee: { ar: 'موظف', en: 'Employee' },
+    };
+    return roleLabels[role]?.[isArabic ? 'ar' : 'en'] || role;
+  };
+
+  // Update responsible options when a risk is selected (combine risk-specific + all users)
+  useEffect(() => {
+    const options: { id: string; name: string; nameEn: string; role: string }[] = [];
+
+    if (selectedRiskId) {
+      const selectedRisk = risks.find(r => r.id === selectedRiskId);
+      if (selectedRisk) {
+        // Add risk owner (priority)
+        if (selectedRisk.owner) {
+          options.push({
+            id: selectedRisk.owner.id,
+            name: selectedRisk.owner.fullName,
+            nameEn: selectedRisk.owner.fullNameEn || selectedRisk.owner.fullName,
+            role: isAr ? 'مالك الخطر' : 'Risk Owner',
+          });
+        }
+
+        // Add risk champion (from risk)
+        if (selectedRisk.champion) {
+          const exists = options.some(o => o.id === selectedRisk.champion!.id);
+          if (!exists) {
+            options.push({
+              id: selectedRisk.champion.id,
+              name: selectedRisk.champion.fullName,
+              nameEn: selectedRisk.champion.fullNameEn || selectedRisk.champion.fullName,
+              role: isAr ? 'رائد الخطر' : 'Risk Champion',
+            });
+          }
+        }
+
+        // Add department risk champion
+        if (selectedRisk.department?.riskChampion) {
+          const exists = options.some(o => o.id === selectedRisk.department!.riskChampion!.id);
+          if (!exists) {
+            options.push({
+              id: selectedRisk.department.riskChampion.id,
+              name: selectedRisk.department.riskChampion.fullName,
+              nameEn: selectedRisk.department.riskChampion.fullNameEn || selectedRisk.department.riskChampion.fullName,
+              role: isAr ? 'رائد مخاطر القسم' : 'Department Risk Champion',
+            });
+          }
+        }
+      }
+    }
+
+    // Add all other responsible users that are not already in the list
+    for (const user of allResponsibleUsers) {
+      const exists = options.some(o => o.id === user.id);
+      if (!exists) {
+        options.push(user);
+      }
+    }
+
+    setResponsibleOptions(options);
+
+    // Auto-select risk owner if available and no selection yet
+    if (selectedRiskId && options.length > 0 && !responsibleId) {
+      setResponsibleId(options[0].id);
+      setResponsibleSearchQuery(isAr ? options[0].name : options[0].nameEn);
+    }
+  }, [selectedRiskId, risks, isAr, allResponsibleUsers]);
+
+  // Reset wizard form when modal closes
+  const resetWizardForm = () => {
+    setSelectedRiskId(null);
+    setSelectedStrategy(null);
+    setPlanTitle('');
+    setResponsibleId(null);
+    setResponsibleSearchQuery('');
+    setShowResponsibleDropdown(false);
+    setDueDate('');
+    setTasks([]);
+    setNewTaskTitleAr('');
+    setNewTaskTitleEn('');
+    setRiskSearchQuery('');
+    setWizardStep(1);
+  };
+
+  // Open edit modal with existing treatment data
+  const openEditModal = (treatmentId: string) => {
+    const treatment = treatments.find(t => t.id === treatmentId);
+    if (!treatment) return;
+
+    setEditingTreatmentId(treatmentId);
+    setSelectedRiskId(treatmentId); // Risk ID is same as treatment ID in current implementation
+    setSelectedStrategy(treatment.strategy);
+    setPlanTitle(isAr ? treatment.titleAr : treatment.titleEn);
+    setDueDate(treatment.dueDate);
+    setTasks(treatment.tasks.map(t => ({
+      id: t.id,
+      titleAr: t.titleAr,
+      titleEn: t.titleEn,
+    })));
+
+    // Find responsible from options
+    const responsible = responsibleOptions.find(
+      o => (isAr ? o.name : o.nameEn) === (isAr ? treatment.responsibleAr : treatment.responsibleEn)
+    );
+    if (responsible) {
+      setResponsibleId(responsible.id);
+      setResponsibleSearchQuery(isAr ? responsible.name : responsible.nameEn);
+    }
+
+    setEditWizardStep(1);
+    setShowEditModal(true);
+  };
+
+  // Reset edit form
+  const resetEditForm = () => {
+    setEditingTreatmentId(null);
+    setSelectedRiskId(null);
+    setSelectedStrategy(null);
+    setPlanTitle('');
+    setResponsibleId(null);
+    setResponsibleSearchQuery('');
+    setShowResponsibleDropdown(false);
+    setDueDate('');
+    setTasks([]);
+    setNewTaskTitleAr('');
+    setNewTaskTitleEn('');
+    setEditWizardStep(1);
+  };
+
+  // Close responsible dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.responsible-dropdown-container')) {
+        setShowResponsibleDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Add a new task
+  const addTask = () => {
+    if (newTaskTitleAr.trim() || newTaskTitleEn.trim()) {
+      setTasks([
+        ...tasks,
+        {
+          id: Date.now().toString(),
+          titleAr: newTaskTitleAr.trim() || newTaskTitleEn.trim(),
+          titleEn: newTaskTitleEn.trim() || newTaskTitleAr.trim(),
+        },
+      ]);
+      setNewTaskTitleAr('');
+      setNewTaskTitleEn('');
+    }
+  };
+
+  // Remove a task
+  const removeTask = (taskId: string) => {
+    setTasks(tasks.filter(t => t.id !== taskId));
+  };
+
+  // Filter risks for selection
+  const filteredRisksForSelection = risks.filter(risk => {
+    if (!riskSearchQuery) return true;
+    const query = riskSearchQuery.toLowerCase();
+    return (
+      risk.riskNumber.toLowerCase().includes(query) ||
+      risk.titleAr.includes(riskSearchQuery) ||
+      risk.titleEn.toLowerCase().includes(query)
+    );
+  });
+
+  // Get selected risk details
+  const selectedRisk = selectedRiskId ? risks.find(r => r.id === selectedRiskId) : null;
 
   // Generate treatments from risks
   const treatments = useMemo(() => {
@@ -733,6 +1002,14 @@ export default function TreatmentPage() {
                       {getStrategyIcon(treatment.strategy)}
                       <span className="ms-1 text-[10px] sm:text-xs">{t(`treatment.strategies.${treatment.strategy}`)}</span>
                     </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEditModal(treatment.id)}
+                      className="p-1.5"
+                    >
+                      <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
                   </div>
                 </div>
 
@@ -955,7 +1232,7 @@ export default function TreatmentPage() {
         isOpen={showAddModal}
         onClose={() => {
           setShowAddModal(false);
-          setWizardStep(1);
+          resetWizardForm();
         }}
         title={t('treatment.addPlan')}
         size="lg"
@@ -1004,9 +1281,54 @@ export default function TreatmentPage() {
                     ? 'اختر من قائمة المخاطر المسجلة التي تحتاج إلى خطة معالجة'
                     : 'Choose from the list of registered risks that need a treatment plan'}
                 </p>
-                {/* Risk selection list would go here */}
-                <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-2 sm:p-3 md:p-4 text-center text-xs sm:text-sm text-[var(--foreground-muted)]">
-                  {isAr ? 'سيتم عرض قائمة المخاطر هنا' : 'Risk list will be displayed here'}
+                {/* Search input */}
+                <div className="mb-3">
+                  <Input
+                    placeholder={isAr ? 'البحث عن خطر...' : 'Search for a risk...'}
+                    value={riskSearchQuery}
+                    onChange={(e) => setRiskSearchQuery(e.target.value)}
+                    leftIcon={<Search className="h-4 w-4" />}
+                  />
+                </div>
+                {/* Risk selection list */}
+                <div className="max-h-[250px] overflow-y-auto space-y-2">
+                  {filteredRisksForSelection.length === 0 ? (
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-4 text-center text-sm text-[var(--foreground-muted)]">
+                      {isAr ? 'لا توجد مخاطر متاحة' : 'No risks available'}
+                    </div>
+                  ) : (
+                    filteredRisksForSelection.map((risk) => (
+                      <button
+                        key={risk.id}
+                        onClick={() => setSelectedRiskId(risk.id)}
+                        className={`w-full rounded-lg border p-3 text-start transition-colors ${
+                          selectedRiskId === risk.id
+                            ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                            : 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <code className="shrink-0 rounded bg-[var(--background-tertiary)] px-1.5 py-0.5 text-[10px] sm:text-xs">
+                              {risk.riskNumber}
+                            </code>
+                            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getRatingColor(normalizeRating(risk.inherentRating))}`}>
+                              {normalizeRating(risk.inherentRating)}
+                            </span>
+                          </div>
+                          {selectedRiskId === risk.id && (
+                            <Check className="h-4 w-4 text-[var(--primary)] shrink-0" />
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm font-medium text-[var(--foreground)] truncate">
+                          {isAr ? risk.titleAr : risk.titleEn}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[var(--foreground-muted)] truncate">
+                          {risk.department ? (isAr ? risk.department.nameAr : risk.department.nameEn) : '-'}
+                        </p>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -1016,17 +1338,37 @@ export default function TreatmentPage() {
                 <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
                   {isAr ? 'اختر استراتيجية المعالجة' : 'Select treatment strategy'}
                 </h4>
+                {selectedRisk && (
+                  <div className="mb-3 p-2 rounded-lg bg-[var(--background)] border border-[var(--border)]">
+                    <p className="text-xs text-[var(--foreground-muted)]">
+                      {isAr ? 'الخطر المختار:' : 'Selected risk:'}
+                    </p>
+                    <p className="text-sm font-medium text-[var(--foreground)]">
+                      {selectedRisk.riskNumber} - {isAr ? selectedRisk.titleAr : selectedRisk.titleEn}
+                    </p>
+                  </div>
+                )}
                 <div className="grid gap-2 sm:gap-3 sm:grid-cols-2">
                   {(['avoid', 'reduce', 'transfer', 'accept'] as TreatmentStrategy[]).map((strategy) => (
                     <button
                       key={strategy}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-2 sm:p-3 md:p-4 text-start transition-colors hover:border-[var(--primary)] hover:bg-[var(--primary-light)]"
+                      onClick={() => setSelectedStrategy(strategy)}
+                      className={`rounded-lg border p-2 sm:p-3 md:p-4 text-start transition-colors ${
+                        selectedStrategy === strategy
+                          ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                          : 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]/50'
+                      }`}
                     >
-                      <div className="flex items-center gap-2">
-                        {getStrategyIcon(strategy)}
-                        <span className="text-xs sm:text-sm font-medium text-[var(--foreground)]">
-                          {t(`treatment.strategies.${strategy}`)}
-                        </span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {getStrategyIcon(strategy)}
+                          <span className="text-xs sm:text-sm font-medium text-[var(--foreground)]">
+                            {t(`treatment.strategies.${strategy}`)}
+                          </span>
+                        </div>
+                        {selectedStrategy === strategy && (
+                          <Check className="h-4 w-4 text-[var(--primary)] shrink-0" />
+                        )}
                       </div>
                       <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
                         {isAr ? strategyDescriptions[strategy].ar : strategyDescriptions[strategy].en}
@@ -1042,25 +1384,128 @@ export default function TreatmentPage() {
                 <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
                   {isAr ? 'تفاصيل خطة المعالجة' : 'Treatment plan details'}
                 </h4>
+                {/* Selected risk and strategy summary */}
+                {selectedRisk && selectedStrategy && (
+                  <div className="mb-3 p-2 rounded-lg bg-[var(--background)] border border-[var(--border)]">
+                    <div className="flex items-center gap-4 text-xs">
+                      <div>
+                        <span className="text-[var(--foreground-muted)]">{isAr ? 'الخطر:' : 'Risk:'}</span>
+                        <span className="ms-1 font-medium text-[var(--foreground)]">{selectedRisk.riskNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-[var(--foreground-muted)]">{isAr ? 'الاستراتيجية:' : 'Strategy:'}</span>
+                        <span className="ms-1 font-medium text-[var(--foreground)]">{t(`treatment.strategies.${selectedStrategy}`)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-3 sm:space-y-4">
                   <div>
                     <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
                       {isAr ? 'عنوان الخطة' : 'Plan Title'}
                     </label>
-                    <Input placeholder={isAr ? 'أدخل عنوان الخطة' : 'Enter plan title'} />
+                    <Input
+                      placeholder={isAr ? 'أدخل عنوان الخطة' : 'Enter plan title'}
+                      value={planTitle}
+                      onChange={(e) => setPlanTitle(e.target.value)}
+                    />
                   </div>
                   <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
-                    <div>
+                    <div className="relative responsible-dropdown-container">
                       <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
                         {isAr ? 'المسؤول' : 'Responsible'}
                       </label>
-                      <Input placeholder={isAr ? 'اختر المسؤول' : 'Select responsible'} />
+                      <div className="relative">
+                        <Input
+                          placeholder={isAr ? 'ابحث عن المسؤول...' : 'Search for responsible...'}
+                          value={responsibleSearchQuery}
+                          onChange={(e) => {
+                            setResponsibleSearchQuery(e.target.value);
+                            setShowResponsibleDropdown(true);
+                            // Clear selection if user is typing
+                            if (responsibleId) {
+                              const selected = responsibleOptions.find(o => o.id === responsibleId);
+                              const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
+                              if (e.target.value !== displayName) {
+                                setResponsibleId(null);
+                              }
+                            }
+                          }}
+                          onFocus={() => setShowResponsibleDropdown(true)}
+                          leftIcon={<User className="h-4 w-4" />}
+                        />
+                        {/* Dropdown */}
+                        {showResponsibleDropdown && (
+                          <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
+                            {responsibleOptions
+                              .filter(option => {
+                                if (!responsibleSearchQuery) return true;
+                                const query = responsibleSearchQuery.toLowerCase();
+                                return (
+                                  option.name.toLowerCase().includes(query) ||
+                                  option.nameEn.toLowerCase().includes(query) ||
+                                  option.role.toLowerCase().includes(query)
+                                );
+                              })
+                              .slice(0, 10)
+                              .map((option) => (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setResponsibleId(option.id);
+                                    setResponsibleSearchQuery(isAr ? option.name : option.nameEn);
+                                    setShowResponsibleDropdown(false);
+                                  }}
+                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${
+                                    responsibleId === option.id ? 'bg-[var(--primary-light)]' : ''
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium text-[var(--foreground)]">
+                                      {isAr ? option.name : option.nameEn}
+                                    </span>
+                                    {responsibleId === option.id && (
+                                      <Check className="h-4 w-4 text-[var(--primary)]" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-[var(--foreground-muted)]">
+                                    {option.role}
+                                  </span>
+                                </button>
+                              ))}
+                            {responsibleOptions.filter(option => {
+                              if (!responsibleSearchQuery) return true;
+                              const query = responsibleSearchQuery.toLowerCase();
+                              return (
+                                option.name.toLowerCase().includes(query) ||
+                                option.nameEn.toLowerCase().includes(query) ||
+                                option.role.toLowerCase().includes(query)
+                              );
+                            }).length === 0 && (
+                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">
+                                {isAr ? 'لا توجد نتائج' : 'No results found'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {/* Selected indicator */}
+                      {responsibleId && (
+                        <p className="mt-1 text-xs text-[var(--status-success)]">
+                          {isAr ? '✓ تم اختيار المسؤول' : '✓ Responsible selected'}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
                         {isAr ? 'تاريخ الانتهاء' : 'Due Date'}
                       </label>
-                      <Input type="date" />
+                      <Input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1072,14 +1517,85 @@ export default function TreatmentPage() {
                 <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
                   {isAr ? 'إضافة المهام' : 'Add Tasks'}
                 </h4>
-                <p className="mb-3 sm:mb-4 text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                <p className="mb-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
                   {isAr
                     ? 'قم بتقسيم خطة المعالجة إلى مهام قابلة للتتبع'
                     : 'Break down the treatment plan into trackable tasks'}
                 </p>
-                <Button variant="outline" size="sm" leftIcon={<Plus className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}>
-                  <span className="text-xs sm:text-sm">{isAr ? 'إضافة مهمة' : 'Add Task'}</span>
-                </Button>
+
+                {/* Task input form */}
+                <div className="mb-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'عنوان المهمة (عربي)' : 'Task Title (Arabic)'}
+                      </label>
+                      <Input
+                        placeholder={isAr ? 'أدخل عنوان المهمة بالعربية' : 'Enter task title in Arabic'}
+                        value={newTaskTitleAr}
+                        onChange={(e) => setNewTaskTitleAr(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'عنوان المهمة (إنجليزي)' : 'Task Title (English)'}
+                      </label>
+                      <Input
+                        placeholder={isAr ? 'أدخل عنوان المهمة بالإنجليزية' : 'Enter task title in English'}
+                        value={newTaskTitleEn}
+                        onChange={(e) => setNewTaskTitleEn(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Plus className="h-4 w-4" />}
+                      onClick={addTask}
+                      disabled={!newTaskTitleAr.trim() && !newTaskTitleEn.trim()}
+                    >
+                      <span className="text-xs sm:text-sm">{isAr ? 'إضافة مهمة' : 'Add Task'}</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Tasks list */}
+                {tasks.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-[var(--foreground-secondary)]">
+                      {isAr ? `المهام المضافة (${tasks.length})` : `Added Tasks (${tasks.length})`}
+                    </p>
+                    {tasks.map((task, index) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] p-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--background-tertiary)] text-xs font-medium">
+                            {index + 1}
+                          </span>
+                          <span className="text-sm text-[var(--foreground)] truncate">
+                            {isAr ? task.titleAr : task.titleEn}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeTask(task.id)}
+                          className="shrink-0 p-1 text-[var(--foreground-muted)] hover:text-[var(--status-error)] transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-[var(--border)] p-4 text-center">
+                    <ListChecks className="mx-auto h-8 w-8 text-[var(--foreground-muted)]" />
+                    <p className="mt-2 text-sm text-[var(--foreground-muted)]">
+                      {isAr ? 'لم يتم إضافة أي مهام بعد' : 'No tasks added yet'}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1088,11 +1604,89 @@ export default function TreatmentPage() {
                 <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
                   {isAr ? 'مراجعة وحفظ' : 'Review and Save'}
                 </h4>
-                <p className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                <p className="mb-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
                   {isAr
                     ? 'راجع تفاصيل خطة المعالجة قبل الحفظ'
                     : 'Review treatment plan details before saving'}
                 </p>
+
+                {/* Summary */}
+                <div className="space-y-3">
+                  {/* Risk */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'الخطر' : 'Risk'}</p>
+                    {selectedRisk ? (
+                      <p className="text-sm font-medium text-[var(--foreground)]">
+                        {selectedRisk.riskNumber} - {isAr ? selectedRisk.titleAr : selectedRisk.titleEn}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-[var(--status-error)]">{isAr ? 'لم يتم اختيار خطر' : 'No risk selected'}</p>
+                    )}
+                  </div>
+
+                  {/* Strategy */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'الاستراتيجية' : 'Strategy'}</p>
+                    {selectedStrategy ? (
+                      <div className="flex items-center gap-2">
+                        {getStrategyIcon(selectedStrategy)}
+                        <span className="text-sm font-medium text-[var(--foreground)]">
+                          {t(`treatment.strategies.${selectedStrategy}`)}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[var(--status-error)]">{isAr ? 'لم يتم اختيار استراتيجية' : 'No strategy selected'}</p>
+                    )}
+                  </div>
+
+                  {/* Plan Details */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                      <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'عنوان الخطة' : 'Plan Title'}</p>
+                      <p className="text-sm font-medium text-[var(--foreground)]">
+                        {planTitle || (isAr ? 'غير محدد' : 'Not specified')}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                      <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'تاريخ الانتهاء' : 'Due Date'}</p>
+                      <p className="text-sm font-medium text-[var(--foreground)]">
+                        {dueDate ? new Date(dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : (isAr ? 'غير محدد' : 'Not specified')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Responsible */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'المسؤول' : 'Responsible'}</p>
+                    {responsibleId ? (
+                      <p className="text-sm font-medium text-[var(--foreground)]">
+                        {(() => {
+                          const responsible = responsibleOptions.find(o => o.id === responsibleId);
+                          return responsible ? (isAr ? `${responsible.name} (${responsible.role})` : `${responsible.nameEn} (${responsible.role})`) : '-';
+                        })()}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-[var(--status-error)]">{isAr ? 'لم يتم اختيار مسؤول' : 'No responsible selected'}</p>
+                    )}
+                  </div>
+
+                  {/* Tasks */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'المهام' : 'Tasks'}</p>
+                    {tasks.length > 0 ? (
+                      <ul className="text-sm space-y-1">
+                        {tasks.map((task, index) => (
+                          <li key={task.id} className="flex items-center gap-2 text-[var(--foreground)]">
+                            <span className="text-[var(--foreground-muted)]">{index + 1}.</span>
+                            {isAr ? task.titleAr : task.titleEn}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد مهام' : 'No tasks'}</p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1127,7 +1721,10 @@ export default function TreatmentPage() {
           </div>
         </div>
         <ModalFooter>
-          <Button variant="outline" size="sm" onClick={() => setShowAddModal(false)}>
+          <Button variant="outline" size="sm" onClick={() => {
+            setShowAddModal(false);
+            resetWizardForm();
+          }}>
             <span className="text-xs sm:text-sm">{t('common.cancel')}</span>
           </Button>
           <div className="flex gap-2">
@@ -1138,14 +1735,451 @@ export default function TreatmentPage() {
               </Button>
             )}
             {wizardStep < 5 ? (
-              <Button size="sm" onClick={() => setWizardStep(wizardStep + 1)}>
+              <Button
+                size="sm"
+                onClick={() => setWizardStep(wizardStep + 1)}
+                disabled={
+                  (wizardStep === 1 && !selectedRiskId) ||
+                  (wizardStep === 2 && !selectedStrategy)
+                }
+              >
                 <span className="text-xs sm:text-sm">{isAr ? 'التالي' : 'Next'}</span>
                 <ArrowRight className="ms-1 sm:ms-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
               </Button>
             ) : (
-              <Button size="sm" onClick={() => setShowAddModal(false)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  // TODO: Implement save functionality
+                  setShowAddModal(false);
+                  resetWizardForm();
+                }}
+                disabled={!selectedRiskId || !selectedStrategy}
+              >
                 <Check className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                 <span className="text-xs sm:text-sm">{t('common.save')}</span>
+              </Button>
+            )}
+          </div>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Treatment Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          resetEditForm();
+        }}
+        title={isAr ? 'تعديل خطة المعالجة' : 'Edit Treatment Plan'}
+        size="lg"
+      >
+        <div className="space-y-3 sm:space-y-4 md:space-y-6">
+          {/* Edit Wizard Steps */}
+          <div className="flex items-center justify-between overflow-x-auto">
+            {[
+              { id: 1, labelAr: 'الاستراتيجية', labelEn: 'Strategy' },
+              { id: 2, labelAr: 'تفاصيل الخطة', labelEn: 'Plan Details' },
+              { id: 3, labelAr: 'المهام', labelEn: 'Tasks' },
+              { id: 4, labelAr: 'المراجعة', labelEn: 'Review' },
+            ].map((step, index) => (
+              <React.Fragment key={step.id}>
+                <div className="flex flex-col items-center shrink-0">
+                  <div
+                    className={`flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-medium ${
+                      editWizardStep === step.id
+                        ? 'bg-[var(--primary)] text-white'
+                        : editWizardStep > step.id
+                        ? 'bg-[var(--status-success)] text-white'
+                        : 'bg-[var(--background-tertiary)] text-[var(--foreground-muted)]'
+                    }`}
+                  >
+                    {editWizardStep > step.id ? <Check className="h-3 w-3 sm:h-4 sm:w-4" /> : step.id}
+                  </div>
+                  <span className="mt-1 text-[10px] sm:text-xs text-[var(--foreground-secondary)] text-center max-w-[60px] sm:max-w-none truncate">
+                    {isAr ? step.labelAr : step.labelEn}
+                  </span>
+                </div>
+                {index < 3 && (
+                  <div
+                    className={`h-0.5 flex-1 mx-1 sm:mx-2 min-w-[20px] ${
+                      editWizardStep > step.id ? 'bg-[var(--status-success)]' : 'bg-[var(--background-tertiary)]'
+                    }`}
+                  />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Edit Step Content */}
+          <div className="min-h-[150px] sm:min-h-[200px] rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4">
+            {/* Show selected risk info */}
+            {editingTreatmentId && (
+              <div className="mb-3 p-2 rounded-lg bg-[var(--background)] border border-[var(--border)]">
+                <p className="text-xs text-[var(--foreground-muted)]">
+                  {isAr ? 'الخطر:' : 'Risk:'}
+                </p>
+                <p className="text-sm font-medium text-[var(--foreground)]">
+                  {(() => {
+                    const treatment = treatments.find(t => t.id === editingTreatmentId);
+                    return treatment ? `${treatment.riskNumber} - ${isAr ? treatment.riskTitleAr : treatment.riskTitleEn}` : '-';
+                  })()}
+                </p>
+              </div>
+            )}
+
+            {editWizardStep === 1 && (
+              <div>
+                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
+                  {isAr ? 'تعديل استراتيجية المعالجة' : 'Edit treatment strategy'}
+                </h4>
+                <div className="grid gap-2 sm:gap-3 sm:grid-cols-2">
+                  {(['avoid', 'reduce', 'transfer', 'accept'] as TreatmentStrategy[]).map((strategy) => (
+                    <button
+                      key={strategy}
+                      onClick={() => setSelectedStrategy(strategy)}
+                      className={`rounded-lg border p-2 sm:p-3 md:p-4 text-start transition-colors ${
+                        selectedStrategy === strategy
+                          ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                          : 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {getStrategyIcon(strategy)}
+                          <span className="text-xs sm:text-sm font-medium text-[var(--foreground)]">
+                            {t(`treatment.strategies.${strategy}`)}
+                          </span>
+                        </div>
+                        {selectedStrategy === strategy && (
+                          <Check className="h-4 w-4 text-[var(--primary)] shrink-0" />
+                        )}
+                      </div>
+                      <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? strategyDescriptions[strategy].ar : strategyDescriptions[strategy].en}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {editWizardStep === 2 && (
+              <div>
+                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
+                  {isAr ? 'تعديل تفاصيل الخطة' : 'Edit plan details'}
+                </h4>
+                <div className="space-y-3 sm:space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                      {isAr ? 'عنوان الخطة' : 'Plan Title'}
+                    </label>
+                    <Input
+                      placeholder={isAr ? 'أدخل عنوان الخطة' : 'Enter plan title'}
+                      value={planTitle}
+                      onChange={(e) => setPlanTitle(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
+                    <div className="relative responsible-dropdown-container">
+                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                        {isAr ? 'المسؤول' : 'Responsible'}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          placeholder={isAr ? 'ابحث عن المسؤول...' : 'Search for responsible...'}
+                          value={responsibleSearchQuery}
+                          onChange={(e) => {
+                            setResponsibleSearchQuery(e.target.value);
+                            setShowResponsibleDropdown(true);
+                            if (responsibleId) {
+                              const selected = responsibleOptions.find(o => o.id === responsibleId);
+                              const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
+                              if (e.target.value !== displayName) {
+                                setResponsibleId(null);
+                              }
+                            }
+                          }}
+                          onFocus={() => setShowResponsibleDropdown(true)}
+                          leftIcon={<User className="h-4 w-4" />}
+                        />
+                        {showResponsibleDropdown && (
+                          <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
+                            {responsibleOptions
+                              .filter(option => {
+                                if (!responsibleSearchQuery) return true;
+                                const query = responsibleSearchQuery.toLowerCase();
+                                return (
+                                  option.name.toLowerCase().includes(query) ||
+                                  option.nameEn.toLowerCase().includes(query) ||
+                                  option.role.toLowerCase().includes(query)
+                                );
+                              })
+                              .slice(0, 10)
+                              .map((option) => (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setResponsibleId(option.id);
+                                    setResponsibleSearchQuery(isAr ? option.name : option.nameEn);
+                                    setShowResponsibleDropdown(false);
+                                  }}
+                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${
+                                    responsibleId === option.id ? 'bg-[var(--primary-light)]' : ''
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium text-[var(--foreground)]">
+                                      {isAr ? option.name : option.nameEn}
+                                    </span>
+                                    {responsibleId === option.id && (
+                                      <Check className="h-4 w-4 text-[var(--primary)]" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-[var(--foreground-muted)]">
+                                    {option.role}
+                                  </span>
+                                </button>
+                              ))}
+                            {responsibleOptions.filter(option => {
+                              if (!responsibleSearchQuery) return true;
+                              const query = responsibleSearchQuery.toLowerCase();
+                              return (
+                                option.name.toLowerCase().includes(query) ||
+                                option.nameEn.toLowerCase().includes(query) ||
+                                option.role.toLowerCase().includes(query)
+                              );
+                            }).length === 0 && (
+                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">
+                                {isAr ? 'لا توجد نتائج' : 'No results found'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {responsibleId && (
+                        <p className="mt-1 text-xs text-[var(--status-success)]">
+                          {isAr ? '✓ تم اختيار المسؤول' : '✓ Responsible selected'}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                        {isAr ? 'تاريخ الانتهاء' : 'Due Date'}
+                      </label>
+                      <Input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {editWizardStep === 3 && (
+              <div>
+                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
+                  {isAr ? 'تعديل المهام' : 'Edit Tasks'}
+                </h4>
+                <p className="mb-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                  {isAr
+                    ? 'يمكنك إضافة أو حذف المهام'
+                    : 'You can add or remove tasks'}
+                </p>
+
+                {/* Task input form */}
+                <div className="mb-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'عنوان المهمة (عربي)' : 'Task Title (Arabic)'}
+                      </label>
+                      <Input
+                        placeholder={isAr ? 'أدخل عنوان المهمة بالعربية' : 'Enter task title in Arabic'}
+                        value={newTaskTitleAr}
+                        onChange={(e) => setNewTaskTitleAr(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'عنوان المهمة (إنجليزي)' : 'Task Title (English)'}
+                      </label>
+                      <Input
+                        placeholder={isAr ? 'أدخل عنوان المهمة بالإنجليزية' : 'Enter task title in English'}
+                        value={newTaskTitleEn}
+                        onChange={(e) => setNewTaskTitleEn(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Plus className="h-4 w-4" />}
+                      onClick={addTask}
+                      disabled={!newTaskTitleAr.trim() && !newTaskTitleEn.trim()}
+                    >
+                      <span className="text-xs sm:text-sm">{isAr ? 'إضافة مهمة' : 'Add Task'}</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Tasks list */}
+                {tasks.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-[var(--foreground-secondary)]">
+                      {isAr ? `المهام (${tasks.length})` : `Tasks (${tasks.length})`}
+                    </p>
+                    {tasks.map((task, index) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] p-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--background-tertiary)] text-xs font-medium">
+                            {index + 1}
+                          </span>
+                          <span className="text-sm text-[var(--foreground)] truncate">
+                            {isAr ? task.titleAr : task.titleEn}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeTask(task.id)}
+                          className="shrink-0 p-1 text-[var(--foreground-muted)] hover:text-[var(--status-error)] transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-[var(--border)] p-4 text-center">
+                    <ListChecks className="mx-auto h-8 w-8 text-[var(--foreground-muted)]" />
+                    <p className="mt-2 text-sm text-[var(--foreground-muted)]">
+                      {isAr ? 'لم يتم إضافة أي مهام بعد' : 'No tasks added yet'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {editWizardStep === 4 && (
+              <div>
+                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
+                  {isAr ? 'مراجعة التعديلات' : 'Review Changes'}
+                </h4>
+                <p className="mb-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                  {isAr
+                    ? 'راجع التعديلات قبل الحفظ'
+                    : 'Review changes before saving'}
+                </p>
+
+                {/* Summary */}
+                <div className="space-y-3">
+                  {/* Strategy */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'الاستراتيجية' : 'Strategy'}</p>
+                    {selectedStrategy ? (
+                      <div className="flex items-center gap-2">
+                        {getStrategyIcon(selectedStrategy)}
+                        <span className="text-sm font-medium text-[var(--foreground)]">
+                          {t(`treatment.strategies.${selectedStrategy}`)}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[var(--status-error)]">{isAr ? 'لم يتم اختيار استراتيجية' : 'No strategy selected'}</p>
+                    )}
+                  </div>
+
+                  {/* Plan Details */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                      <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'عنوان الخطة' : 'Plan Title'}</p>
+                      <p className="text-sm font-medium text-[var(--foreground)]">
+                        {planTitle || (isAr ? 'غير محدد' : 'Not specified')}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                      <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'تاريخ الانتهاء' : 'Due Date'}</p>
+                      <p className="text-sm font-medium text-[var(--foreground)]">
+                        {dueDate ? new Date(dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : (isAr ? 'غير محدد' : 'Not specified')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Responsible */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'المسؤول' : 'Responsible'}</p>
+                    {responsibleId ? (
+                      <p className="text-sm font-medium text-[var(--foreground)]">
+                        {(() => {
+                          const responsible = responsibleOptions.find(o => o.id === responsibleId);
+                          return responsible ? (isAr ? `${responsible.name} (${responsible.role})` : `${responsible.nameEn} (${responsible.role})`) : '-';
+                        })()}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-[var(--foreground-muted)]">{isAr ? 'غير محدد' : 'Not specified'}</p>
+                    )}
+                  </div>
+
+                  {/* Tasks */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'المهام' : 'Tasks'}</p>
+                    {tasks.length > 0 ? (
+                      <ul className="text-sm space-y-1">
+                        {tasks.map((task, index) => (
+                          <li key={task.id} className="flex items-center gap-2 text-[var(--foreground)]">
+                            <span className="text-[var(--foreground-muted)]">{index + 1}.</span>
+                            {isAr ? task.titleAr : task.titleEn}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد مهام' : 'No tasks'}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <ModalFooter>
+          <Button variant="outline" size="sm" onClick={() => {
+            setShowEditModal(false);
+            resetEditForm();
+          }}>
+            <span className="text-xs sm:text-sm">{t('common.cancel')}</span>
+          </Button>
+          <div className="flex gap-2">
+            {editWizardStep > 1 && (
+              <Button variant="outline" size="sm" onClick={() => setEditWizardStep(editWizardStep - 1)}>
+                <ArrowLeft className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                <span className="text-xs sm:text-sm">{isAr ? 'السابق' : 'Previous'}</span>
+              </Button>
+            )}
+            {editWizardStep < 4 ? (
+              <Button
+                size="sm"
+                onClick={() => setEditWizardStep(editWizardStep + 1)}
+                disabled={editWizardStep === 1 && !selectedStrategy}
+              >
+                <span className="text-xs sm:text-sm">{isAr ? 'التالي' : 'Next'}</span>
+                <ArrowRight className="ms-1 sm:ms-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => {
+                  // TODO: Implement save edit functionality
+                  setShowEditModal(false);
+                  resetEditForm();
+                }}
+              >
+                <Check className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                <span className="text-xs sm:text-sm">{isAr ? 'حفظ التعديلات' : 'Save Changes'}</span>
               </Button>
             )}
           </div>

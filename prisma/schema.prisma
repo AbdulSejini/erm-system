@@ -43,6 +43,7 @@ model User {
   notifications         Notification[]
   auditLogs             AuditLog[]
   riskComments          RiskComment[]          @relation("CommentAuthor")
+  riskChangeLogs        RiskChangeLog[]        @relation("RiskChangeLogUser")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -203,6 +204,7 @@ model Risk {
   treatments    TreatmentPlan[]
   incidents     Incident[]
   comments      RiskComment[]     // المحادثات والتعليقات على الخطر
+  changeLogs    RiskChangeLog[]   // سجل التعديلات على الخطر
 
   @@index([categoryId])
   @@index([departmentId])
@@ -501,4 +503,32 @@ model RiskComment {
   @@index([riskId])
   @@index([authorId])
   @@index([parentId])
+}
+
+// سجل تعديلات المخاطر
+model RiskChangeLog {
+  id              String    @id @default(cuid())
+  riskId          String
+  userId          String
+  changeType      String    // create, update, delete, treatment_add, treatment_update, treatment_delete, assessment_add, status_change
+  changeCategory  String    // risk_info, assessment, treatment, status, ownership
+  fieldName       String?   // اسم الحقل المتغير (إذا كان التغيير على حقل محدد)
+  fieldNameAr     String?   // اسم الحقل بالعربي
+  oldValue        String?   // القيمة القديمة (JSON للقيم المعقدة)
+  newValue        String?   // القيمة الجديدة (JSON للقيم المعقدة)
+  description     String?   // وصف التغيير
+  descriptionAr   String?   // وصف التغيير بالعربي
+  relatedEntityId String?   // معرف الكيان المرتبط (مثل معرف خطة المعالجة)
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+
+  // العلاقات
+  risk  Risk  @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  user  User  @relation("RiskChangeLogUser", fields: [userId], references: [id])
+
+  @@index([riskId])
+  @@index([userId])
+  @@index([changeType])
+  @@index([createdAt])
 }

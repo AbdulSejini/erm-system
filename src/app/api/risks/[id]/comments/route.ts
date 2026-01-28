@@ -379,7 +379,22 @@ async function sendCommentNotifications(
       notificationRecipients.add(department.riskChampionId);
     }
 
-    // 5. المستخدمين في نفس الوظيفة/القسم (departmentId)
+    // 5. فريق إدارة المخاطر (admin, riskManager, riskAnalyst)
+    // يستلمون إشعارات لجميع التعليقات
+    const riskManagementTeam = await prisma.user.findMany({
+      where: {
+        role: { in: ['admin', 'riskManager', 'riskAnalyst'] },
+        status: 'active',
+        id: { not: currentUser.id },
+      },
+      select: { id: true },
+    });
+
+    for (const member of riskManagementTeam) {
+      notificationRecipients.add(member.id);
+    }
+
+    // 6. المستخدمين في نفس الوظيفة/القسم (departmentId)
     // مثال: جميع مستخدمي الصيانة MAI يستلمون إشعار للخطر MAI-R-643
     const departmentUsers = await prisma.user.findMany({
       where: {
@@ -394,7 +409,7 @@ async function sendCommentNotifications(
       notificationRecipients.add(user.id);
     }
 
-    // 6. المستخدمين الذين لديهم صلاحية الوصول للوظيفة (UserDepartmentAccess)
+    // 7. المستخدمين الذين لديهم صلاحية الوصول للوظيفة (UserDepartmentAccess)
     // مثال: مستخدم لديه وصول لـ MAI يستلم إشعار للخطر MAI-R-643
     const usersWithAccess = await prisma.userDepartmentAccess.findMany({
       where: {
@@ -412,7 +427,7 @@ async function sendCommentNotifications(
       notificationRecipients.add(access.userId);
     }
 
-    // 7. رواد المخاطر الذين يديرون الوظيفة/القسم (championDepartments)
+    // 8. رواد المخاطر الذين يديرون الوظيفة/القسم (championDepartments)
     // البحث عن جميع رواد المخاطر المسؤولين عن هذا القسم
     const championUsers = await prisma.user.findMany({
       where: {
@@ -430,7 +445,7 @@ async function sendCommentNotifications(
       notificationRecipients.add(champion.id);
     }
 
-    // 8. إذا كان التعليق رداً، نرسل إشعار لصاحب التعليق الأصلي
+    // 9. إذا كان التعليق رداً، نرسل إشعار لصاحب التعليق الأصلي
     if (comment.parentId) {
       const originalComment = await prisma.riskComment.findUnique({
         where: { id: comment.parentId },

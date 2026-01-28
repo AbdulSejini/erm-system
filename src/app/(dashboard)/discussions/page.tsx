@@ -24,7 +24,10 @@ import {
   RefreshCw,
   TrendingUp,
   X,
+  Plus,
+  Send,
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 interface Comment {
   id: string;
@@ -69,17 +72,40 @@ interface Stats {
   total: number;
 }
 
+interface Risk {
+  id: string;
+  riskNumber: string;
+  titleAr: string;
+  titleEn: string;
+  department: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+    code: string;
+  };
+}
+
 export default function DiscussionsPage() {
   const { t, isRTL, language } = useTranslation();
   const router = useRouter();
+  const { data: session } = useSession();
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [risks, setRisks] = useState<Risk[]>([]);
   const [stats, setStats] = useState<Stats>({ byType: {}, today: 0, thisWeek: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+
+  // New Discussion Modal
+  const [showNewDiscussionModal, setShowNewDiscussionModal] = useState(false);
+  const [selectedRiskId, setSelectedRiskId] = useState('');
+  const [newCommentContent, setNewCommentContent] = useState('');
+  const [newCommentType, setNewCommentType] = useState('comment');
+  const [submitting, setSubmitting] = useState(false);
+  const [riskSearchQuery, setRiskSearchQuery] = useState('');
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,6 +113,9 @@ export default function DiscussionsPage() {
   const [selectedType, setSelectedType] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  // Check if user can start discussions (admin, riskManager, riskAnalyst)
+  const canStartDiscussion = session?.user?.role && ['admin', 'riskManager', 'riskAnalyst'].includes(session.user.role);
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
@@ -129,9 +158,58 @@ export default function DiscussionsPage() {
     }
   }, []);
 
+  const fetchRisks = useCallback(async () => {
+    try {
+      const response = await fetch('/api/risks?filterByAccess=true');
+      const data = await response.json();
+      if (data.success) {
+        setRisks(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching risks:', error);
+    }
+  }, []);
+
+  const handleSubmitNewDiscussion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRiskId || !newCommentContent.trim()) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/risks/${selectedRiskId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: newCommentContent.trim(),
+          type: newCommentType,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setShowNewDiscussionModal(false);
+        setSelectedRiskId('');
+        setNewCommentContent('');
+        setNewCommentType('comment');
+        setRiskSearchQuery('');
+        fetchComments();
+      } else {
+        alert(data.error || 'Failed to create discussion');
+      }
+    } catch (error) {
+      console.error('Error creating discussion:', error);
+      alert('Failed to create discussion');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     fetchDepartments();
-  }, [fetchDepartments]);
+    if (canStartDiscussion) {
+      fetchRisks();
+    }
+  }, [fetchDepartments, fetchRisks, canStartDiscussion]);
 
   useEffect(() => {
     fetchComments();
@@ -227,10 +305,18 @@ export default function DiscussionsPage() {
           </p>
         </div>
 
-        <Button onClick={fetchComments} variant="outline" disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} ${loading ? 'animate-spin' : ''}`} />
-          {language === 'ar' ? 'تحديث' : 'Refresh'}
-        </Button>
+        <div className="flex gap-2">
+          {canStartDiscussion && (
+            <Button onClick={() => setShowNewDiscussionModal(true)}>
+              <Plus className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+              {language === 'ar' ? 'بدء مناقشة' : 'Start Discussion'}
+            </Button>
+          )}
+          <Button onClick={fetchComments} variant="outline" disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} ${loading ? 'animate-spin' : ''}`} />
+            {language === 'ar' ? 'تحديث' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -518,6 +604,171 @@ export default function DiscussionsPage() {
           >
             {isRTL ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
+        </div>
+      )}
+
+      {/* New Discussion Modal */}
+      {showNewDiscussionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary-600" />
+                {language === 'ar' ? 'بدء مناقشة جديدة' : 'Start New Discussion'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowNewDiscussionModal(false);
+                  setSelectedRiskId('');
+                  setNewCommentContent('');
+                  setRiskSearchQuery('');
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSubmitNewDiscussion} className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)]">
+              {/* Risk Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {language === 'ar' ? 'اختر الخطر' : 'Select Risk'} *
+                </label>
+                <Input
+                  placeholder={language === 'ar' ? 'ابحث عن خطر...' : 'Search for a risk...'}
+                  value={riskSearchQuery}
+                  onChange={(e) => setRiskSearchQuery(e.target.value)}
+                  className="mb-2"
+                />
+                <div className="max-h-48 overflow-y-auto border dark:border-gray-700 rounded-lg">
+                  {risks
+                    .filter((risk) => {
+                      if (!riskSearchQuery) return true;
+                      const query = riskSearchQuery.toLowerCase();
+                      return (
+                        risk.riskNumber.toLowerCase().includes(query) ||
+                        risk.titleAr.toLowerCase().includes(query) ||
+                        risk.titleEn.toLowerCase().includes(query) ||
+                        risk.department.nameAr.toLowerCase().includes(query) ||
+                        risk.department.code.toLowerCase().includes(query)
+                      );
+                    })
+                    .slice(0, 20)
+                    .map((risk) => (
+                      <div
+                        key={risk.id}
+                        onClick={() => setSelectedRiskId(risk.id)}
+                        className={`p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 border-b dark:border-gray-700 last:border-b-0 ${
+                          selectedRiskId === risk.id ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-primary-600 dark:text-primary-400">
+                            {risk.riskNumber}
+                          </span>
+                          <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                            {risk.department.code}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">
+                          {language === 'ar' ? risk.titleAr : risk.titleEn}
+                        </p>
+                      </div>
+                    ))}
+                  {risks.filter((risk) => {
+                    if (!riskSearchQuery) return true;
+                    const query = riskSearchQuery.toLowerCase();
+                    return (
+                      risk.riskNumber.toLowerCase().includes(query) ||
+                      risk.titleAr.toLowerCase().includes(query) ||
+                      risk.titleEn.toLowerCase().includes(query)
+                    );
+                  }).length === 0 && (
+                    <div className="p-4 text-center text-gray-500">
+                      {language === 'ar' ? 'لا توجد مخاطر' : 'No risks found'}
+                    </div>
+                  )}
+                </div>
+                {selectedRiskId && (
+                  <div className="mt-2 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-sm">
+                    <span className="text-primary-700 dark:text-primary-300">
+                      {language === 'ar' ? 'المحدد: ' : 'Selected: '}
+                      {risks.find((r) => r.id === selectedRiskId)?.riskNumber}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Comment Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {language === 'ar' ? 'نوع المناقشة' : 'Discussion Type'}
+                </label>
+                <Select
+                  value={newCommentType}
+                  onChange={(value) => setNewCommentType(value)}
+                  options={[
+                    { value: 'comment', label: language === 'ar' ? 'تعليق' : 'Comment' },
+                    { value: 'question', label: language === 'ar' ? 'سؤال' : 'Question' },
+                    { value: 'statusUpdate', label: language === 'ar' ? 'تحديث حالة' : 'Status Update' },
+                  ]}
+                />
+              </div>
+
+              {/* Comment Content */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {language === 'ar' ? 'محتوى المناقشة' : 'Discussion Content'} *
+                </label>
+                <textarea
+                  value={newCommentContent}
+                  onChange={(e) => setNewCommentContent(e.target.value)}
+                  placeholder={language === 'ar' ? 'اكتب مناقشتك هنا...' : 'Write your discussion here...'}
+                  className="w-full h-32 p-3 border dark:border-gray-700 rounded-lg resize-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+
+              {/* Info Note */}
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+                <p>
+                  {language === 'ar'
+                    ? 'سيتم إرسال إشعار لجميع المستخدمين المعنيين بهذا الخطر (صاحب الخطر، رائد المخاطر، وموظفي الإدارة).'
+                    : 'A notification will be sent to all users related to this risk (risk owner, risk champion, and department staff).'}
+                </p>
+              </div>
+            </form>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowNewDiscussionModal(false);
+                  setSelectedRiskId('');
+                  setNewCommentContent('');
+                  setRiskSearchQuery('');
+                }}
+              >
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+              </Button>
+              <Button
+                onClick={handleSubmitNewDiscussion}
+                disabled={!selectedRiskId || !newCommentContent.trim() || submitting}
+              >
+                {submitting ? (
+                  <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} animate-spin`} />
+                ) : (
+                  <Send className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                )}
+                {language === 'ar' ? 'إرسال' : 'Send'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
