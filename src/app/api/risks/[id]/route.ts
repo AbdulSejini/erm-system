@@ -188,13 +188,87 @@ export async function PATCH(
     const body = await request.json();
 
     // التحقق من وجود الخطر
-    const existingRisk = await prisma.risk.findUnique({
+    let existingRisk = await prisma.risk.findUnique({
       where: { id },
     });
 
+    // إذا الخطر غير موجود والـ id يبدأ بـ hr- أو mock-، نقوم بإنشائه
+    if (!existingRisk && (id.startsWith('hr-') || id.startsWith('mock-'))) {
+      // جلب إدارة افتراضية (HR أو أول إدارة موجودة)
+      let defaultDepartment = await prisma.department.findFirst({
+        where: { code: 'HR' }
+      });
+
+      if (!defaultDepartment) {
+        defaultDepartment = await prisma.department.findFirst();
+      }
+
+      if (!defaultDepartment) {
+        return NextResponse.json(
+          { success: false, error: 'لا توجد إدارات في النظام' },
+          { status: 400 }
+        );
+      }
+
+      // جلب مستخدم افتراضي (المدير) لـ owner و createdBy
+      const defaultUser = await prisma.user.findFirst({
+        where: { role: 'admin' }
+      });
+
+      if (!defaultUser) {
+        return NextResponse.json(
+          { success: false, error: 'لا يوجد مستخدم مدير في النظام' },
+          { status: 400 }
+        );
+      }
+
+      // إنشاء الخطر الجديد من البيانات المرسلة
+      existingRisk = await prisma.risk.create({
+        data: {
+          id: id,
+          riskNumber: body.riskNumber || `${defaultDepartment.code}-${Date.now().toString().slice(-4)}`,
+          titleAr: body.titleAr || body.descriptionAr?.substring(0, 100) || 'خطر جديد',
+          titleEn: body.titleEn || body.descriptionEn?.substring(0, 100) || 'New Risk',
+          descriptionAr: body.descriptionAr || '',
+          descriptionEn: body.descriptionEn || '',
+          inherentLikelihood: body.inherentLikelihood || 3,
+          inherentImpact: body.inherentImpact || 3,
+          inherentScore: (body.inherentLikelihood || 3) * (body.inherentImpact || 3),
+          inherentRating: calculateRating((body.inherentLikelihood || 3) * (body.inherentImpact || 3)),
+          residualLikelihood: body.residualLikelihood || body.inherentLikelihood || 3,
+          residualImpact: body.residualImpact || body.inherentImpact || 3,
+          residualScore: (body.residualLikelihood || body.inherentLikelihood || 3) * (body.residualImpact || body.inherentImpact || 3),
+          residualRating: calculateRating((body.residualLikelihood || body.inherentLikelihood || 3) * (body.residualImpact || body.inherentImpact || 3)),
+          status: body.status || 'draft',
+          potentialCauseAr: body.potentialCauseAr || '',
+          potentialCauseEn: body.potentialCauseEn || '',
+          potentialImpactAr: body.potentialImpactAr || '',
+          potentialImpactEn: body.potentialImpactEn || '',
+          issuedBy: body.issuedBy || 'Risk Register',
+          department: {
+            connect: { id: body.departmentId || defaultDepartment.id }
+          },
+          owner: {
+            connect: { id: body.ownerId || defaultUser.id }
+          },
+          createdBy: {
+            connect: { id: defaultUser.id }
+          },
+          ...(body.categoryId && {
+            category: { connect: { id: body.categoryId } }
+          }),
+          ...(body.championId && {
+            champion: { connect: { id: body.championId } }
+          }),
+        },
+      });
+
+      console.log(`Created new risk from mock data: ${existingRisk.riskNumber}`);
+    }
+
     if (!existingRisk) {
       return NextResponse.json(
-        { success: false, error: 'الخطر غير موجود' },
+        { success: false, error: 'الخطر غير موجود في قاعدة البيانات' },
         { status: 404 }
       );
     }
