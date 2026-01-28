@@ -565,6 +565,8 @@ export default function RisksPage() {
   const [risks, setRisks] = useState(allRisks);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isUsingFallbackData, setIsUsingFallbackData] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
   const [categories, setCategories] = useState<APICategory[]>([]);
   const [riskStatuses, setRiskStatuses] = useState<APIRiskStatus[]>([]);
   const [allDepartments, setAllDepartments] = useState<{ id: string; code: string; nameAr: string; nameEn: string }[]>([]);
@@ -655,6 +657,7 @@ export default function RisksPage() {
         }));
 
         setRisks(transformedRisks);
+        setIsUsingFallbackData(false);
       } else {
         // Database is empty, seed initial data then refetch
         try {
@@ -719,6 +722,7 @@ export default function RisksPage() {
                 mitigationActionsEn: risk.mitigationActionsEn || '',
               }));
               setRisks(transformedRisks);
+              setIsUsingFallbackData(false);
               return;
             }
           }
@@ -727,11 +731,13 @@ export default function RisksPage() {
         }
         // Use fallback data if seeding fails
         setRisks(allRisks);
+        setIsUsingFallbackData(true);
       }
     } catch (error) {
       console.error('Error fetching risks:', error);
       // Use fallback data on error
       setRisks(allRisks);
+      setIsUsingFallbackData(true);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -912,6 +918,30 @@ export default function RisksPage() {
   // Handle refresh button click
   const handleRefresh = () => {
     fetchRisks(true);
+  };
+
+  // Handle migrate data to database
+  const handleMigrateData = async () => {
+    setIsMigrating(true);
+    try {
+      const response = await fetch('/api/risks/seed', { method: 'POST' });
+      const result = await response.json();
+
+      if (result.success) {
+        // Refetch risks after migration
+        await fetchRisks(true);
+        alert(isAr
+          ? `تم نقل البيانات بنجاح: ${result.results?.added || 0} خطر جديد`
+          : `Data migrated successfully: ${result.results?.added || 0} new risks`);
+      } else {
+        alert(isAr ? 'فشل في نقل البيانات' : 'Failed to migrate data');
+      }
+    } catch (error) {
+      console.error('Error migrating data:', error);
+      alert(isAr ? 'حدث خطأ أثناء نقل البيانات' : 'Error occurred while migrating data');
+    } finally {
+      setIsMigrating(false);
+    }
   };
 
   // Update URL with current filters (for persistence)
@@ -1346,6 +1376,42 @@ export default function RisksPage() {
           </div>
         </Card>
       </div>
+
+      {/* Warning Banner for Fallback Data */}
+      {isUsingFallbackData && !isLoading && (
+        <Card className="border-[var(--status-warning)] bg-[var(--status-warning)]/5">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--status-warning)]/20">
+                  <AlertTriangle className="h-5 w-5 text-[var(--status-warning)]" />
+                </div>
+                <div>
+                  <p className="font-medium text-[var(--foreground)]">
+                    {isAr ? 'البيانات المعروضة هي بيانات تجريبية' : 'Displaying demo data'}
+                  </p>
+                  <p className="text-sm text-[var(--foreground-secondary)]">
+                    {isAr
+                      ? 'لتتمكن من تعديل وحفظ المخاطر، يجب نقل البيانات إلى قاعدة البيانات أولاً'
+                      : 'To edit and save risks, you need to migrate data to the database first'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="warning"
+                size="sm"
+                onClick={handleMigrateData}
+                disabled={isMigrating}
+                leftIcon={isMigrating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              >
+                {isMigrating
+                  ? (isAr ? 'جاري النقل...' : 'Migrating...')
+                  : (isAr ? 'نقل البيانات' : 'Migrate Data')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search and Filters */}
       <Card>

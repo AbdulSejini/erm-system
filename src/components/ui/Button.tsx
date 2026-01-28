@@ -21,6 +21,8 @@ const buttonVariants = cva(
           'bg-[var(--status-error)] text-white hover:opacity-90 focus-visible:ring-[var(--status-error)]',
         success:
           'bg-[var(--status-success)] text-white hover:opacity-90 focus-visible:ring-[var(--status-success)]',
+        warning:
+          'bg-[var(--status-warning)] text-white hover:opacity-90 focus-visible:ring-[var(--status-warning)]',
         link:
           'text-[var(--primary)] underline-offset-4 hover:underline bg-transparent',
       },
