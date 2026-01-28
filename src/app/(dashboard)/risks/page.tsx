@@ -556,6 +556,7 @@ interface APIRisk {
   owner?: { id: string; fullName: string; fullNameEn: string | null };
   champion?: { id: string; fullName: string; fullNameEn: string | null };
   riskOwner?: { id: string; fullName: string; fullNameEn: string | null };
+  riskOwnerId?: string | null;
   isDeleted?: boolean;
   deletedAt?: string | null;
 }
