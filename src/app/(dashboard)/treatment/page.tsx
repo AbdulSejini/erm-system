@@ -312,6 +312,8 @@ export default function TreatmentPage() {
   const [filterStatus, setFilterStatus] = useState<TreatmentStatus | 'all'>('all');
   const [filterStrategy, setFilterStrategy] = useState<TreatmentStrategy | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // عدد العناصر في كل صفحة
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -439,6 +441,14 @@ export default function TreatmentPage() {
       return matchesSearch && matchesStatus && matchesStrategy;
     });
   }, [treatments, searchQuery, filterStatus, filterStrategy]);
+
+  // Pagination - عرض الصفحة الحالية فقط
+  const paginatedTreatments = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredTreatments.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredTreatments, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredTreatments.length / itemsPerPage);
 
   const stats = useMemo(() => ({
     total: treatments.length,
@@ -720,13 +730,13 @@ export default function TreatmentPage() {
       </div>
 
       {/* Treatment Cards Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredTreatments.length === 0 ? (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {paginatedTreatments.length === 0 ? (
           <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
-            <div className="p-4 rounded-full bg-[var(--background-secondary)] mb-4">
-              <FileText className="h-8 w-8 text-[var(--foreground-muted)]" />
+            <div className="p-4 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+              <FileText className="h-8 w-8 text-gray-400" />
             </div>
-            <p className="text-[var(--foreground-secondary)]">
+            <p className="text-gray-500 dark:text-gray-400">
               {isAr ? 'لا توجد خطط معالجة' : 'No treatment plans found'}
             </p>
             <Button variant="outline" className="mt-4" onClick={openAddModal}>
@@ -735,7 +745,7 @@ export default function TreatmentPage() {
             </Button>
           </div>
         ) : (
-          filteredTreatments.map((treatment) => {
+          paginatedTreatments.map((treatment) => {
             const StrategyIcon = strategyConfig[treatment.strategy].icon;
             const StatusIcon = statusConfig[treatment.status].icon;
             const statusConf = statusConfig[treatment.status];
@@ -867,6 +877,66 @@ export default function TreatmentPage() {
           })
         )}
       </div>
+
+      {/* Pagination - التنقل بين الصفحات */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="text-sm"
+          >
+            {isAr ? 'السابق' : 'Previous'}
+          </Button>
+
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${
+                    currentPage === pageNum
+                      ? 'bg-[#F39200] text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="text-sm"
+          >
+            {isAr ? 'التالي' : 'Next'}
+          </Button>
+
+          <span className="text-sm text-gray-500 dark:text-gray-400 ms-4">
+            {isAr
+              ? `صفحة ${currentPage} من ${totalPages} (${filteredTreatments.length} خطة)`
+              : `Page ${currentPage} of ${totalPages} (${filteredTreatments.length} plans)`
+            }
+          </span>
+        </div>
+      )}
 
       {/* Add Treatment Modal - Simplified Wizard */}
       {showAddModal && (
