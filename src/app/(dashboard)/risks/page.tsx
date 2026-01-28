@@ -2746,13 +2746,14 @@ export default function RisksPage() {
                   setSelectedRisk(null);
                   // Refresh from API
                   fetchRisks(false);
+                } else {
+                  const errorData = await response.json();
+                  console.error('Error updating risk:', errorData);
+                  alert(isAr ? 'حدث خطأ أثناء حفظ التعديلات. الخطر قد لا يكون موجوداً في قاعدة البيانات.' : 'Error saving changes. The risk may not exist in the database.');
                 }
               } catch (error) {
                 console.error('Error updating risk:', error);
-                // Still update local state as fallback
-                setRisks(prev => prev.map(r => r.id === selectedRisk.id ? selectedRisk : r));
-                setShowEditModal(false);
-                setSelectedRisk(null);
+                alert(isAr ? 'حدث خطأ أثناء حفظ التعديلات' : 'Error saving changes');
               }
             }
           }}>
