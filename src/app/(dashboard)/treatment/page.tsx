@@ -238,45 +238,45 @@ const strategyConfig = {
   },
 };
 
-// Status metadata - ألوان واضحة للوضع النهاري والليلي
+// Status metadata - ألوان فاتحة للوضع النهاري مع الحفاظ على الوضع الليلي
 const statusConfig = {
   notStarted: {
     icon: CircleDot,
-    colorClass: 'text-gray-700 dark:text-gray-300',
-    bgClass: 'bg-gray-200 dark:bg-gray-700/50',
-    borderClass: 'border-gray-400 dark:border-gray-600',
+    colorClass: 'text-gray-600 dark:text-gray-300',
+    bgClass: 'bg-gray-100 dark:bg-gray-700/50',
+    borderClass: 'border-gray-200 dark:border-gray-600',
     labelAr: 'لم يبدأ',
     labelEn: 'Not Started',
   },
   inProgress: {
     icon: Play,
-    colorClass: 'text-sky-700 dark:text-sky-300',
-    bgClass: 'bg-sky-100 dark:bg-sky-900/30',
-    borderClass: 'border-sky-400 dark:border-sky-600',
+    colorClass: 'text-sky-600 dark:text-sky-300',
+    bgClass: 'bg-sky-50 dark:bg-sky-900/30',
+    borderClass: 'border-sky-200 dark:border-sky-600',
     labelAr: 'قيد التنفيذ',
     labelEn: 'In Progress',
   },
   completed: {
     icon: CheckCircle2,
-    colorClass: 'text-emerald-700 dark:text-emerald-300',
-    bgClass: 'bg-emerald-100 dark:bg-emerald-900/30',
-    borderClass: 'border-emerald-400 dark:border-emerald-600',
+    colorClass: 'text-emerald-600 dark:text-emerald-300',
+    bgClass: 'bg-emerald-50 dark:bg-emerald-900/30',
+    borderClass: 'border-emerald-200 dark:border-emerald-600',
     labelAr: 'مكتمل',
     labelEn: 'Completed',
   },
   overdue: {
     icon: AlertCircle,
-    colorClass: 'text-rose-700 dark:text-rose-300',
-    bgClass: 'bg-rose-100 dark:bg-rose-900/30',
-    borderClass: 'border-rose-400 dark:border-rose-600',
+    colorClass: 'text-rose-600 dark:text-rose-300',
+    bgClass: 'bg-rose-50 dark:bg-rose-900/30',
+    borderClass: 'border-rose-200 dark:border-rose-600',
     labelAr: 'متأخر',
     labelEn: 'Overdue',
   },
   cancelled: {
     icon: XCircle,
-    colorClass: 'text-gray-600 dark:text-gray-400',
-    bgClass: 'bg-gray-100 dark:bg-gray-800/50',
-    borderClass: 'border-gray-400 dark:border-gray-600',
+    colorClass: 'text-gray-500 dark:text-gray-400',
+    bgClass: 'bg-gray-50 dark:bg-gray-800/50',
+    borderClass: 'border-gray-200 dark:border-gray-600',
     labelAr: 'ملغي',
     labelEn: 'Cancelled',
   },
@@ -654,20 +654,20 @@ export default function TreatmentPage() {
         </Button>
       </div>
 
-      {/* Stats Cards - بطاقات بخلفيات فاتحة وأنيقة */}
+      {/* Stats Cards - تصميم فاتح مثل لوحة المعلومات */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-[#F39200]', bg: 'bg-[#F39200]', iconColor: 'text-white', cardBg: 'bg-orange-100 dark:bg-orange-950/30', border: 'border-[#F39200]/50 dark:border-[#F39200]/30' },
-          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500', iconColor: 'text-white', cardBg: 'bg-emerald-100 dark:bg-emerald-950/30', border: 'border-emerald-400 dark:border-emerald-700' },
-          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-sky-700 dark:text-sky-400', bg: 'bg-sky-500', iconColor: 'text-white', cardBg: 'bg-sky-100 dark:bg-sky-950/30', border: 'border-sky-400 dark:border-sky-700' },
-          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-500', iconColor: 'text-white', cardBg: 'bg-rose-100 dark:bg-rose-950/30', border: 'border-rose-400 dark:border-rose-700' },
-          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-gray-700 dark:text-gray-400', bg: 'bg-gray-500 dark:bg-gray-500', iconColor: 'text-white', cardBg: 'bg-gray-200 dark:bg-gray-800/50', border: 'border-gray-400 dark:border-gray-600' },
+          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-[#F39200]', bg: 'bg-gradient-to-r from-orange-400 to-amber-400', iconColor: 'text-white', cardBg: 'bg-gradient-to-b from-orange-50 to-white dark:from-orange-950/30 dark:to-[#2E2D2C]', border: 'border-orange-200 dark:border-[#F39200]/30' },
+          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-gradient-to-r from-emerald-400 to-teal-400', iconColor: 'text-white', cardBg: 'bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950/30 dark:to-[#2E2D2C]', border: 'border-emerald-200 dark:border-emerald-700' },
+          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-sky-500 dark:text-sky-400', bg: 'bg-gradient-to-r from-sky-400 to-blue-400', iconColor: 'text-white', cardBg: 'bg-gradient-to-b from-sky-50 to-white dark:from-sky-950/30 dark:to-[#2E2D2C]', border: 'border-sky-200 dark:border-sky-700' },
+          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-rose-500 dark:text-rose-400', bg: 'bg-gradient-to-r from-red-400 to-rose-400', iconColor: 'text-white', cardBg: 'bg-gradient-to-b from-rose-50 to-white dark:from-rose-950/30 dark:to-[#2E2D2C]', border: 'border-rose-200 dark:border-rose-700' },
+          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-gray-500 dark:text-gray-400', bg: 'bg-gradient-to-r from-gray-400 to-slate-400 dark:from-gray-500 dark:to-slate-500', iconColor: 'text-white', cardBg: 'bg-gradient-to-b from-gray-50 to-white dark:from-gray-800/50 dark:to-[#2E2D2C]', border: 'border-gray-200 dark:border-gray-600' },
         ].map((stat, i) => (
-          <Card key={i} className={`overflow-hidden hover:shadow-lg transition-all duration-300 border ${stat.border} ${stat.cardBg}`}>
+          <Card key={i} className={`overflow-hidden hover:shadow-lg transition-all duration-300 border shadow-sm rounded-2xl ${stat.border} ${stat.cardBg}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">{stat.label}</p>
+                  <p className="text-xs font-semibold text-[var(--foreground-secondary)] uppercase tracking-wide">{stat.label}</p>
                   <p className={`text-3xl font-black ${stat.color}`}>{stat.value}</p>
                 </div>
                 <div className={`p-3 rounded-xl ${stat.bg} shadow-md`}>
@@ -679,19 +679,19 @@ export default function TreatmentPage() {
         ))}
       </div>
 
-      {/* Progress Overview - شريط التقدم بألوان هوية الشركة */}
-      <Card className="overflow-hidden border border-[#F39200]/50 dark:border-[#F39200]/30 bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-950/20 dark:to-amber-950/20">
+      {/* Progress Overview - تصميم فاتح */}
+      <Card className="overflow-hidden border border-orange-200 dark:border-[#F39200]/30 shadow-sm rounded-2xl bg-gradient-to-b from-orange-50 to-white dark:from-orange-950/20 dark:to-[#2E2D2C]">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-[#F39200] shadow-md">
+              <div className="p-2.5 rounded-xl bg-gradient-to-r from-orange-400 to-amber-400 shadow-md">
                 <Activity className="h-6 w-6 text-white" />
               </div>
-              <span className="font-bold text-lg text-gray-800 dark:text-gray-200">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
+              <span className="font-bold text-lg text-[var(--foreground)]">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
             </div>
             <span className="text-3xl font-black text-[#F39200]">{avgProgress}%</span>
           </div>
-          <div className="h-4 rounded-full bg-gray-300 dark:bg-gray-700 overflow-hidden">
+          <div className="h-4 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-[#F39200] to-amber-400 transition-all duration-500"
               style={{ width: `${avgProgress}%` }}
@@ -762,7 +762,7 @@ export default function TreatmentPage() {
             return (
               <Card
                 key={treatment.id}
-                className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#2E2D2C]"
+                className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border border-[var(--border)] shadow-sm rounded-2xl bg-[var(--card)] dark:bg-[#2E2D2C]"
                 onClick={() => openViewModal(treatment)}
               >
                 {/* Card Header with Strategy Color - شريط ملون واضح */}
@@ -773,7 +773,7 @@ export default function TreatmentPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${ratingColors[treatment.inherentRating]}`} />
-                      <span className="text-sm font-mono font-bold text-gray-800 dark:text-gray-200">
+                      <span className="text-sm font-mono font-bold text-[var(--foreground)]">
                         {treatment.riskNumber}
                       </span>
                     </div>
@@ -785,10 +785,10 @@ export default function TreatmentPage() {
 
                   {/* Title */}
                   <div>
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 line-clamp-2 group-hover:text-[#F39200] transition-colors text-sm">
+                    <h3 className="font-bold text-[var(--foreground)] line-clamp-2 group-hover:text-[#F39200] transition-colors text-sm">
                       {isAr ? treatment.riskTitleAr : treatment.riskTitleEn}
                     </h3>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-[var(--foreground-secondary)] mt-1">
                       {isAr ? treatment.departmentAr : treatment.departmentEn}
                     </p>
                   </div>
@@ -804,10 +804,10 @@ export default function TreatmentPage() {
                   {/* Progress Bar */}
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-gray-700 dark:text-gray-400 font-medium">{isAr ? 'التقدم' : 'Progress'}</span>
+                      <span className="text-[var(--foreground-secondary)] font-medium">{isAr ? 'التقدم' : 'Progress'}</span>
                       <span className="font-bold text-[#F39200]">{treatment.progress}%</span>
                     </div>
-                    <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                    <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-[#F39200] to-amber-400 transition-all duration-500"
                         style={{ width: `${treatment.progress}%` }}
@@ -816,14 +816,14 @@ export default function TreatmentPage() {
                   </div>
 
                   {/* Footer: Responsible & Due Date */}
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-400">
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--foreground-secondary)]">
                       <Users className="h-3.5 w-3.5" />
                       <span className="truncate max-w-[90px]">
                         {isAr ? treatment.responsibleAr : treatment.responsibleEn}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-400">
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--foreground-secondary)]">
                       <Calendar className="h-3.5 w-3.5" />
                       <span>{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
                     </div>
@@ -834,7 +834,7 @@ export default function TreatmentPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="flex-1 text-xs"
                       onClick={(e) => {
                         e.stopPropagation();
                         openViewModal(treatment);
