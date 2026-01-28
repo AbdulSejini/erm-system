@@ -1271,7 +1271,7 @@ export default function TreatmentPage() {
                                   {riskOwnersList
                                     .filter(owner => {
                                       const searchVal = (assignedToSearch[index] || '').toLowerCase();
-                                      return !searchVal || owner.nameAr.includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                      return !searchVal || (owner.nameAr || '').toLowerCase().includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
                                     })
                                     .slice(0, 10)
                                     .map(owner => (
@@ -1291,7 +1291,7 @@ export default function TreatmentPage() {
                                   }
                                   {riskOwnersList.filter(owner => {
                                     const searchVal = (assignedToSearch[index] || '').toLowerCase();
-                                    return !searchVal || owner.nameAr.includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                    return !searchVal || (owner.nameAr || '').toLowerCase().includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
                                   }).length === 0 && (
                                     <div className="px-3 py-2 text-sm text-gray-500">{isAr ? 'لا توجد نتائج' : 'No results'}</div>
                                   )}
@@ -1318,7 +1318,7 @@ export default function TreatmentPage() {
                                   {riskOwnersList
                                     .filter(owner => {
                                       const searchVal = (followedBySearch[index] || '').toLowerCase();
-                                      return !searchVal || owner.nameAr.includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                      return !searchVal || (owner.nameAr || '').toLowerCase().includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
                                     })
                                     .slice(0, 10)
                                     .map(owner => (
@@ -1338,7 +1338,7 @@ export default function TreatmentPage() {
                                   }
                                   {riskOwnersList.filter(owner => {
                                     const searchVal = (followedBySearch[index] || '').toLowerCase();
-                                    return !searchVal || owner.nameAr.includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                    return !searchVal || (owner.nameAr || '').toLowerCase().includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
                                   }).length === 0 && (
                                     <div className="px-3 py-2 text-sm text-gray-500">{isAr ? 'لا توجد نتائج' : 'No results'}</div>
                                   )}
