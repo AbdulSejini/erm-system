@@ -48,6 +48,11 @@ import {
   Gauge,
   Flame,
   ListChecks,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  SortAsc,
+  SortDesc,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { RiskDiscussion } from '@/components/RiskDiscussion';
@@ -545,12 +550,18 @@ export default function RisksPage() {
   const pathname = usePathname();
   const isAr = language === 'ar';
 
+  // Sort options type
+  type SortField = 'riskNumber' | 'title' | 'inherentScore' | 'residualScore' | 'status' | 'identifiedDate';
+  type SortDirection = 'asc' | 'desc';
+
   // Initialize state from URL params for persistence
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [filterRating, setFilterRating] = useState(searchParams.get('rating') || '');
   const [filterCategory, setFilterCategory] = useState(searchParams.get('category') || '');
   const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || '');
   const [filterDepartment, setFilterDepartment] = useState(searchParams.get('department') || '');
+  const [sortField, setSortField] = useState<SortField>((searchParams.get('sortBy') as SortField) || 'inherentScore');
+  const [sortDirection, setSortDirection] = useState<SortDirection>((searchParams.get('sortDir') as SortDirection) || 'desc');
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1', 10));
   const [itemsPerPage, setItemsPerPage] = useState(parseInt(searchParams.get('perPage') || '10', 10));
   const [showWizard, setShowWizard] = useState(false);
@@ -979,15 +990,39 @@ export default function RisksPage() {
       category: filterCategory,
       status: filterStatus,
       department: filterDepartment,
+      sortBy: sortField,
+      sortDir: sortDirection,
       page: currentPage,
       perPage: itemsPerPage,
     });
-  }, [debouncedSearch, filterRating, filterCategory, filterStatus, filterDepartment, currentPage, itemsPerPage, updateURLParams]);
+  }, [debouncedSearch, filterRating, filterCategory, filterStatus, filterDepartment, sortField, sortDirection, currentPage, itemsPerPage, updateURLParams]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearch, filterRating, filterCategory, filterStatus, filterDepartment]);
+
+  // Sort options
+  const sortOptions = useMemo(() => [
+    { value: 'inherentScore', label: isAr ? 'درجة الخطر الأصلي' : 'Inherent Risk Score' },
+    { value: 'residualScore', label: isAr ? 'درجة الخطر المتبقي' : 'Residual Risk Score' },
+    { value: 'riskNumber', label: isAr ? 'رقم الخطر' : 'Risk Number' },
+    { value: 'title', label: isAr ? 'العنوان' : 'Title' },
+    { value: 'status', label: isAr ? 'الحالة' : 'Status' },
+    { value: 'identifiedDate', label: isAr ? 'تاريخ التعريف' : 'Identified Date' },
+  ], [isAr]);
+
+  // Handle sort change
+  const handleSortChange = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new field with default desc direction
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
 
   // Rating options based on new rating system
   const ratingOptions = [
@@ -1050,7 +1085,8 @@ export default function RisksPage() {
   }, [risks, isAr]);
 
   const filteredRisks = useMemo(() => {
-    return risks.filter((risk) => {
+    // Filter first
+    const filtered = risks.filter((risk) => {
       const matchesSearch =
         risk.riskNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         risk.titleAr.includes(searchQuery) ||
@@ -1061,7 +1097,38 @@ export default function RisksPage() {
       const matchesDepartment = !filterDepartment || risk.departmentAr === filterDepartment;
       return matchesSearch && matchesRating && matchesCategory && matchesStatus && matchesDepartment;
     });
-  }, [risks, searchQuery, filterRating, filterCategory, filterStatus, filterDepartment]);
+
+    // Then sort
+    return filtered.sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'riskNumber':
+          comparison = a.riskNumber.localeCompare(b.riskNumber);
+          break;
+        case 'title':
+          comparison = (isAr ? a.titleAr : a.titleEn).localeCompare(isAr ? b.titleAr : b.titleEn);
+          break;
+        case 'inherentScore':
+          comparison = (a.inherentScore || 0) - (b.inherentScore || 0);
+          break;
+        case 'residualScore':
+          comparison = (a.residualScore || 0) - (b.residualScore || 0);
+          break;
+        case 'status':
+          const statusOrder = { open: 1, inProgress: 2, mitigated: 3, accepted: 4, closed: 5 };
+          comparison = (statusOrder[a.status as keyof typeof statusOrder] || 0) - (statusOrder[b.status as keyof typeof statusOrder] || 0);
+          break;
+        case 'identifiedDate':
+          comparison = new Date(a.identifiedDate || 0).getTime() - new Date(b.identifiedDate || 0).getTime();
+          break;
+        default:
+          comparison = 0;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [risks, searchQuery, filterRating, filterCategory, filterStatus, filterDepartment, sortField, sortDirection, isAr]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredRisks.length / itemsPerPage);
@@ -1436,7 +1503,61 @@ export default function RisksPage() {
                 )}
               </div>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Sort Dropdown */}
+              <div className="relative group">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<ArrowUpDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+                  rightIcon={sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                  className="min-w-[120px]"
+                >
+                  <span className="text-xs sm:text-sm truncate">
+                    {sortOptions.find(opt => opt.value === sortField)?.label}
+                  </span>
+                </Button>
+                <div className="absolute top-full mt-1 end-0 z-50 min-w-[200px] rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                  <div className="p-1">
+                    <div className="px-2 py-1.5 text-xs font-medium text-[var(--foreground-secondary)]">
+                      {isAr ? 'ترتيب حسب' : 'Sort by'}
+                    </div>
+                    {sortOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => handleSortChange(option.value as SortField)}
+                        className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortField === option.value ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
+                      >
+                        <span>{option.label}</span>
+                        {sortField === option.value && (
+                          sortDirection === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="border-t border-[var(--border)] p-1">
+                    <div className="px-2 py-1.5 text-xs font-medium text-[var(--foreground-secondary)]">
+                      {isAr ? 'اتجاه الترتيب' : 'Direction'}
+                    </div>
+                    <button
+                      onClick={() => setSortDirection('asc')}
+                      className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortDirection === 'asc' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                      <span>{isAr ? 'تصاعدي' : 'Ascending'}</span>
+                    </button>
+                    <button
+                      onClick={() => setSortDirection('desc')}
+                      className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortDirection === 'desc' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                      <span>{isAr ? 'تنازلي' : 'Descending'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Button */}
               <Button
                 variant={showFilters ? 'primary' : 'outline'}
                 size="sm"
@@ -1461,6 +1582,8 @@ export default function RisksPage() {
                   {isAr ? 'مسح الكل' : 'Clear all'}
                 </Button>
               )}
+
+              {/* View Mode Toggle */}
               <div className="flex rounded-lg border border-[var(--border)]">
                 <button
                   onClick={() => setViewMode('table')}
@@ -1478,8 +1601,8 @@ export default function RisksPage() {
             </div>
           </div>
 
-          {/* Active Filters Tags */}
-          {activeFiltersCount > 0 && (
+          {/* Active Filters & Sort Tags */}
+          {(activeFiltersCount > 0 || sortField !== 'inherentScore' || sortDirection !== 'desc') && (
             <div className="mt-2 flex flex-wrap gap-2">
               {filterRating && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
@@ -1509,6 +1632,22 @@ export default function RisksPage() {
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
                   {departmentOptions.find(d => d.value === filterDepartment)?.label}
                   <button onClick={() => setFilterDepartment('')} className="hover:text-[var(--status-error)]">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {/* Sort Tag */}
+              {(sortField !== 'inherentScore' || sortDirection !== 'desc') && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--secondary)]/10 px-2.5 py-1 text-xs text-[var(--secondary)]">
+                  {sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                  {sortOptions.find(opt => opt.value === sortField)?.label}
+                  <button
+                    onClick={() => {
+                      setSortField('inherentScore');
+                      setSortDirection('desc');
+                    }}
+                    className="hover:text-[var(--status-error)]"
+                  >
                     <X className="h-3 w-3" />
                   </button>
                 </span>
@@ -1569,23 +1708,63 @@ export default function RisksPage() {
               <table className="w-full min-w-[800px]">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--background-secondary)]">
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
-                      {t('risks.riskNumber')}
+                    <th
+                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      onClick={() => handleSortChange('riskNumber')}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t('risks.riskNumber')}
+                        {sortField === 'riskNumber' && (
+                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        )}
+                      </div>
                     </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)]">
-                      {t('risks.riskTitle')}
+                    <th
+                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      onClick={() => handleSortChange('title')}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t('risks.riskTitle')}
+                        {sortField === 'title' && (
+                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        )}
+                      </div>
                     </th>
                     <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
                       {t('risks.riskCategory')}
                     </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
-                      {t('risks.inherentRisk')}
+                    <th
+                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      onClick={() => handleSortChange('inherentScore')}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t('risks.inherentRisk')}
+                        {sortField === 'inherentScore' && (
+                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        )}
+                      </div>
                     </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
-                      {t('risks.residualRisk')}
+                    <th
+                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      onClick={() => handleSortChange('residualScore')}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t('risks.residualRisk')}
+                        {sortField === 'residualScore' && (
+                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        )}
+                      </div>
                     </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
-                      {t('common.status')}
+                    <th
+                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      onClick={() => handleSortChange('status')}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t('common.status')}
+                        {sortField === 'status' && (
+                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        )}
+                      </div>
                     </th>
                     <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
                       {t('risks.riskOwner')}
