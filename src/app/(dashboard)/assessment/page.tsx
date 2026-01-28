@@ -21,7 +21,18 @@ import {
   HelpCircle,
   Calculator,
   Loader2,
+  X,
+  Building2,
+  User,
+  Calendar,
+  Target,
+  Shield,
+  FileText,
+  MessageSquare,
+  History,
+  Wrench,
 } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
 import {
   type RiskRating,
   calculateRiskScore,
@@ -109,6 +120,34 @@ export default function AssessmentPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // State for View Modal
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
+  const [viewModalTab, setViewModalTab] = useState<'details' | 'assessment' | 'treatments' | 'history'>('details');
+  const [riskDetails, setRiskDetails] = useState<APIRisk | null>(null);
+  const [riskDetailsLoading, setRiskDetailsLoading] = useState(false);
+  const [treatments, setTreatments] = useState<Array<{
+    id: string;
+    titleAr: string;
+    titleEn: string;
+    strategy: string;
+    status: string;
+    progress: number;
+    dueDate: string;
+    responsible?: { fullName: string; fullNameEn: string | null };
+  }>>([]);
+  const [changeLogs, setChangeLogs] = useState<Array<{
+    id: string;
+    changeType: string;
+    fieldNameAr: string;
+    descriptionAr: string;
+    description: string;
+    oldValue: string | null;
+    newValue: string | null;
+    createdAt: string;
+    user?: { fullName: string; fullNameEn: string | null };
+  }>>([]);
 
   // Fetch risks from API
   useEffect(() => {
@@ -228,6 +267,86 @@ export default function AssessmentPage() {
       case 'Negligible': return 'bg-green-500';
       default: return 'bg-gray-500';
     }
+  };
+
+  // Handle view risk
+  const handleViewRisk = async (assessment: Assessment) => {
+    setSelectedAssessment(assessment);
+    setShowViewModal(true);
+    setViewModalTab('details');
+    setRiskDetailsLoading(true);
+
+    try {
+      // Fetch risk details
+      const response = await fetch(`/api/risks/${assessment.id}`);
+      const result = await response.json();
+      if (result.success) {
+        setRiskDetails(result.data);
+      }
+    } catch (err) {
+      console.error('Error fetching risk details:', err);
+    } finally {
+      setRiskDetailsLoading(false);
+    }
+  };
+
+  // Fetch treatments when tab changes
+  useEffect(() => {
+    if (showViewModal && selectedAssessment && viewModalTab === 'treatments') {
+      const fetchTreatments = async () => {
+        try {
+          const response = await fetch(`/api/risks/${selectedAssessment.id}/treatments`);
+          const result = await response.json();
+          if (result.success) {
+            setTreatments(result.data);
+          }
+        } catch (err) {
+          console.error('Error fetching treatments:', err);
+        }
+      };
+      fetchTreatments();
+    }
+  }, [showViewModal, selectedAssessment, viewModalTab]);
+
+  // Fetch change logs when tab changes
+  useEffect(() => {
+    if (showViewModal && selectedAssessment && viewModalTab === 'history') {
+      const fetchChangeLogs = async () => {
+        try {
+          const response = await fetch(`/api/risks/${selectedAssessment.id}/changelog`);
+          const result = await response.json();
+          if (result.success) {
+            setChangeLogs(result.data.logs);
+          }
+        } catch (err) {
+          console.error('Error fetching change logs:', err);
+        }
+      };
+      fetchChangeLogs();
+    }
+  }, [showViewModal, selectedAssessment, viewModalTab]);
+
+  // Get strategy label
+  const getStrategyLabel = (strategy: string) => {
+    const strategies: Record<string, { ar: string; en: string }> = {
+      accept: { ar: 'قبول', en: 'Accept' },
+      avoid: { ar: 'تجنب', en: 'Avoid' },
+      reduce: { ar: 'تخفيف', en: 'Reduce' },
+      transfer: { ar: 'نقل', en: 'Transfer' },
+    };
+    return strategies[strategy]?.[isAr ? 'ar' : 'en'] || strategy;
+  };
+
+  // Get status label
+  const getStatusLabel = (status: string) => {
+    const statuses: Record<string, { ar: string; en: string }> = {
+      notStarted: { ar: 'لم يبدأ', en: 'Not Started' },
+      inProgress: { ar: 'قيد التنفيذ', en: 'In Progress' },
+      completed: { ar: 'مكتمل', en: 'Completed' },
+      onHold: { ar: 'معلق', en: 'On Hold' },
+      cancelled: { ar: 'ملغي', en: 'Cancelled' },
+    };
+    return statuses[status]?.[isAr ? 'ar' : 'en'] || status;
   };
 
   // Loading state
@@ -773,7 +892,12 @@ export default function AssessmentPage() {
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
                         <div className="flex items-center justify-center gap-1">
-                          <Button variant="ghost" size="icon-sm" title={isAr ? 'عرض' : 'View'}>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title={isAr ? 'عرض' : 'View'}
+                            onClick={() => handleViewRisk(assessment)}
+                          >
                             <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                           </Button>
                           <Button variant="ghost" size="icon-sm" title={isAr ? 'إعادة تقييم' : 'Reassess'}>
@@ -798,6 +922,330 @@ export default function AssessmentPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* View Risk Modal */}
+      <Modal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setSelectedAssessment(null);
+          setRiskDetails(null);
+          setViewModalTab('details');
+          setTreatments([]);
+          setChangeLogs([]);
+        }}
+        title={selectedAssessment ? (isAr ? selectedAssessment.titleAr : selectedAssessment.titleEn) : ''}
+        size="xl"
+      >
+        {selectedAssessment && (
+          <div className="space-y-4">
+            {/* Risk Number Badge */}
+            <div className="flex items-center justify-between">
+              <code className="rounded bg-[var(--primary)] px-3 py-1 text-sm font-mono text-white">
+                {selectedAssessment.riskNumber}
+              </code>
+              <Badge variant={getRatingBadgeVariant(selectedAssessment.inherent.rating)}>
+                {t(`risks.ratings.${selectedAssessment.inherent.rating}`)}
+              </Badge>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 border-b border-[var(--border)] overflow-x-auto">
+              <button
+                onClick={() => setViewModalTab('details')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  viewModalTab === 'details'
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                {isAr ? 'التفاصيل' : 'Details'}
+              </button>
+              <button
+                onClick={() => setViewModalTab('assessment')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  viewModalTab === 'assessment'
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <Target className="h-4 w-4" />
+                {isAr ? 'التقييم' : 'Assessment'}
+              </button>
+              <button
+                onClick={() => setViewModalTab('treatments')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  viewModalTab === 'treatments'
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <Wrench className="h-4 w-4" />
+                {isAr ? 'خطط المعالجة' : 'Treatments'}
+              </button>
+              <button
+                onClick={() => setViewModalTab('history')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  viewModalTab === 'history'
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <History className="h-4 w-4" />
+                {isAr ? 'سجل التعديلات' : 'History'}
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="max-h-[60vh] overflow-y-auto">
+              {/* Details Tab */}
+              {viewModalTab === 'details' && (
+                <div className="space-y-4">
+                  {riskDetailsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Department & Category */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="rounded-lg border border-[var(--border)] p-3">
+                          <div className="flex items-center gap-2 text-xs text-[var(--foreground-muted)] mb-1">
+                            <Building2 className="h-4 w-4" />
+                            {isAr ? 'الإدارة' : 'Department'}
+                          </div>
+                          <p className="font-medium text-[var(--foreground)]">
+                            {isAr ? selectedAssessment.departmentAr : selectedAssessment.departmentEn}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-[var(--border)] p-3">
+                          <div className="flex items-center gap-2 text-xs text-[var(--foreground-muted)] mb-1">
+                            <Shield className="h-4 w-4" />
+                            {isAr ? 'الفئة' : 'Category'}
+                          </div>
+                          <p className="font-medium text-[var(--foreground)]">
+                            {selectedAssessment.categoryCode}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Assessed By & Review Date */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="rounded-lg border border-[var(--border)] p-3">
+                          <div className="flex items-center gap-2 text-xs text-[var(--foreground-muted)] mb-1">
+                            <User className="h-4 w-4" />
+                            {isAr ? 'تم التقييم بواسطة' : 'Assessed By'}
+                          </div>
+                          <p className="font-medium text-[var(--foreground)]">
+                            {isAr ? selectedAssessment.assessedByAr : selectedAssessment.assessedByEn}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-[var(--border)] p-3">
+                          <div className="flex items-center gap-2 text-xs text-[var(--foreground-muted)] mb-1">
+                            <Calendar className="h-4 w-4" />
+                            {isAr ? 'تاريخ المراجعة القادمة' : 'Next Review Date'}
+                          </div>
+                          <p className="font-medium text-[var(--foreground)]">
+                            {new Date(selectedAssessment.nextReviewDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Risk Details from API */}
+                      {riskDetails && (
+                        <div className="space-y-3">
+                          <div className="rounded-lg border border-[var(--border)] p-3">
+                            <p className="text-xs text-[var(--foreground-muted)] mb-1">
+                              {isAr ? 'الوصف' : 'Description'}
+                            </p>
+                            <p className="text-sm text-[var(--foreground)]">
+                              {isAr ? riskDetails.descriptionAr : riskDetails.descriptionEn}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Assessment Tab */}
+              {viewModalTab === 'assessment' && (
+                <div className="space-y-4">
+                  {/* Inherent Risk */}
+                  <div className="rounded-lg border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
+                    <h4 className="font-semibold text-red-700 dark:text-red-400 mb-3">
+                      {t('risks.inherentRisk')}
+                    </h4>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-xs text-[var(--foreground-muted)]">{t('risks.likelihood')}</p>
+                        <p className="text-2xl font-bold text-[var(--foreground)]">{selectedAssessment.inherent.likelihood}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--foreground-muted)]">{t('risks.impact')}</p>
+                        <p className="text-2xl font-bold text-[var(--foreground)]">{selectedAssessment.inherent.impact}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--foreground-muted)]">{t('risks.score')}</p>
+                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">{selectedAssessment.inherent.score}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-center">
+                      <Badge variant={getRatingBadgeVariant(selectedAssessment.inherent.rating)} size="lg">
+                        {t(`risks.ratings.${selectedAssessment.inherent.rating}`)}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Residual Risk */}
+                  <div className="rounded-lg border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4">
+                    <h4 className="font-semibold text-green-700 dark:text-green-400 mb-3">
+                      {t('risks.residualRisk')}
+                    </h4>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-xs text-[var(--foreground-muted)]">{t('risks.likelihood')}</p>
+                        <p className="text-2xl font-bold text-[var(--foreground)]">{selectedAssessment.residual.likelihood}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--foreground-muted)]">{t('risks.impact')}</p>
+                        <p className="text-2xl font-bold text-[var(--foreground)]">{selectedAssessment.residual.impact}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--foreground-muted)]">{t('risks.score')}</p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{selectedAssessment.residual.score}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-center">
+                      <Badge variant={getRatingBadgeVariant(selectedAssessment.residual.rating)} size="lg">
+                        {t(`risks.ratings.${selectedAssessment.residual.rating}`)}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Reduction */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      {getTrendIcon(selectedAssessment.inherent.score, selectedAssessment.residual.score)}
+                      <span className="text-lg font-bold text-[var(--status-success)]">
+                        -{selectedAssessment.inherent.score - selectedAssessment.residual.score}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[var(--foreground-muted)]">
+                      {isAr ? 'نسبة التخفيض' : 'Reduction'}: {Math.round(((selectedAssessment.inherent.score - selectedAssessment.residual.score) / selectedAssessment.inherent.score) * 100)}%
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Treatments Tab */}
+              {viewModalTab === 'treatments' && (
+                <div className="space-y-3">
+                  {treatments.length === 0 ? (
+                    <div className="text-center py-8 text-[var(--foreground-muted)]">
+                      <Wrench className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>{isAr ? 'لا توجد خطط معالجة' : 'No treatment plans'}</p>
+                    </div>
+                  ) : (
+                    treatments.map((treatment) => (
+                      <div key={treatment.id} className="rounded-lg border border-[var(--border)] p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-semibold text-[var(--foreground)]">
+                            {isAr ? treatment.titleAr : treatment.titleEn}
+                          </h4>
+                          <Badge variant={treatment.status === 'completed' ? 'success' : treatment.status === 'inProgress' ? 'warning' : 'default'}>
+                            {getStatusLabel(treatment.status)}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-[var(--foreground-muted)]">{isAr ? 'الاستراتيجية:' : 'Strategy:'}</span>
+                            <span className="ms-1 font-medium">{getStrategyLabel(treatment.strategy)}</span>
+                          </div>
+                          <div>
+                            <span className="text-[var(--foreground-muted)]">{isAr ? 'المسؤول:' : 'Responsible:'}</span>
+                            <span className="ms-1 font-medium">
+                              {treatment.responsible ? (isAr ? treatment.responsible.fullName : treatment.responsible.fullNameEn || treatment.responsible.fullName) : '-'}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="mt-3">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-[var(--foreground-muted)]">{isAr ? 'التقدم' : 'Progress'}</span>
+                            <span className="font-medium">{treatment.progress}%</span>
+                          </div>
+                          <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                treatment.progress === 100 ? 'bg-green-500' : 'bg-[var(--primary)]'
+                              }`}
+                              style={{ width: `${treatment.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* History Tab */}
+              {viewModalTab === 'history' && (
+                <div className="space-y-3">
+                  {changeLogs.length === 0 ? (
+                    <div className="text-center py-8 text-[var(--foreground-muted)]">
+                      <History className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>{isAr ? 'لا يوجد سجل تعديلات' : 'No change history'}</p>
+                    </div>
+                  ) : (
+                    changeLogs.map((log) => (
+                      <div key={log.id} className="rounded-lg border border-[var(--border)] p-3">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="font-medium text-[var(--foreground)]">
+                              {isAr ? log.fieldNameAr : log.fieldNameAr}
+                            </p>
+                            <p className="text-xs text-[var(--foreground-muted)]">
+                              {isAr ? log.descriptionAr : log.description}
+                            </p>
+                          </div>
+                          <span className="text-xs text-[var(--foreground-muted)]">
+                            {new Date(log.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                          </span>
+                        </div>
+                        {(log.oldValue || log.newValue) && (
+                          <div className="flex items-center gap-2 text-xs">
+                            {log.oldValue && (
+                              <span className="px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 line-through">
+                                {log.oldValue.length > 50 ? log.oldValue.substring(0, 50) + '...' : log.oldValue}
+                              </span>
+                            )}
+                            {log.oldValue && log.newValue && <span>→</span>}
+                            {log.newValue && (
+                              <span className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                {log.newValue.length > 50 ? log.newValue.substring(0, 50) + '...' : log.newValue}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {log.user && (
+                          <p className="mt-2 text-xs text-[var(--foreground-muted)]">
+                            <User className="h-3 w-3 inline me-1" />
+                            {isAr ? log.user.fullName : log.user.fullNameEn || log.user.fullName}
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
