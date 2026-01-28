@@ -193,13 +193,13 @@ const calculateProgress = (inherentScore: number, residualScore: number | null):
   return Math.max(0, Math.min(100, Math.round(reduction)));
 };
 
-// Strategy metadata
+// Strategy metadata - ألوان متناسقة للوضع النهاري والليلي
 const strategyConfig = {
   avoid: {
     icon: Ban,
-    colorClass: 'text-red-500',
+    colorClass: 'text-red-600 dark:text-red-400',
     bgClass: 'bg-red-50 dark:bg-red-900/20',
-    borderClass: 'border-red-200 dark:border-red-800',
+    borderClass: 'border-red-300 dark:border-red-700',
     labelAr: 'تجنب',
     labelEn: 'Avoid',
     descAr: 'تجنب الخطر عن طريق عدم القيام بالنشاط المسبب له',
@@ -207,9 +207,9 @@ const strategyConfig = {
   },
   reduce: {
     icon: TrendingDown,
-    colorClass: 'text-amber-500',
+    colorClass: 'text-amber-600 dark:text-amber-400',
     bgClass: 'bg-amber-50 dark:bg-amber-900/20',
-    borderClass: 'border-amber-200 dark:border-amber-800',
+    borderClass: 'border-amber-300 dark:border-amber-700',
     labelAr: 'تقليل',
     labelEn: 'Reduce',
     descAr: 'تقليل احتمالية أو تأثير الخطر من خلال إجراءات رقابية',
@@ -217,9 +217,9 @@ const strategyConfig = {
   },
   transfer: {
     icon: Share2,
-    colorClass: 'text-blue-500',
+    colorClass: 'text-blue-600 dark:text-blue-400',
     bgClass: 'bg-blue-50 dark:bg-blue-900/20',
-    borderClass: 'border-blue-200 dark:border-blue-800',
+    borderClass: 'border-blue-300 dark:border-blue-700',
     labelAr: 'نقل',
     labelEn: 'Transfer',
     descAr: 'نقل الخطر إلى طرف ثالث مثل شركات التأمين',
@@ -227,9 +227,9 @@ const strategyConfig = {
   },
   accept: {
     icon: CheckCircle,
-    colorClass: 'text-green-500',
+    colorClass: 'text-green-600 dark:text-green-400',
     bgClass: 'bg-green-50 dark:bg-green-900/20',
-    borderClass: 'border-green-200 dark:border-green-800',
+    borderClass: 'border-green-300 dark:border-green-700',
     labelAr: 'قبول',
     labelEn: 'Accept',
     descAr: 'قبول الخطر عندما تكون تكلفة المعالجة أعلى من الأثر',
@@ -237,40 +237,45 @@ const strategyConfig = {
   },
 };
 
-// Status metadata
+// Status metadata - ألوان متناسقة للوضع النهاري والليلي
 const statusConfig = {
   notStarted: {
     icon: CircleDot,
-    colorClass: 'text-slate-500',
-    bgClass: 'bg-slate-100 dark:bg-slate-800',
+    colorClass: 'text-slate-600 dark:text-slate-400',
+    bgClass: 'bg-slate-100 dark:bg-slate-800/50',
+    borderClass: 'border-slate-300 dark:border-slate-600',
     labelAr: 'لم يبدأ',
     labelEn: 'Not Started',
   },
   inProgress: {
     icon: Play,
-    colorClass: 'text-blue-500',
-    bgClass: 'bg-blue-100 dark:bg-blue-900/30',
+    colorClass: 'text-blue-600 dark:text-blue-400',
+    bgClass: 'bg-blue-50 dark:bg-blue-900/30',
+    borderClass: 'border-blue-300 dark:border-blue-700',
     labelAr: 'قيد التنفيذ',
     labelEn: 'In Progress',
   },
   completed: {
     icon: CheckCircle2,
-    colorClass: 'text-green-500',
-    bgClass: 'bg-green-100 dark:bg-green-900/30',
+    colorClass: 'text-green-600 dark:text-green-400',
+    bgClass: 'bg-green-50 dark:bg-green-900/30',
+    borderClass: 'border-green-300 dark:border-green-700',
     labelAr: 'مكتمل',
     labelEn: 'Completed',
   },
   overdue: {
     icon: AlertCircle,
-    colorClass: 'text-red-500',
-    bgClass: 'bg-red-100 dark:bg-red-900/30',
+    colorClass: 'text-red-600 dark:text-red-400',
+    bgClass: 'bg-red-50 dark:bg-red-900/30',
+    borderClass: 'border-red-300 dark:border-red-700',
     labelAr: 'متأخر',
     labelEn: 'Overdue',
   },
   cancelled: {
     icon: XCircle,
-    colorClass: 'text-gray-400',
-    bgClass: 'bg-gray-100 dark:bg-gray-800',
+    colorClass: 'text-gray-500 dark:text-gray-400',
+    bgClass: 'bg-gray-100 dark:bg-gray-800/50',
+    borderClass: 'border-gray-300 dark:border-gray-600',
     labelAr: 'ملغي',
     labelEn: 'Cancelled',
   },
@@ -620,20 +625,20 @@ export default function TreatmentPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-[var(--primary)]', bg: 'bg-[var(--primary)]/10' },
-          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
-          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
-          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-slate-500', bg: 'bg-slate-500/10' },
+          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-200 dark:border-orange-800' },
+          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-200 dark:border-green-800' },
+          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-800' },
+          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-800' },
+          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800/50', border: 'border-slate-200 dark:border-slate-700' },
         ].map((stat, i) => (
-          <Card key={i} className="overflow-hidden hover:shadow-md transition-shadow">
+          <Card key={i} className={`overflow-hidden hover:shadow-md transition-shadow border ${stat.border}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-[var(--foreground-secondary)]">{stat.label}</p>
+                  <p className="text-xs font-medium text-[var(--foreground-secondary)]">{stat.label}</p>
                   <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
                 </div>
-                <div className={`p-2 rounded-lg ${stat.bg}`}>
+                <div className={`p-2.5 rounded-xl ${stat.bg}`}>
                   <stat.icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
               </div>
@@ -643,18 +648,20 @@ export default function TreatmentPage() {
       </div>
 
       {/* Progress Overview */}
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border border-orange-200 dark:border-orange-800">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-[var(--primary)]" />
-              <span className="font-medium">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
+              <div className="p-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                <Activity className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <span className="font-semibold text-[var(--foreground)]">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
             </div>
-            <span className="text-2xl font-bold text-[var(--primary)]">{avgProgress}%</span>
+            <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">{avgProgress}%</span>
           </div>
-          <div className="h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+          <div className="h-4 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--primary-dark)] transition-all duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500"
               style={{ width: `${avgProgress}%` }}
             />
           </div>
@@ -717,74 +724,76 @@ export default function TreatmentPage() {
           filteredTreatments.map((treatment) => {
             const StrategyIcon = strategyConfig[treatment.strategy].icon;
             const StatusIcon = statusConfig[treatment.status].icon;
+            const statusConf = statusConfig[treatment.status];
+            const strategyConf = strategyConfig[treatment.strategy];
 
             return (
               <Card
                 key={treatment.id}
-                className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group"
+                className={`overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 ${statusConf.borderClass}`}
                 onClick={() => openViewModal(treatment)}
               >
                 {/* Card Header with Strategy Color */}
-                <div className={`h-1 ${strategyConfig[treatment.strategy].bgClass}`} />
+                <div className={`h-1.5 ${strategyConf.bgClass}`} style={{ background: treatment.strategy === 'avoid' ? '#ef4444' : treatment.strategy === 'reduce' ? '#f59e0b' : treatment.strategy === 'transfer' ? '#3b82f6' : '#22c55e' }} />
 
-                <CardContent className="p-4 space-y-4">
+                <CardContent className="p-4 space-y-3">
                   {/* Top Row: Risk Number & Status */}
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${ratingColors[treatment.inherentRating]}`} />
-                      <span className="text-xs font-mono text-[var(--foreground-secondary)]">
+                      <div className={`w-3 h-3 rounded-full ${ratingColors[treatment.inherentRating]}`} />
+                      <span className="text-sm font-mono font-semibold text-gray-700 dark:text-gray-300">
                         {treatment.riskNumber}
                       </span>
                     </div>
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${statusConfig[treatment.status].bgClass} ${statusConfig[treatment.status].colorClass}`}>
-                      <StatusIcon className="h-3 w-3" />
-                      <span>{isAr ? statusConfig[treatment.status].labelAr : statusConfig[treatment.status].labelEn}</span>
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${statusConf.bgClass} ${statusConf.colorClass} ${statusConf.borderClass}`}>
+                      <StatusIcon className="h-3.5 w-3.5" />
+                      <span>{isAr ? statusConf.labelAr : statusConf.labelEn}</span>
                     </div>
                   </div>
 
                   {/* Title */}
                   <div>
-                    <h3 className="font-semibold text-[var(--foreground)] line-clamp-1 group-hover:text-[var(--primary)] transition-colors">
+                    <h3 className="font-bold text-gray-800 dark:text-gray-100 line-clamp-2 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                       {isAr ? treatment.riskTitleAr : treatment.riskTitleEn}
                     </h3>
-                    <p className="text-xs text-[var(--foreground-secondary)] mt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">
                       {isAr ? treatment.departmentAr : treatment.departmentEn}
                     </p>
                   </div>
 
                   {/* Strategy Badge */}
-                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${strategyConfig[treatment.strategy].bgClass} ${strategyConfig[treatment.strategy].borderClass} border`}>
-                    <StrategyIcon className={`h-4 w-4 ${strategyConfig[treatment.strategy].colorClass}`} />
-                    <span className={`text-sm font-medium ${strategyConfig[treatment.strategy].colorClass}`}>
-                      {isAr ? strategyConfig[treatment.strategy].labelAr : strategyConfig[treatment.strategy].labelEn}
+                  <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 ${strategyConf.bgClass} ${strategyConf.borderClass}`}>
+                    <StrategyIcon className={`h-4 w-4 ${strategyConf.colorClass}`} />
+                    <span className={`text-sm font-bold ${strategyConf.colorClass}`}>
+                      {isAr ? strategyConf.labelAr : strategyConf.labelEn}
                     </span>
                   </div>
 
                   {/* Progress Bar */}
                   <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-[var(--foreground-secondary)]">{isAr ? 'التقدم' : 'Progress'}</span>
-                      <span className="font-semibold text-[var(--primary)]">{treatment.progress}%</span>
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="text-gray-600 dark:text-gray-400 font-medium">{isAr ? 'التقدم' : 'Progress'}</span>
+                      <span className="font-bold text-orange-600 dark:text-orange-400">{treatment.progress}%</span>
                     </div>
-                    <div className="h-2 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                    <div className="h-2.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--primary-dark)] transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500"
                         style={{ width: `${treatment.progress}%` }}
                       />
                     </div>
                   </div>
 
                   {/* Footer: Responsible & Due Date */}
-                  <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
-                    <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
-                      <Users className="h-3.5 w-3.5" />
-                      <span className="truncate max-w-[100px]">
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <Users className="h-4 w-4" />
+                      <span className="truncate max-w-[100px] font-medium">
                         {isAr ? treatment.responsibleAr : treatment.responsibleEn}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
+                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <Calendar className="h-4 w-4" />
+                      <span className="font-medium">{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
                     </div>
                   </div>
                 </CardContent>
