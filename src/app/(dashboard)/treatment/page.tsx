@@ -315,6 +315,12 @@ export default function TreatmentPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12; // عدد العناصر في كل صفحة
 
+  // Autocomplete states للمكلف والمتابعة
+  const [assignedToSearch, setAssignedToSearch] = useState<{ [key: number]: string }>({});
+  const [followedBySearch, setFollowedBySearch] = useState<{ [key: number]: string }>({});
+  const [showAssignedDropdown, setShowAssignedDropdown] = useState<{ [key: number]: boolean }>({});
+  const [showFollowedDropdown, setShowFollowedDropdown] = useState<{ [key: number]: boolean }>({});
+
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -341,6 +347,7 @@ export default function TreatmentPage() {
       dueDate: string;
       priority: 'high' | 'medium' | 'low';
       assignedTo: string;
+      followedBy: string;
       description: string;
       status: string;
     }[],
@@ -563,7 +570,8 @@ export default function TreatmentPage() {
       titleEn: '',
       dueDate: formData.dueDate,
       priority: 'medium' as 'high' | 'medium' | 'low',
-      assignedTo: formData.responsibleId,
+      assignedTo: '',
+      followedBy: '',
       description: '',
       status: 'notStarted',
     };
@@ -859,6 +867,7 @@ export default function TreatmentPage() {
                             dueDate: t.dueDate || '',
                             priority: (t.priority || 'medium') as 'high' | 'medium' | 'low',
                             assignedTo: '',
+                            followedBy: '',
                             description: '',
                             status: t.status,
                           })),
@@ -1199,34 +1208,19 @@ export default function TreatmentPage() {
                             </div>
                           </div>
 
-                          {/* Task Details Row */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {/* Task Details Row 1: Priority, Due Date, Status */}
+                          <div className="grid grid-cols-3 gap-3 mb-3">
                             {/* Priority */}
                             <div>
                               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الأولوية' : 'Priority'}</label>
                               <select
                                 value={task.priority || 'medium'}
                                 onChange={(e) => updateTask(index, 'priority', e.target.value)}
-                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500"
+                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200]"
                               >
                                 <option value="high">{isAr ? '🔴 عالية' : '🔴 High'}</option>
                                 <option value="medium">{isAr ? '🟡 متوسطة' : '🟡 Medium'}</option>
                                 <option value="low">{isAr ? '🟢 منخفضة' : '🟢 Low'}</option>
-                              </select>
-                            </div>
-
-                            {/* Assigned To */}
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المكلف' : 'Assigned To'}</label>
-                              <select
-                                value={task.assignedTo || ''}
-                                onChange={(e) => updateTask(index, 'assignedTo', e.target.value)}
-                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500"
-                              >
-                                <option value="">{isAr ? 'اختر...' : 'Select...'}</option>
-                                {responsibleOptions.map((opt) => (
-                                  <option key={opt.id} value={opt.id}>{isAr ? opt.name : opt.nameEn}</option>
-                                ))}
                               </select>
                             </div>
 
@@ -1247,12 +1241,109 @@ export default function TreatmentPage() {
                               <select
                                 value={task.status || 'notStarted'}
                                 onChange={(e) => updateTask(index, 'status', e.target.value)}
-                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500"
+                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200]"
                               >
                                 <option value="notStarted">{isAr ? '⏳ لم يبدأ' : '⏳ Not Started'}</option>
                                 <option value="inProgress">{isAr ? '🔄 قيد التنفيذ' : '🔄 In Progress'}</option>
                                 <option value="completed">{isAr ? '✅ مكتمل' : '✅ Completed'}</option>
                               </select>
+                            </div>
+                          </div>
+
+                          {/* Task Details Row 2: Assigned To & Followed By with Autocomplete */}
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Assigned To - المكلف */}
+                            <div className="relative">
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المكلف' : 'Assigned To'}</label>
+                              <input
+                                type="text"
+                                value={assignedToSearch[index] !== undefined ? assignedToSearch[index] : (riskOwnersList.find(o => o.id === task.assignedTo)?.[isAr ? 'nameAr' : 'nameEn'] || '')}
+                                onChange={(e) => {
+                                  setAssignedToSearch({ ...assignedToSearch, [index]: e.target.value });
+                                  setShowAssignedDropdown({ ...showAssignedDropdown, [index]: true });
+                                }}
+                                onFocus={() => setShowAssignedDropdown({ ...showAssignedDropdown, [index]: true })}
+                                placeholder={isAr ? 'ابدأ بكتابة الاسم...' : 'Start typing name...'}
+                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200] focus:border-[#F39200]"
+                              />
+                              {showAssignedDropdown[index] && (
+                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                  {riskOwnersList
+                                    .filter(owner => {
+                                      const searchVal = (assignedToSearch[index] || '').toLowerCase();
+                                      return !searchVal || owner.nameAr.includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                    })
+                                    .slice(0, 10)
+                                    .map(owner => (
+                                      <button
+                                        key={owner.id}
+                                        type="button"
+                                        onClick={() => {
+                                          updateTask(index, 'assignedTo', owner.id);
+                                          setAssignedToSearch({ ...assignedToSearch, [index]: isAr ? owner.nameAr : owner.nameEn });
+                                          setShowAssignedDropdown({ ...showAssignedDropdown, [index]: false });
+                                        }}
+                                        className="w-full px-3 py-2 text-start text-sm hover:bg-[#F39200]/10 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                      >
+                                        <span className="font-medium">{isAr ? owner.nameAr : owner.nameEn}</span>
+                                      </button>
+                                    ))
+                                  }
+                                  {riskOwnersList.filter(owner => {
+                                    const searchVal = (assignedToSearch[index] || '').toLowerCase();
+                                    return !searchVal || owner.nameAr.includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                  }).length === 0 && (
+                                    <div className="px-3 py-2 text-sm text-gray-500">{isAr ? 'لا توجد نتائج' : 'No results'}</div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Followed By - المتابعة */}
+                            <div className="relative">
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المتابعة' : 'Followed By'}</label>
+                              <input
+                                type="text"
+                                value={followedBySearch[index] !== undefined ? followedBySearch[index] : (riskOwnersList.find(o => o.id === task.followedBy)?.[isAr ? 'nameAr' : 'nameEn'] || '')}
+                                onChange={(e) => {
+                                  setFollowedBySearch({ ...followedBySearch, [index]: e.target.value });
+                                  setShowFollowedDropdown({ ...showFollowedDropdown, [index]: true });
+                                }}
+                                onFocus={() => setShowFollowedDropdown({ ...showFollowedDropdown, [index]: true })}
+                                placeholder={isAr ? 'ابدأ بكتابة الاسم...' : 'Start typing name...'}
+                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200] focus:border-[#F39200]"
+                              />
+                              {showFollowedDropdown[index] && (
+                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                  {riskOwnersList
+                                    .filter(owner => {
+                                      const searchVal = (followedBySearch[index] || '').toLowerCase();
+                                      return !searchVal || owner.nameAr.includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                    })
+                                    .slice(0, 10)
+                                    .map(owner => (
+                                      <button
+                                        key={owner.id}
+                                        type="button"
+                                        onClick={() => {
+                                          updateTask(index, 'followedBy', owner.id);
+                                          setFollowedBySearch({ ...followedBySearch, [index]: isAr ? owner.nameAr : owner.nameEn });
+                                          setShowFollowedDropdown({ ...showFollowedDropdown, [index]: false });
+                                        }}
+                                        className="w-full px-3 py-2 text-start text-sm hover:bg-[#F39200]/10 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                      >
+                                        <span className="font-medium">{isAr ? owner.nameAr : owner.nameEn}</span>
+                                      </button>
+                                    ))
+                                  }
+                                  {riskOwnersList.filter(owner => {
+                                    const searchVal = (followedBySearch[index] || '').toLowerCase();
+                                    return !searchVal || owner.nameAr.includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                  }).length === 0 && (
+                                    <div className="px-3 py-2 text-sm text-gray-500">{isAr ? 'لا توجد نتائج' : 'No results'}</div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
 
