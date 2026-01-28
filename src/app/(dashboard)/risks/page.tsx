@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { Autocomplete } from '@/components/ui/Autocomplete';
 import { RiskWizard } from '@/components/risks/RiskWizard';
 import {
   Plus,
@@ -2319,27 +2320,34 @@ export default function RisksPage() {
 
             {/* Risk Owner */}
             <div>
-              <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
-                {isAr ? 'مالك الخطر' : 'Risk Owner'}
-              </label>
-              <Select
-                options={[
-                  { value: '', label: isAr ? '-- اختر مالك الخطر --' : '-- Select Risk Owner --' },
-                  ...riskOwners.map(owner => ({
-                    value: owner.id,
-                    label: isAr ? owner.fullName : (owner.fullNameEn || owner.fullName)
-                  }))
-                ]}
+              <Autocomplete
+                label={isAr ? 'مالك الخطر' : 'Risk Owner'}
+                placeholder={isAr ? 'ابحث عن مالك الخطر...' : 'Search for risk owner...'}
+                options={riskOwners.map(owner => ({
+                  id: owner.id,
+                  label: isAr ? owner.fullName : (owner.fullNameEn || owner.fullName),
+                  labelSecondary: isAr ? (owner.fullNameEn || undefined) : (owner.fullName !== owner.fullNameEn ? owner.fullName : undefined)
+                }))}
                 value={selectedRisk.ownerId || ''}
-                onChange={(value) => {
-                  const selectedOwner = riskOwners.find(o => o.id === value);
-                  setSelectedRisk({
-                    ...selectedRisk,
-                    ownerId: value || undefined,
-                    ownerAr: selectedOwner?.fullName || 'غير محدد',
-                    ownerEn: selectedOwner?.fullNameEn || selectedOwner?.fullName || 'Not Assigned'
-                  });
+                onChange={(option) => {
+                  if (option) {
+                    const selectedOwner = riskOwners.find(o => o.id === option.id);
+                    setSelectedRisk({
+                      ...selectedRisk,
+                      ownerId: option.id,
+                      ownerAr: selectedOwner?.fullName || 'غير محدد',
+                      ownerEn: selectedOwner?.fullNameEn || selectedOwner?.fullName || 'Not Assigned'
+                    });
+                  } else {
+                    setSelectedRisk({
+                      ...selectedRisk,
+                      ownerId: undefined,
+                      ownerAr: 'غير محدد',
+                      ownerEn: 'Not Assigned'
+                    });
+                  }
                 }}
+                noResultsText={isAr ? 'لا توجد نتائج' : 'No results found'}
               />
             </div>
 
