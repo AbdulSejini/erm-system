@@ -3338,7 +3338,9 @@ export default function RisksPage() {
             if (selectedRisk) {
               try {
                 // Check if this is a mock/fallback risk (HR risks or other mock data)
-                const isMockRisk = selectedRisk.id.startsWith('hr-') || selectedRisk.id.startsWith('mock-') || !selectedRisk.id.includes('-');
+                // Note: Prisma IDs start with 'cm' and are 25+ chars, mock IDs are simple like '1', '2', 'hr-1', 'mock-1'
+                const isMockRisk = selectedRisk.id.startsWith('hr-') || selectedRisk.id.startsWith('mock-') ||
+                  (selectedRisk.id.length < 10 && !selectedRisk.id.startsWith('cm'));
 
                 if (isMockRisk) {
                   // Create the risk in database first
