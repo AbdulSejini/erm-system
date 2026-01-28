@@ -43,6 +43,10 @@ import {
   Wrench,
   Minus,
   Loader2,
+  ClipboardList,
+  Gauge,
+  Flame,
+  ListChecks,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { RiskDiscussion } from '@/components/RiskDiscussion';
@@ -97,6 +101,70 @@ interface ChangeLogEntry {
     fullNameEn: string | null;
     avatar: string | null;
     role: string;
+  };
+}
+
+interface TreatmentTask {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  status: string;
+  dueDate: string;
+  completedDate: string | null;
+}
+
+interface TreatmentPlan {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  strategy: string;
+  status: string;
+  startDate: string;
+  dueDate: string;
+  completionDate: string | null;
+  progress: number;
+  cost: number | null;
+  responsible?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+  };
+  tasks: TreatmentTask[];
+}
+
+interface RiskAssessment {
+  id: string;
+  assessmentType: string;
+  likelihood: number;
+  impact: number;
+  score: number;
+  rating: string;
+  notesAr: string | null;
+  notesEn: string | null;
+  assessmentDate: string;
+  assessedBy?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+  };
+}
+
+interface Incident {
+  id: string;
+  incidentNumber: string;
+  titleAr: string;
+  titleEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  status: string;
+  severity: string;
+  occurredAt: string;
+  reportedBy?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
   };
 }
 
@@ -485,10 +553,16 @@ export default function RisksPage() {
   const [categories, setCategories] = useState<APICategory[]>([]);
   const [riskStatuses, setRiskStatuses] = useState<APIRiskStatus[]>([]);
   const [allDepartments, setAllDepartments] = useState<{ id: string; code: string; nameAr: string; nameEn: string }[]>([]);
-  const [viewModalTab, setViewModalTab] = useState<'details' | 'discussion' | 'history'>('details');
+  const [viewModalTab, setViewModalTab] = useState<'details' | 'assessment' | 'treatments' | 'discussion' | 'incidents' | 'history'>('details');
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
   const [modalChangeLogs, setModalChangeLogs] = useState<ChangeLogEntry[]>([]);
   const [modalChangeLogsLoading, setModalChangeLogsLoading] = useState(false);
+  const [modalTreatments, setModalTreatments] = useState<TreatmentPlan[]>([]);
+  const [modalTreatmentsLoading, setModalTreatmentsLoading] = useState(false);
+  const [modalAssessments, setModalAssessments] = useState<RiskAssessment[]>([]);
+  const [modalAssessmentsLoading, setModalAssessmentsLoading] = useState(false);
+  const [modalIncidents, setModalIncidents] = useState<Incident[]>([]);
+  const [modalIncidentsLoading, setModalIncidentsLoading] = useState(false);
 
   // Normalize rating to valid values
   const normalizeRating = (rating: string | null | undefined): RiskRating => {
@@ -665,6 +739,75 @@ export default function RisksPage() {
     };
 
     fetchChangeLogs();
+  }, [viewModalTab, selectedRisk]);
+
+  // Fetch treatments when treatments tab is selected
+  useEffect(() => {
+    const fetchTreatments = async () => {
+      if (viewModalTab !== 'treatments' || !selectedRisk) return;
+
+      try {
+        setModalTreatmentsLoading(true);
+        const response = await fetch(`/api/risks/${selectedRisk.id}/treatments`);
+        const result = await response.json();
+
+        if (result.success) {
+          setModalTreatments(result.data);
+        }
+      } catch (err) {
+        console.error('Error fetching treatments:', err);
+      } finally {
+        setModalTreatmentsLoading(false);
+      }
+    };
+
+    fetchTreatments();
+  }, [viewModalTab, selectedRisk]);
+
+  // Fetch assessments when assessment tab is selected
+  useEffect(() => {
+    const fetchAssessments = async () => {
+      if (viewModalTab !== 'assessment' || !selectedRisk) return;
+
+      try {
+        setModalAssessmentsLoading(true);
+        const response = await fetch(`/api/risks/${selectedRisk.id}`);
+        const result = await response.json();
+
+        if (result.success && result.data.assessments) {
+          setModalAssessments(result.data.assessments);
+        }
+      } catch (err) {
+        console.error('Error fetching assessments:', err);
+      } finally {
+        setModalAssessmentsLoading(false);
+      }
+    };
+
+    fetchAssessments();
+  }, [viewModalTab, selectedRisk]);
+
+  // Fetch incidents when incidents tab is selected
+  useEffect(() => {
+    const fetchIncidents = async () => {
+      if (viewModalTab !== 'incidents' || !selectedRisk) return;
+
+      try {
+        setModalIncidentsLoading(true);
+        const response = await fetch(`/api/risks/${selectedRisk.id}`);
+        const result = await response.json();
+
+        if (result.success && result.data.incidents) {
+          setModalIncidents(result.data.incidents);
+        }
+      } catch (err) {
+        console.error('Error fetching incidents:', err);
+      } finally {
+        setModalIncidentsLoading(false);
+      }
+    };
+
+    fetchIncidents();
   }, [viewModalTab, selectedRisk]);
 
   // Handle refresh button click
@@ -1374,6 +1517,9 @@ export default function RisksPage() {
           setSelectedRisk(null);
           setViewModalTab('details');
           setModalChangeLogs([]);
+          setModalTreatments([]);
+          setModalAssessments([]);
+          setModalIncidents([]);
         }}
         title={isAr ? 'تفاصيل الخطر' : 'Risk Details'}
         size="xl"
@@ -1396,38 +1542,71 @@ export default function RisksPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-[var(--border)]">
+            <div className="flex gap-1 border-b border-[var(--border)] overflow-x-auto">
               <button
                 onClick={() => setViewModalTab('details')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
                   viewModalTab === 'details'
                     ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
                     : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
                 }`}
               >
-                <FileText className="h-4 w-4" />
+                <FileText className="h-3.5 w-3.5" />
                 {isAr ? 'التفاصيل' : 'Details'}
               </button>
               <button
+                onClick={() => setViewModalTab('assessment')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
+                  viewModalTab === 'assessment'
+                    ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
+                    : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <Gauge className="h-3.5 w-3.5" />
+                {isAr ? 'التقييم' : 'Assessment'}
+              </button>
+              <button
+                onClick={() => setViewModalTab('treatments')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
+                  viewModalTab === 'treatments'
+                    ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
+                    : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                {isAr ? 'المعالجة' : 'Treatments'}
+              </button>
+              <button
                 onClick={() => setViewModalTab('discussion')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
                   viewModalTab === 'discussion'
                     ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
                     : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
                 }`}
               >
-                <MessageSquare className="h-4 w-4" />
+                <MessageSquare className="h-3.5 w-3.5" />
                 {isAr ? 'النقاش' : 'Discussion'}
               </button>
               <button
+                onClick={() => setViewModalTab('incidents')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
+                  viewModalTab === 'incidents'
+                    ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
+                    : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <Flame className="h-3.5 w-3.5" />
+                {isAr ? 'الحوادث' : 'Incidents'}
+              </button>
+              <button
                 onClick={() => setViewModalTab('history')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
                   viewModalTab === 'history'
                     ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
                     : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
                 }`}
               >
-                <History className="h-4 w-4" />
+                <History className="h-3.5 w-3.5" />
                 {isAr ? 'السجل' : 'History'}
               </button>
             </div>
@@ -1570,6 +1749,250 @@ export default function RisksPage() {
                     <span className="font-medium">{new Date(selectedRisk.identifiedDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
                   </div>
                 </div>
+              ) : viewModalTab === 'assessment' ? (
+                /* Assessment Tab */
+                <div className="py-2 space-y-4">
+                  {/* Current Risk Scores */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg border-2 border-[var(--primary)] p-4">
+                      <h4 className="font-semibold text-sm text-[var(--primary)] mb-3 flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        {isAr ? 'الخطر الأصلي (الكامن)' : 'Inherent Risk'}
+                      </h4>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="p-2 rounded bg-[var(--background-secondary)]">
+                          <p className="text-xs text-[var(--foreground-muted)]">{isAr ? 'الاحتمالية' : 'Likelihood'}</p>
+                          <p className="text-xl font-bold text-[var(--foreground)]">{selectedRisk.inherentLikelihood}</p>
+                        </div>
+                        <div className="p-2 rounded bg-[var(--background-secondary)]">
+                          <p className="text-xs text-[var(--foreground-muted)]">{isAr ? 'التأثير' : 'Impact'}</p>
+                          <p className="text-xl font-bold text-[var(--foreground)]">{selectedRisk.inherentImpact}</p>
+                        </div>
+                        <div className="p-2 rounded bg-[var(--primary-light)]">
+                          <p className="text-xs text-[var(--foreground-muted)]">{isAr ? 'الدرجة' : 'Score'}</p>
+                          <p className="text-xl font-bold text-[var(--primary)]">{selectedRisk.inherentScore}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 text-center">
+                        <Badge variant={getRatingBadgeVariant(selectedRisk.inherentRating)}>
+                          {t(`risks.ratings.${selectedRisk.inherentRating}`)}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[var(--border)] p-4">
+                      <h4 className="font-semibold text-sm text-[var(--foreground-secondary)] mb-3 flex items-center gap-2">
+                        <Target className="h-4 w-4" />
+                        {isAr ? 'الخطر المتبقي' : 'Residual Risk'}
+                      </h4>
+                      {selectedRisk.residualScore ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="p-2 rounded bg-[var(--background-secondary)]">
+                              <p className="text-xs text-[var(--foreground-muted)]">{isAr ? 'الاحتمالية' : 'Likelihood'}</p>
+                              <p className="text-xl font-bold text-[var(--foreground)]">{selectedRisk.residualLikelihood}</p>
+                            </div>
+                            <div className="p-2 rounded bg-[var(--background-secondary)]">
+                              <p className="text-xs text-[var(--foreground-muted)]">{isAr ? 'التأثير' : 'Impact'}</p>
+                              <p className="text-xl font-bold text-[var(--foreground)]">{selectedRisk.residualImpact}</p>
+                            </div>
+                            <div className="p-2 rounded bg-green-50">
+                              <p className="text-xs text-[var(--foreground-muted)]">{isAr ? 'الدرجة' : 'Score'}</p>
+                              <p className="text-xl font-bold text-green-600">{selectedRisk.residualScore}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 text-center">
+                            <Badge variant={getRatingBadgeVariant(selectedRisk.residualRating || 'Moderate')}>
+                              {t(`risks.ratings.${selectedRisk.residualRating}`)}
+                            </Badge>
+                          </div>
+                          {selectedRisk.inherentScore && selectedRisk.residualScore && (
+                            <div className="mt-3 p-2 rounded bg-green-50 text-center">
+                              <p className="text-xs text-green-600">
+                                {isAr ? 'نسبة التخفيض' : 'Risk Reduction'}:
+                                <span className="font-bold ms-1">
+                                  {Math.round((1 - selectedRisk.residualScore / selectedRisk.inherentScore) * 100)}%
+                                </span>
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-center py-6 text-[var(--foreground-muted)]">
+                          {isAr ? 'لم يتم تقييمه بعد' : 'Not assessed yet'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Assessment History */}
+                  <div>
+                    <h4 className="font-semibold text-sm text-[var(--foreground)] mb-3 flex items-center gap-2">
+                      <History className="h-4 w-4 text-[var(--primary)]" />
+                      {isAr ? 'سجل التقييمات' : 'Assessment History'}
+                    </h4>
+                    {modalAssessmentsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-[var(--primary)]" />
+                      </div>
+                    ) : modalAssessments.length === 0 ? (
+                      <div className="text-center py-6 text-[var(--foreground-muted)] bg-[var(--background-secondary)] rounded-lg">
+                        <Gauge className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">{isAr ? 'لا توجد تقييمات سابقة' : 'No assessment history'}</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {modalAssessments.map((assessment) => (
+                          <div key={assessment.id} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+                            <div className="flex items-center justify-between mb-2">
+                              <Badge variant={assessment.assessmentType === 'inherent' ? 'warning' : 'success'} size="sm">
+                                {assessment.assessmentType === 'inherent' ? (isAr ? 'كامن' : 'Inherent') : (isAr ? 'متبقي' : 'Residual')}
+                              </Badge>
+                              <span className="text-xs text-[var(--foreground-muted)]">
+                                {new Date(assessment.assessmentDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <span className="text-[var(--foreground-secondary)]">
+                                {isAr ? 'الدرجة' : 'Score'}: <strong className="text-[var(--foreground)]">{assessment.score}</strong>
+                              </span>
+                              <span className="text-[var(--foreground-secondary)]">
+                                {isAr ? 'التصنيف' : 'Rating'}: <strong className="text-[var(--foreground)]">{assessment.rating}</strong>
+                              </span>
+                            </div>
+                            {assessment.assessedBy && (
+                              <p className="text-xs text-[var(--foreground-muted)] mt-2">
+                                {isAr ? 'بواسطة' : 'By'}: {isAr ? assessment.assessedBy.fullName : assessment.assessedBy.fullNameEn || assessment.assessedBy.fullName}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : viewModalTab === 'treatments' ? (
+                /* Treatments Tab */
+                <div className="py-2">
+                  {modalTreatmentsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+                    </div>
+                  ) : modalTreatments.length === 0 ? (
+                    <div className="text-center py-8 text-[var(--foreground-muted)]">
+                      <ClipboardList className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>{isAr ? 'لا توجد خطط معالجة' : 'No treatment plans'}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {modalTreatments.map((plan, index) => (
+                        <div key={plan.id} className="border border-[var(--border)] rounded-lg overflow-hidden">
+                          {/* Plan Header */}
+                          <div className="p-3 flex items-center justify-between bg-[var(--background-secondary)]">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold px-2 py-0.5 rounded bg-[var(--primary)] text-white">
+                                {index + 1}
+                              </span>
+                              <span className="font-medium text-sm text-[var(--foreground)]">
+                                {isAr ? plan.titleAr : plan.titleEn}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={
+                                plan.strategy === 'avoid' ? 'danger' :
+                                plan.strategy === 'reduce' ? 'warning' :
+                                plan.strategy === 'transfer' ? 'info' : 'secondary'
+                              } size="sm">
+                                {plan.strategy === 'avoid' ? (isAr ? 'تجنب' : 'Avoid') :
+                                 plan.strategy === 'reduce' ? (isAr ? 'تخفيض' : 'Reduce') :
+                                 plan.strategy === 'transfer' ? (isAr ? 'نقل' : 'Transfer') :
+                                 (isAr ? 'قبول' : 'Accept')}
+                              </Badge>
+                              <Badge variant={
+                                plan.status === 'completed' ? 'success' :
+                                plan.status === 'inProgress' ? 'warning' :
+                                plan.status === 'overdue' ? 'danger' : 'secondary'
+                              } size="sm">
+                                {plan.status === 'completed' ? (isAr ? 'مكتمل' : 'Completed') :
+                                 plan.status === 'inProgress' ? (isAr ? 'قيد التنفيذ' : 'In Progress') :
+                                 plan.status === 'overdue' ? (isAr ? 'متأخر' : 'Overdue') :
+                                 (isAr ? 'لم يبدأ' : 'Not Started')}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Plan Content */}
+                          <div className="p-3">
+                            <p className="text-sm text-[var(--foreground-secondary)] mb-3">
+                              {isAr ? plan.descriptionAr : plan.descriptionEn}
+                            </p>
+
+                            {/* Plan Details */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3">
+                              <div className="p-2 rounded bg-[var(--background-secondary)]">
+                                <p className="text-[var(--foreground-muted)]">{isAr ? 'المسؤول' : 'Responsible'}</p>
+                                <p className="font-medium text-[var(--foreground)]">
+                                  {plan.responsible ? (isAr ? plan.responsible.fullName : plan.responsible.fullNameEn || plan.responsible.fullName) : '-'}
+                                </p>
+                              </div>
+                              <div className="p-2 rounded bg-[var(--background-secondary)]">
+                                <p className="text-[var(--foreground-muted)]">{isAr ? 'تاريخ البدء' : 'Start'}</p>
+                                <p className="font-medium text-[var(--foreground)]">
+                                  {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                </p>
+                              </div>
+                              <div className="p-2 rounded bg-[var(--background-secondary)]">
+                                <p className="text-[var(--foreground-muted)]">{isAr ? 'الاستحقاق' : 'Due'}</p>
+                                <p className="font-medium text-[var(--foreground)]">
+                                  {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                </p>
+                              </div>
+                              <div className="p-2 rounded bg-[var(--background-secondary)]">
+                                <p className="text-[var(--foreground-muted)]">{isAr ? 'التقدم' : 'Progress'}</p>
+                                <p className="font-medium text-[var(--foreground)]">{plan.progress}%</p>
+                              </div>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="h-2 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${plan.progress}%`,
+                                  backgroundColor: plan.progress === 100 ? '#22c55e' : 'var(--primary)'
+                                }}
+                              />
+                            </div>
+
+                            {/* Tasks */}
+                            {plan.tasks && plan.tasks.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-[var(--border)]">
+                                <h5 className="text-xs font-bold mb-2 flex items-center gap-1 text-[var(--foreground)]">
+                                  <ListChecks className="h-3 w-3" />
+                                  {isAr ? 'المهام' : 'Tasks'} ({plan.tasks.length})
+                                </h5>
+                                <div className="space-y-1">
+                                  {plan.tasks.map((task) => (
+                                    <div key={task.id} className="flex items-center gap-2 text-xs p-2 rounded bg-[var(--background-secondary)]">
+                                      {task.status === 'completed' ? (
+                                        <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                                      ) : (
+                                        <Clock className="h-3 w-3 text-[var(--foreground-muted)] flex-shrink-0" />
+                                      )}
+                                      <span className={task.status === 'completed' ? 'line-through text-[var(--foreground-muted)]' : 'text-[var(--foreground)]'}>
+                                        {isAr ? task.titleAr : task.titleEn}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : viewModalTab === 'discussion' ? (
                 /* Discussion Tab */
                 <div className="py-2">
@@ -1582,6 +2005,72 @@ export default function RisksPage() {
                   ) : (
                     <div className="text-center py-8 text-[var(--foreground-secondary)]">
                       {isAr ? 'جاري التحميل...' : 'Loading...'}
+                    </div>
+                  )}
+                </div>
+              ) : viewModalTab === 'incidents' ? (
+                /* Incidents Tab */
+                <div className="py-2">
+                  {modalIncidentsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+                    </div>
+                  ) : modalIncidents.length === 0 ? (
+                    <div className="text-center py-8 text-[var(--foreground-muted)]">
+                      <Flame className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>{isAr ? 'لا توجد حوادث مسجلة' : 'No incidents recorded'}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {modalIncidents.map((incident) => (
+                        <div key={incident.id} className="p-4 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <code className="text-xs bg-[var(--background-secondary)] px-2 py-0.5 rounded">
+                                {incident.incidentNumber}
+                              </code>
+                              <h5 className="font-medium text-sm text-[var(--foreground)] mt-1">
+                                {isAr ? incident.titleAr : incident.titleEn}
+                              </h5>
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge variant={
+                                incident.severity === 'critical' ? 'danger' :
+                                incident.severity === 'major' ? 'warning' :
+                                incident.severity === 'minor' ? 'info' : 'secondary'
+                              } size="sm">
+                                {incident.severity === 'critical' ? (isAr ? 'حرج' : 'Critical') :
+                                 incident.severity === 'major' ? (isAr ? 'رئيسي' : 'Major') :
+                                 incident.severity === 'minor' ? (isAr ? 'ثانوي' : 'Minor') :
+                                 (isAr ? 'ضئيل' : 'Negligible')}
+                              </Badge>
+                              <Badge variant={
+                                incident.status === 'resolved' ? 'success' :
+                                incident.status === 'investigating' ? 'warning' : 'danger'
+                              } size="sm">
+                                {incident.status === 'resolved' ? (isAr ? 'تم الحل' : 'Resolved') :
+                                 incident.status === 'investigating' ? (isAr ? 'قيد التحقيق' : 'Investigating') :
+                                 (isAr ? 'مفتوح' : 'Open')}
+                              </Badge>
+                            </div>
+                          </div>
+                          <p className="text-sm text-[var(--foreground-secondary)] mb-2">
+                            {isAr ? incident.descriptionAr : incident.descriptionEn}
+                          </p>
+                          <div className="flex items-center gap-4 text-xs text-[var(--foreground-muted)]">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(incident.occurredAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                            </span>
+                            {incident.reportedBy && (
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {isAr ? incident.reportedBy.fullName : incident.reportedBy.fullNameEn || incident.reportedBy.fullName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
