@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -541,15 +541,22 @@ interface APIRisk {
 export default function RisksPage() {
   const { t, language } = useTranslation();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const isAr = language === 'ar';
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterRating, setFilterRating] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterDepartment, setFilterDepartment] = useState('');
+  // Initialize state from URL params for persistence
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [filterRating, setFilterRating] = useState(searchParams.get('rating') || '');
+  const [filterCategory, setFilterCategory] = useState(searchParams.get('category') || '');
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || '');
+  const [filterDepartment, setFilterDepartment] = useState(searchParams.get('department') || '');
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1', 10));
+  const [itemsPerPage, setItemsPerPage] = useState(parseInt(searchParams.get('perPage') || '10', 10));
   const [showWizard, setShowWizard] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(
+    !!(searchParams.get('rating') || searchParams.get('category') || searchParams.get('status') || searchParams.get('department'))
+  );
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedRisk, setSelectedRisk] = useState<typeof mockRisks[0] | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -907,6 +914,51 @@ export default function RisksPage() {
     fetchRisks(true);
   };
 
+  // Update URL with current filters (for persistence)
+  const updateURLParams = useCallback((params: Record<string, string | number>) => {
+    const newParams = new URLSearchParams(searchParams.toString());
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value && value !== '' && value !== 1 && value !== 10) {
+        newParams.set(key, String(value));
+      } else {
+        newParams.delete(key);
+      }
+    });
+
+    const queryString = newParams.toString();
+    const newURL = queryString ? `${pathname}?${queryString}` : pathname;
+    router.replace(newURL, { scroll: false });
+  }, [searchParams, pathname, router]);
+
+  // Debounced search update
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Update URL when filters change
+  useEffect(() => {
+    updateURLParams({
+      search: debouncedSearch,
+      rating: filterRating,
+      category: filterCategory,
+      status: filterStatus,
+      department: filterDepartment,
+      page: currentPage,
+      perPage: itemsPerPage,
+    });
+  }, [debouncedSearch, filterRating, filterCategory, filterStatus, filterDepartment, currentPage, itemsPerPage, updateURLParams]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, filterRating, filterCategory, filterStatus, filterDepartment]);
+
   // Rating options based on new rating system
   const ratingOptions = [
     { value: '', label: isAr ? 'جميع التصنيفات' : 'All Ratings' },
@@ -980,6 +1032,40 @@ export default function RisksPage() {
       return matchesSearch && matchesRating && matchesCategory && matchesStatus && matchesDepartment;
     });
   }, [risks, searchQuery, filterRating, filterCategory, filterStatus, filterDepartment]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredRisks.length / itemsPerPage);
+  const paginatedRisks = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredRisks.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredRisks, currentPage, itemsPerPage]);
+
+  // Ensure currentPage is valid when filteredRisks change
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  // Active filters count
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filterRating) count++;
+    if (filterCategory) count++;
+    if (filterStatus) count++;
+    if (filterDepartment) count++;
+    return count;
+  }, [filterRating, filterCategory, filterStatus, filterDepartment]);
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setFilterRating('');
+    setFilterCategory('');
+    setFilterStatus('');
+    setFilterDepartment('');
+    setCurrentPage(1);
+  };
 
   // Statistics
   const stats = useMemo(() => ({
@@ -1264,35 +1350,61 @@ export default function RisksPage() {
       {/* Search and Filters */}
       <Card>
         <CardContent className="p-2 sm:p-3 md:p-4">
-          <div className="flex flex-col gap-2 sm:gap-3 md:gap-4 lg:flex-row lg:items-end">
+          <div className="flex flex-col gap-2 sm:gap-3 md:gap-4 lg:flex-row lg:items-center">
             <div className="flex-1">
-              <Input
-                placeholder={isAr ? 'بحث برقم الخطر أو العنوان...' : 'Search by risk number or title...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                leftIcon={<Search className="h-4 w-4 sm:h-5 sm:w-5" />}
-                className="text-xs sm:text-sm"
-              />
+              <div className="relative">
+                <Input
+                  placeholder={isAr ? 'بحث برقم الخطر أو العنوان...' : 'Search by risk number or title...'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  leftIcon={<Search className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  className="text-xs sm:text-sm"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 end-0 flex items-center pe-3 text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Button
-                variant="outline"
+                variant={showFilters ? 'primary' : 'outline'}
                 size="sm"
                 leftIcon={<Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
                 onClick={() => setShowFilters(!showFilters)}
+                className="relative"
               >
                 <span className="text-xs sm:text-sm">{isAr ? 'تصفية' : 'Filter'}</span>
+                {activeFiltersCount > 0 && (
+                  <span className="absolute -top-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--status-error)] text-[10px] font-bold text-white">
+                    {activeFiltersCount}
+                  </span>
+                )}
               </Button>
+              {activeFiltersCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="text-xs text-[var(--status-error)] hover:text-[var(--status-error)]"
+                >
+                  {isAr ? 'مسح الكل' : 'Clear all'}
+                </Button>
+              )}
               <div className="flex rounded-lg border border-[var(--border)]">
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`rounded-s-lg p-1.5 sm:p-2 ${viewMode === 'table' ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-secondary)]'}`}
+                  className={`rounded-s-lg p-1.5 sm:p-2 transition-colors ${viewMode === 'table' ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-secondary)]'}`}
                 >
                   <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('cards')}
-                  className={`rounded-e-lg p-1.5 sm:p-2 ${viewMode === 'cards' ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-secondary)]'}`}
+                  className={`rounded-e-lg p-1.5 sm:p-2 transition-colors ${viewMode === 'cards' ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-secondary)]'}`}
                 >
                   <Grid3X3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </button>
@@ -1300,8 +1412,47 @@ export default function RisksPage() {
             </div>
           </div>
 
-          {showFilters && (
-            <div className="mt-3 sm:mt-4 grid gap-2 sm:gap-3 md:gap-4 border-t border-[var(--border)] pt-3 sm:pt-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Active Filters Tags */}
+          {activeFiltersCount > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {filterRating && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
+                  {t(`risks.ratings.${filterRating}`)}
+                  <button onClick={() => setFilterRating('')} className="hover:text-[var(--status-error)]">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {filterCategory && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
+                  {categoryOptions.find(c => c.value === filterCategory)?.label}
+                  <button onClick={() => setFilterCategory('')} className="hover:text-[var(--status-error)]">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {filterStatus && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
+                  {statusOptions.find(s => s.value === filterStatus)?.label}
+                  <button onClick={() => setFilterStatus('')} className="hover:text-[var(--status-error)]">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {filterDepartment && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
+                  {departmentOptions.find(d => d.value === filterDepartment)?.label}
+                  <button onClick={() => setFilterDepartment('')} className="hover:text-[var(--status-error)]">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Filter Panel */}
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showFilters ? 'mt-3 sm:mt-4 max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+            <div className="grid gap-2 sm:gap-3 md:gap-4 border-t border-[var(--border)] pt-3 sm:pt-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               <Select
                 label={t('risks.riskRating')}
                 options={ratingOptions}
@@ -1327,7 +1478,7 @@ export default function RisksPage() {
                 onChange={setFilterDepartment}
               />
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
@@ -1379,7 +1530,7 @@ export default function RisksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRisks.map((risk) => (
+                  {paginatedRisks.map((risk) => (
                     <tr
                       key={risk.id}
                       className="border-b border-[var(--border)] transition-colors hover:bg-[var(--background-secondary)]"
@@ -1467,19 +1618,84 @@ export default function RisksPage() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between border-t border-[var(--border)] p-2 sm:p-3 md:p-4">
-              <p className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
-                {isAr
-                  ? `عرض ${filteredRisks.length} من ${risks.length} خطر`
-                  : `Showing ${filteredRisks.length} of ${risks.length} risks`}
-              </p>
+            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-[var(--border)] p-2 sm:p-3 md:p-4 gap-3">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon-sm" disabled>
+                <p className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                  {isAr
+                    ? `عرض ${paginatedRisks.length} من ${filteredRisks.length} خطر`
+                    : `Showing ${paginatedRisks.length} of ${filteredRisks.length} risks`}
+                </p>
+                <Select
+                  options={[
+                    { value: '5', label: '5' },
+                    { value: '10', label: '10' },
+                    { value: '20', label: '20' },
+                    { value: '50', label: '50' },
+                  ]}
+                  value={String(itemsPerPage)}
+                  onChange={(val) => {
+                    setItemsPerPage(parseInt(val, 10));
+                    setCurrentPage(1);
+                  }}
+                  className="w-16 h-8 text-xs"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  title={isAr ? 'الصفحة الأولى' : 'First page'}
+                >
+                  {isAr ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                  {isAr ? <ChevronRight className="h-4 w-4 -ms-2" /> : <ChevronLeft className="h-4 w-4 -ms-2" />}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  title={isAr ? 'الصفحة السابقة' : 'Previous page'}
+                >
                   {isAr ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                 </Button>
-                <span className="text-sm text-[var(--foreground)]">1 / 1</span>
-                <Button variant="outline" size="icon-sm" disabled>
+                <div className="flex items-center gap-1 px-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages || 1}
+                    value={currentPage}
+                    onChange={(e) => {
+                      const page = parseInt(e.target.value, 10);
+                      if (page >= 1 && page <= totalPages) {
+                        setCurrentPage(page);
+                      }
+                    }}
+                    className="w-12 h-8 text-center text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+                  />
+                  <span className="text-sm text-[var(--foreground-secondary)]">
+                    / {totalPages || 1}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  title={isAr ? 'الصفحة التالية' : 'Next page'}
+                >
                   {isAr ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                  title={isAr ? 'الصفحة الأخيرة' : 'Last page'}
+                >
+                  {isAr ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {isAr ? <ChevronLeft className="h-4 w-4 -ms-2" /> : <ChevronRight className="h-4 w-4 -ms-2" />}
                 </Button>
               </div>
             </div>
@@ -1488,7 +1704,7 @@ export default function RisksPage() {
       ) : (
         /* Card View */
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredRisks.map((risk) => (
+          {paginatedRisks.map((risk) => (
             <Card key={risk.id} hover className="overflow-hidden">
               <div className="p-4">
                 {/* Header */}
@@ -1577,6 +1793,61 @@ export default function RisksPage() {
               </div>
             </Card>
           ))}
+
+          {/* Cards View Pagination */}
+          {totalPages > 1 && (
+            <div className="col-span-full">
+              <Card>
+                <CardContent className="p-3">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-[var(--foreground-secondary)]">
+                        {isAr
+                          ? `عرض ${paginatedRisks.length} من ${filteredRisks.length} خطر`
+                          : `Showing ${paginatedRisks.length} of ${filteredRisks.length} risks`}
+                      </p>
+                      <Select
+                        options={[
+                          { value: '6', label: '6' },
+                          { value: '12', label: '12' },
+                          { value: '24', label: '24' },
+                        ]}
+                        value={String(itemsPerPage)}
+                        onChange={(val) => {
+                          setItemsPerPage(parseInt(val, 10));
+                          setCurrentPage(1);
+                        }}
+                        className="w-16 h-8 text-xs"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        {isAr ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                        <span className="ms-1">{isAr ? 'السابق' : 'Previous'}</span>
+                      </Button>
+                      <span className="text-sm text-[var(--foreground)]">
+                        {currentPage} / {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                      >
+                        <span className="me-1">{isAr ? 'التالي' : 'Next'}</span>
+                        {isAr ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       )}
 
