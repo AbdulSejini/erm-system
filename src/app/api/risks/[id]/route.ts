@@ -31,7 +31,8 @@ const fieldNamesAr: Record<string, string> = {
   residualRating: 'تصنيف الخطر المتبقي',
   departmentId: 'الإدارة',
   categoryId: 'الفئة',
-  ownerId: 'مالك الخطر',
+  ownerId: 'مالك الخطر (مستخدم)',
+  riskOwnerId: 'مالك الخطر',
   championId: 'رائد المخاطر',
   followUpDate: 'تاريخ المتابعة',
   processText: 'العملية',
@@ -73,7 +74,7 @@ function getChangeCategory(fieldName: string): string {
   if (['status', 'approvalStatus'].includes(fieldName)) {
     return 'status';
   }
-  if (['ownerId', 'championId', 'departmentId'].includes(fieldName)) {
+  if (['ownerId', 'riskOwnerId', 'championId', 'departmentId'].includes(fieldName)) {
     return 'ownership';
   }
   return 'risk_info';
@@ -353,6 +354,9 @@ export async function PATCH(
     if (body.ownerId !== undefined) {
       updateData.ownerId = body.ownerId;
     }
+    if (body.riskOwnerId !== undefined) {
+      updateData.riskOwnerId = body.riskOwnerId || null;
+    }
     if (body.championId !== undefined) {
       updateData.championId = body.championId || null;
     }
@@ -426,7 +430,7 @@ export async function PATCH(
         'krisAr', 'krisEn', 'status', 'approvalStatus',
         'inherentLikelihood', 'inherentImpact', 'inherentScore', 'inherentRating',
         'residualLikelihood', 'residualImpact', 'residualScore', 'residualRating',
-        'departmentId', 'categoryId', 'ownerId', 'championId',
+        'departmentId', 'categoryId', 'ownerId', 'riskOwnerId', 'championId',
         'followUpDate', 'processText', 'subProcessText', 'complianceRequired', 'riskNumber'
       ];
 
