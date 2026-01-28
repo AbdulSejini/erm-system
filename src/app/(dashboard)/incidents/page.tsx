@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -20,82 +20,54 @@ import {
 } from 'lucide-react';
 import type { IncidentSeverity, IncidentStatus } from '@/types';
 
-const mockIncidents = [
-  {
-    id: '1',
-    incidentNumber: 'INC-2026-0012',
-    titleAr: 'انقطاع في خط الإنتاج رقم 3',
-    titleEn: 'Production Line 3 Outage',
-    descriptionAr: 'توقف خط الإنتاج رقم 3 لمدة 4 ساعات بسبب عطل في المحرك الرئيسي',
-    descriptionEn: 'Production line 3 stopped for 4 hours due to main motor failure',
-    severity: 'major' as IncidentSeverity,
-    status: 'investigating' as IncidentStatus,
-    departmentAr: 'العمليات',
-    departmentEn: 'Operations',
-    reportedByAr: 'خالد أحمد',
-    reportedByEn: 'Khalid Ahmed',
-    incidentDate: '2026-01-16',
-    reportedDate: '2026-01-16',
-    relatedRisk: 'RSK-2026-0043',
-  },
-  {
-    id: '2',
-    incidentNumber: 'INC-2026-0011',
-    titleAr: 'محاولة اختراق للنظام',
-    titleEn: 'System Breach Attempt',
-    descriptionAr: 'تم رصد محاولات متعددة للوصول غير المصرح به للنظام',
-    descriptionEn: 'Multiple unauthorized access attempts were detected',
-    severity: 'critical' as IncidentSeverity,
-    status: 'resolved' as IncidentStatus,
-    departmentAr: 'تقنية المعلومات',
-    departmentEn: 'IT',
-    reportedByAr: 'محمد عبدالله',
-    reportedByEn: 'Mohammed Abdullah',
-    incidentDate: '2026-01-14',
-    reportedDate: '2026-01-14',
-    relatedRisk: 'RSK-2026-0041',
-  },
-  {
-    id: '3',
-    incidentNumber: 'INC-2026-0010',
-    titleAr: 'تسرب مادة كيميائية',
-    titleEn: 'Chemical Leak',
-    descriptionAr: 'تسرب محدود لمادة التبريد في منطقة التخزين',
-    descriptionEn: 'Limited coolant leak in storage area',
-    severity: 'moderate' as IncidentSeverity,
-    status: 'closed' as IncidentStatus,
-    departmentAr: 'السلامة والبيئة',
-    departmentEn: 'HSE',
-    reportedByAr: 'فاطمة حسن',
-    reportedByEn: 'Fatima Hassan',
-    incidentDate: '2026-01-10',
-    reportedDate: '2026-01-10',
-    relatedRisk: null,
-  },
-  {
-    id: '4',
-    incidentNumber: 'INC-2026-0009',
-    titleAr: 'تأخير شحنة مواد خام',
-    titleEn: 'Raw Material Shipment Delay',
-    descriptionAr: 'تأخر وصول شحنة النحاس الخام 5 أيام عن الموعد المحدد',
-    descriptionEn: 'Copper shipment arrived 5 days late',
-    severity: 'minor' as IncidentSeverity,
-    status: 'reported' as IncidentStatus,
-    departmentAr: 'سلسلة التوريد',
-    departmentEn: 'Supply Chain',
-    reportedByAr: 'أحمد محمد',
-    reportedByEn: 'Ahmed Mohammed',
-    incidentDate: '2026-01-08',
-    reportedDate: '2026-01-09',
-    relatedRisk: 'RSK-2026-0045',
-  },
-];
+// Incident interface
+interface Incident {
+  id: string;
+  incidentNumber: string;
+  titleAr: string;
+  titleEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  departmentAr: string;
+  departmentEn: string;
+  reportedByAr: string;
+  reportedByEn: string;
+  incidentDate: string;
+  reportedDate: string;
+  relatedRisk: string | null;
+}
 
 export default function IncidentsPage() {
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch incidents from API
+  const fetchIncidents = useCallback(async () => {
+    try {
+      const response = await fetch('/api/incidents');
+      const result = await response.json();
+      if (result.success && result.data) {
+        setIncidents(result.data);
+      } else {
+        setIncidents([]);
+      }
+    } catch (error) {
+      console.error('Error fetching incidents:', error);
+      setIncidents([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchIncidents();
+  }, [fetchIncidents]);
 
   const getSeverityColor = (severity: IncidentSeverity): 'critical' | 'high' | 'medium' | 'low' => {
     switch (severity) {
@@ -126,7 +98,7 @@ export default function IncidentsPage() {
     }
   };
 
-  const filteredIncidents = mockIncidents.filter(
+  const filteredIncidents = incidents.filter(
     (incident) =>
       incident.incidentNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       incident.titleAr.includes(searchQuery) ||
@@ -135,9 +107,9 @@ export default function IncidentsPage() {
 
   // Stats
   const stats = {
-    total: mockIncidents.length,
-    open: mockIncidents.filter((i) => i.status === 'reported' || i.status === 'investigating').length,
-    critical: mockIncidents.filter((i) => i.severity === 'critical').length,
+    total: incidents.length,
+    open: incidents.filter((i) => i.status === 'reported' || i.status === 'investigating').length,
+    critical: incidents.filter((i) => i.severity === 'critical').length,
   };
 
   return (
