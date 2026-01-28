@@ -389,10 +389,10 @@ export default function TreatmentPage() {
         if (ownersRes.ok) {
           const data = await ownersRes.json();
           if (data.success && data.data) {
-            setRiskOwnersList(data.data.map((o: { id: string; nameAr: string; nameEn: string | null }) => ({
+            setRiskOwnersList(data.data.map((o: { id: string; fullName: string; fullNameEn: string | null }) => ({
               id: o.id,
-              nameAr: o.nameAr,
-              nameEn: o.nameEn || o.nameAr,
+              nameAr: o.fullName,
+              nameEn: o.fullNameEn || o.fullName,
             })));
           }
         }
