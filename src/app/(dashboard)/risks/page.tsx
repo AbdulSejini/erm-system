@@ -3342,6 +3342,15 @@ export default function RisksPage() {
                 const isMockRisk = selectedRisk.id.startsWith('hr-') || selectedRisk.id.startsWith('mock-') ||
                   (selectedRisk.id.length < 10 && !selectedRisk.id.startsWith('cm'));
 
+                console.log('DEBUG Save Risk:', {
+                  id: selectedRisk.id,
+                  idLength: selectedRisk.id.length,
+                  startsWithCm: selectedRisk.id.startsWith('cm'),
+                  isMockRisk,
+                  departmentId: selectedRisk.departmentId,
+                  ownerId: selectedRisk.ownerId
+                });
+
                 if (isMockRisk) {
                   // Create the risk in database first
                   const createResponse = await fetch('/api/risks', {
