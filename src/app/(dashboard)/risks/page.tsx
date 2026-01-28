@@ -187,6 +187,7 @@ const convertedHRRisks = hrRisks.map((hr) => ({
   processEn: 'Human Resources',
   ownerAr: hr.championName || 'غير محدد',
   ownerEn: hr.championName || 'Not Assigned',
+  ownerId: undefined as string | undefined,
   championAr: hr.championName || 'غير محدد',
   championEn: hr.championName || 'Not Assigned',
   identifiedDate: hr.createdAt.toISOString().split('T')[0],
@@ -237,6 +238,7 @@ const mockRisks = [
     subProcessText: 'إدارة العقود',
     ownerAr: 'سارة علي',
     ownerEn: 'Sarah Ali',
+    ownerId: undefined as string | undefined,
     championAr: 'أحمد محمد',
     championEn: 'Ahmed Mohammed',
     identifiedDate: '2026-01-14',
@@ -280,6 +282,7 @@ const mockRisks = [
     subProcessEn: 'Supplier Management',
     ownerAr: 'أحمد محمد',
     ownerEn: 'Ahmed Mohammed',
+    ownerId: undefined as string | undefined,
     championAr: 'خالد أحمد',
     championEn: 'Khalid Ahmed',
     identifiedDate: '2026-01-15',
@@ -323,6 +326,7 @@ const mockRisks = [
     processEn: 'Production',
     ownerAr: 'خالد أحمد',
     ownerEn: 'Khalid Ahmed',
+    ownerId: undefined as string | undefined,
     championAr: 'فاطمة حسن',
     championEn: 'Fatima Hassan',
     identifiedDate: '2026-01-13',
@@ -366,6 +370,7 @@ const mockRisks = [
     processEn: 'Cybersecurity',
     ownerAr: 'محمد عبدالله',
     ownerEn: 'Mohammed Abdullah',
+    ownerId: undefined as string | undefined,
     championAr: 'محمد عبدالله',
     championEn: 'Mohammed Abdullah',
     identifiedDate: '2026-01-10',
@@ -409,6 +414,7 @@ const mockRisks = [
     processEn: 'Environment',
     ownerAr: 'فاطمة حسن',
     ownerEn: 'Fatima Hassan',
+    ownerId: undefined as string | undefined,
     championAr: 'سارة علي',
     championEn: 'Sarah Ali',
     identifiedDate: '2026-01-12',
@@ -452,6 +458,7 @@ const mockRisks = [
     processEn: 'Occupational Safety',
     ownerAr: 'فاطمة حسن',
     ownerEn: 'Fatima Hassan',
+    ownerId: undefined as string | undefined,
     championAr: 'خالد أحمد',
     championEn: 'Khalid Ahmed',
     identifiedDate: '2026-01-08',
@@ -563,6 +570,7 @@ export default function RisksPage() {
   const [modalAssessmentsLoading, setModalAssessmentsLoading] = useState(false);
   const [modalIncidents, setModalIncidents] = useState<Incident[]>([]);
   const [modalIncidentsLoading, setModalIncidentsLoading] = useState(false);
+  const [riskOwners, setRiskOwners] = useState<{ id: string; fullName: string; fullNameEn: string | null }[]>([]);
 
   // Normalize rating to valid values
   const normalizeRating = (rating: string | null | undefined): RiskRating => {
@@ -692,13 +700,27 @@ export default function RisksPage() {
     }
   }, []);
 
-  // Fetch risks, categories, statuses, and departments on component mount
+  // Fetch risk owners from API
+  const fetchRiskOwners = useCallback(async () => {
+    try {
+      const response = await fetch('/api/risk-owners');
+      const result = await response.json();
+      if (result.success && result.data.length > 0) {
+        setRiskOwners(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching risk owners:', error);
+    }
+  }, []);
+
+  // Fetch risks, categories, statuses, departments, and risk owners on component mount
   useEffect(() => {
     fetchRisks();
     fetchCategories();
     fetchRiskStatuses();
     fetchDepartments();
-  }, [fetchRisks, fetchCategories, fetchRiskStatuses, fetchDepartments]);
+    fetchRiskOwners();
+  }, [fetchRisks, fetchCategories, fetchRiskStatuses, fetchDepartments, fetchRiskOwners]);
 
   // Fetch current user
   useEffect(() => {
@@ -2295,6 +2317,32 @@ export default function RisksPage() {
               </p>
             </div>
 
+            {/* Risk Owner */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                {isAr ? 'مالك الخطر' : 'Risk Owner'}
+              </label>
+              <Select
+                options={[
+                  { value: '', label: isAr ? '-- اختر مالك الخطر --' : '-- Select Risk Owner --' },
+                  ...riskOwners.map(owner => ({
+                    value: owner.id,
+                    label: isAr ? owner.fullName : (owner.fullNameEn || owner.fullName)
+                  }))
+                ]}
+                value={selectedRisk.ownerId || ''}
+                onChange={(value) => {
+                  const selectedOwner = riskOwners.find(o => o.id === value);
+                  setSelectedRisk({
+                    ...selectedRisk,
+                    ownerId: value || undefined,
+                    ownerAr: selectedOwner?.fullName || 'غير محدد',
+                    ownerEn: selectedOwner?.fullNameEn || selectedOwner?.fullName || 'Not Assigned'
+                  });
+                }}
+              />
+            </div>
+
             {/* Category & Status */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -2652,6 +2700,7 @@ export default function RisksPage() {
                   body: JSON.stringify({
                     riskNumber: selectedRisk.riskNumber,
                     departmentId: selectedRisk.departmentId,
+                    ownerId: selectedRisk.ownerId || null,
                     titleAr: selectedRisk.titleAr,
                     titleEn: selectedRisk.titleEn,
                     descriptionAr: selectedRisk.descriptionAr,
