@@ -193,13 +193,16 @@ const calculateProgress = (inherentScore: number, residualScore: number | null):
   return Math.max(0, Math.min(100, Math.round(reduction)));
 };
 
-// Strategy metadata - ألوان متناسقة للوضع النهاري والليلي
+// Strategy metadata - ألوان واضحة ومتناسقة للوضع النهاري والليلي
 const strategyConfig = {
   avoid: {
     icon: Ban,
-    colorClass: 'text-red-600 dark:text-red-400',
-    bgClass: 'bg-red-50 dark:bg-red-900/20',
-    borderClass: 'border-red-300 dark:border-red-700',
+    colorClass: 'text-white',
+    bgClass: 'bg-red-600 dark:bg-red-700',
+    borderClass: 'border-red-600 dark:border-red-600',
+    badgeBg: 'bg-red-100 dark:bg-red-900/40',
+    badgeText: 'text-red-700 dark:text-red-300',
+    badgeBorder: 'border-red-400 dark:border-red-600',
     labelAr: 'تجنب',
     labelEn: 'Avoid',
     descAr: 'تجنب الخطر عن طريق عدم القيام بالنشاط المسبب له',
@@ -207,9 +210,12 @@ const strategyConfig = {
   },
   reduce: {
     icon: TrendingDown,
-    colorClass: 'text-amber-600 dark:text-amber-400',
-    bgClass: 'bg-amber-50 dark:bg-amber-900/20',
-    borderClass: 'border-amber-300 dark:border-amber-700',
+    colorClass: 'text-white',
+    bgClass: 'bg-amber-500 dark:bg-amber-600',
+    borderClass: 'border-amber-500 dark:border-amber-500',
+    badgeBg: 'bg-amber-100 dark:bg-amber-900/40',
+    badgeText: 'text-amber-700 dark:text-amber-300',
+    badgeBorder: 'border-amber-400 dark:border-amber-600',
     labelAr: 'تقليل',
     labelEn: 'Reduce',
     descAr: 'تقليل احتمالية أو تأثير الخطر من خلال إجراءات رقابية',
@@ -217,9 +223,12 @@ const strategyConfig = {
   },
   transfer: {
     icon: Share2,
-    colorClass: 'text-blue-600 dark:text-blue-400',
-    bgClass: 'bg-blue-50 dark:bg-blue-900/20',
-    borderClass: 'border-blue-300 dark:border-blue-700',
+    colorClass: 'text-white',
+    bgClass: 'bg-blue-600 dark:bg-blue-700',
+    borderClass: 'border-blue-600 dark:border-blue-600',
+    badgeBg: 'bg-blue-100 dark:bg-blue-900/40',
+    badgeText: 'text-blue-700 dark:text-blue-300',
+    badgeBorder: 'border-blue-400 dark:border-blue-600',
     labelAr: 'نقل',
     labelEn: 'Transfer',
     descAr: 'نقل الخطر إلى طرف ثالث مثل شركات التأمين',
@@ -227,9 +236,12 @@ const strategyConfig = {
   },
   accept: {
     icon: CheckCircle,
-    colorClass: 'text-green-600 dark:text-green-400',
-    bgClass: 'bg-green-50 dark:bg-green-900/20',
-    borderClass: 'border-green-300 dark:border-green-700',
+    colorClass: 'text-white',
+    bgClass: 'bg-emerald-600 dark:bg-emerald-700',
+    borderClass: 'border-emerald-600 dark:border-emerald-600',
+    badgeBg: 'bg-emerald-100 dark:bg-emerald-900/40',
+    badgeText: 'text-emerald-700 dark:text-emerald-300',
+    badgeBorder: 'border-emerald-400 dark:border-emerald-600',
     labelAr: 'قبول',
     labelEn: 'Accept',
     descAr: 'قبول الخطر عندما تكون تكلفة المعالجة أعلى من الأثر',
@@ -237,45 +249,45 @@ const strategyConfig = {
   },
 };
 
-// Status metadata - ألوان متناسقة للوضع النهاري والليلي
+// Status metadata - ألوان واضحة ومتناسقة للوضع النهاري والليلي
 const statusConfig = {
   notStarted: {
     icon: CircleDot,
-    colorClass: 'text-slate-600 dark:text-slate-400',
-    bgClass: 'bg-slate-100 dark:bg-slate-800/50',
-    borderClass: 'border-slate-300 dark:border-slate-600',
+    colorClass: 'text-slate-700 dark:text-slate-300',
+    bgClass: 'bg-slate-200 dark:bg-slate-700',
+    borderClass: 'border-slate-400 dark:border-slate-500',
     labelAr: 'لم يبدأ',
     labelEn: 'Not Started',
   },
   inProgress: {
     icon: Play,
-    colorClass: 'text-blue-600 dark:text-blue-400',
-    bgClass: 'bg-blue-50 dark:bg-blue-900/30',
-    borderClass: 'border-blue-300 dark:border-blue-700',
+    colorClass: 'text-sky-700 dark:text-sky-300',
+    bgClass: 'bg-sky-100 dark:bg-sky-900/50',
+    borderClass: 'border-sky-400 dark:border-sky-600',
     labelAr: 'قيد التنفيذ',
     labelEn: 'In Progress',
   },
   completed: {
     icon: CheckCircle2,
-    colorClass: 'text-green-600 dark:text-green-400',
-    bgClass: 'bg-green-50 dark:bg-green-900/30',
-    borderClass: 'border-green-300 dark:border-green-700',
+    colorClass: 'text-emerald-700 dark:text-emerald-300',
+    bgClass: 'bg-emerald-100 dark:bg-emerald-900/50',
+    borderClass: 'border-emerald-400 dark:border-emerald-600',
     labelAr: 'مكتمل',
     labelEn: 'Completed',
   },
   overdue: {
     icon: AlertCircle,
-    colorClass: 'text-red-600 dark:text-red-400',
-    bgClass: 'bg-red-50 dark:bg-red-900/30',
-    borderClass: 'border-red-300 dark:border-red-700',
+    colorClass: 'text-rose-700 dark:text-rose-300',
+    bgClass: 'bg-rose-100 dark:bg-rose-900/50',
+    borderClass: 'border-rose-400 dark:border-rose-600',
     labelAr: 'متأخر',
     labelEn: 'Overdue',
   },
   cancelled: {
     icon: XCircle,
-    colorClass: 'text-gray-500 dark:text-gray-400',
-    bgClass: 'bg-gray-100 dark:bg-gray-800/50',
-    borderClass: 'border-gray-300 dark:border-gray-600',
+    colorClass: 'text-gray-600 dark:text-gray-300',
+    bgClass: 'bg-gray-200 dark:bg-gray-700',
+    borderClass: 'border-gray-400 dark:border-gray-500',
     labelAr: 'ملغي',
     labelEn: 'Cancelled',
   },
@@ -321,7 +333,7 @@ export default function TreatmentPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Form states - simplified
+  // Form states - محسّن مع حقول إضافية للمهام
   const [formData, setFormData] = useState({
     riskId: '',
     strategy: '' as TreatmentStrategy | '',
@@ -331,7 +343,16 @@ export default function TreatmentPage() {
     priority: 'medium' as 'high' | 'medium' | 'low',
     startDate: new Date().toISOString().split('T')[0],
     dueDate: '',
-    tasks: [] as { id: string; titleAr: string; titleEn: string; dueDate: string }[],
+    tasks: [] as {
+      id: string;
+      titleAr: string;
+      titleEn: string;
+      dueDate: string;
+      priority: 'high' | 'medium' | 'low';
+      assignedTo: string;
+      description: string;
+      status: string;
+    }[],
   });
 
   // ============================================
@@ -542,6 +563,10 @@ export default function TreatmentPage() {
       titleAr: '',
       titleEn: '',
       dueDate: formData.dueDate,
+      priority: 'medium' as 'high' | 'medium' | 'low',
+      assignedTo: formData.responsibleId,
+      description: '',
+      status: 'notStarted',
     };
     setFormData((prev) => ({ ...prev, tasks: [...prev.tasks, newTask] }));
   };
@@ -625,21 +650,21 @@ export default function TreatmentPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-200 dark:border-orange-800' },
-          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-200 dark:border-green-800' },
-          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-800' },
-          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-800' },
-          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800/50', border: 'border-slate-200 dark:border-slate-700' },
+          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-violet-700 dark:text-violet-300', bg: 'bg-violet-500', iconColor: 'text-white', border: 'border-violet-400 dark:border-violet-600' },
+          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-500', iconColor: 'text-white', border: 'border-emerald-400 dark:border-emerald-600' },
+          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-500', iconColor: 'text-white', border: 'border-sky-400 dark:border-sky-600' },
+          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-rose-700 dark:text-rose-300', bg: 'bg-rose-500', iconColor: 'text-white', border: 'border-rose-400 dark:border-rose-600' },
+          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-500', iconColor: 'text-white', border: 'border-slate-400 dark:border-slate-500' },
         ].map((stat, i) => (
-          <Card key={i} className={`overflow-hidden hover:shadow-md transition-shadow border ${stat.border}`}>
+          <Card key={i} className={`overflow-hidden hover:shadow-lg transition-all duration-300 border-2 ${stat.border} bg-white dark:bg-gray-800`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-[var(--foreground-secondary)]">{stat.label}</p>
-                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">{stat.label}</p>
+                  <p className={`text-3xl font-black ${stat.color}`}>{stat.value}</p>
                 </div>
-                <div className={`p-2.5 rounded-xl ${stat.bg}`}>
-                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                <div className={`p-3 rounded-xl ${stat.bg} shadow-lg`}>
+                  <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
                 </div>
               </div>
             </CardContent>
@@ -648,20 +673,20 @@ export default function TreatmentPage() {
       </div>
 
       {/* Progress Overview */}
-      <Card className="overflow-hidden border border-orange-200 dark:border-orange-800">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30">
-                <Activity className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+      <Card className="overflow-hidden border-2 border-violet-300 dark:border-violet-700 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-violet-500 shadow-lg">
+                <Activity className="h-6 w-6 text-white" />
               </div>
-              <span className="font-semibold text-[var(--foreground)]">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
+              <span className="font-bold text-lg text-gray-800 dark:text-gray-100">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
             </div>
-            <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">{avgProgress}%</span>
+            <span className="text-3xl font-black text-violet-600 dark:text-violet-400">{avgProgress}%</span>
           </div>
-          <div className="h-4 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+          <div className="h-5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden shadow-inner">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 transition-all duration-500 shadow-sm"
               style={{ width: `${avgProgress}%` }}
             />
           </div>
@@ -730,22 +755,22 @@ export default function TreatmentPage() {
             return (
               <Card
                 key={treatment.id}
-                className={`overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 ${statusConf.borderClass}`}
+                className="overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
                 onClick={() => openViewModal(treatment)}
               >
-                {/* Card Header with Strategy Color */}
-                <div className={`h-1.5 ${strategyConf.bgClass}`} style={{ background: treatment.strategy === 'avoid' ? '#ef4444' : treatment.strategy === 'reduce' ? '#f59e0b' : treatment.strategy === 'transfer' ? '#3b82f6' : '#22c55e' }} />
+                {/* Card Header with Strategy Color - شريط ملون واضح */}
+                <div className={`h-2 ${strategyConf.bgClass}`} />
 
-                <CardContent className="p-4 space-y-3">
+                <CardContent className="p-4 space-y-4">
                   {/* Top Row: Risk Number & Status */}
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${ratingColors[treatment.inherentRating]}`} />
-                      <span className="text-sm font-mono font-semibold text-gray-700 dark:text-gray-300">
+                      <div className={`w-4 h-4 rounded-full ${ratingColors[treatment.inherentRating]} shadow-sm`} />
+                      <span className="text-sm font-mono font-bold text-gray-800 dark:text-gray-200">
                         {treatment.riskNumber}
                       </span>
                     </div>
-                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${statusConf.bgClass} ${statusConf.colorClass} ${statusConf.borderClass}`}>
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 ${statusConf.bgClass} ${statusConf.colorClass} ${statusConf.borderClass}`}>
                       <StatusIcon className="h-3.5 w-3.5" />
                       <span>{isAr ? statusConf.labelAr : statusConf.labelEn}</span>
                     </div>
@@ -753,16 +778,16 @@ export default function TreatmentPage() {
 
                   {/* Title */}
                   <div>
-                    <h3 className="font-bold text-gray-800 dark:text-gray-100 line-clamp-2 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+                    <h3 className="font-bold text-gray-900 dark:text-white line-clamp-2 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors text-base">
                       {isAr ? treatment.riskTitleAr : treatment.riskTitleEn}
                     </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-medium">
                       {isAr ? treatment.departmentAr : treatment.departmentEn}
                     </p>
                   </div>
 
-                  {/* Strategy Badge */}
-                  <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 ${strategyConf.bgClass} ${strategyConf.borderClass}`}>
+                  {/* Strategy Badge - شارة الاستراتيجية بألوان واضحة */}
+                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${strategyConf.bgClass} shadow-md`}>
                     <StrategyIcon className={`h-4 w-4 ${strategyConf.colorClass}`} />
                     <span className={`text-sm font-bold ${strategyConf.colorClass}`}>
                       {isAr ? strategyConf.labelAr : strategyConf.labelEn}
@@ -771,30 +796,85 @@ export default function TreatmentPage() {
 
                   {/* Progress Bar */}
                   <div>
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-gray-600 dark:text-gray-400 font-medium">{isAr ? 'التقدم' : 'Progress'}</span>
-                      <span className="font-bold text-orange-600 dark:text-orange-400">{treatment.progress}%</span>
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-gray-700 dark:text-gray-300 font-semibold">{isAr ? 'التقدم' : 'Progress'}</span>
+                      <span className="font-black text-violet-600 dark:text-violet-400">{treatment.progress}%</span>
                     </div>
-                    <div className="h-2.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                    <div className="h-3 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden shadow-inner">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-600 transition-all duration-500 shadow-sm"
                         style={{ width: `${treatment.progress}%` }}
                       />
                     </div>
                   </div>
 
                   {/* Footer: Responsible & Due Date */}
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <Users className="h-4 w-4" />
-                      <span className="truncate max-w-[100px] font-medium">
+                  <div className="flex items-center justify-between pt-3 border-t-2 border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <div className="p-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <span className="truncate max-w-[100px] font-semibold">
                         {isAr ? treatment.responsibleAr : treatment.responsibleEn}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <Calendar className="h-4 w-4" />
-                      <span className="font-medium">{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
+                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <div className="p-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+                        <Calendar className="h-4 w-4" />
+                      </div>
+                      <span className="font-semibold">{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
                     </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-sm font-semibold border-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openViewModal(treatment);
+                      }}
+                    >
+                      <Eye className="h-4 w-4 me-1.5" />
+                      {isAr ? 'عرض' : 'View'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-sm font-semibold border-2 border-violet-300 text-violet-700 dark:border-violet-600 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // فتح مودال التعديل
+                        setSelectedTreatment(treatment);
+                        setFormData({
+                          riskId: treatment.riskId,
+                          strategy: treatment.strategy,
+                          titleAr: treatment.titleAr,
+                          titleEn: treatment.titleEn,
+                          responsibleId: '',
+                          priority: treatment.priority as 'high' | 'medium' | 'low',
+                          startDate: treatment.startDate.split('T')[0],
+                          dueDate: treatment.dueDate.split('T')[0],
+                          tasks: treatment.tasks.map(t => ({
+                            id: t.id,
+                            titleAr: t.titleAr,
+                            titleEn: t.titleEn,
+                            dueDate: t.dueDate || '',
+                            priority: (t.priority || 'medium') as 'high' | 'medium' | 'low',
+                            assignedTo: '',
+                            description: '',
+                            status: t.status,
+                          })),
+                        });
+                        setWizardStep(2);
+                        setShowAddModal(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4 me-1.5" />
+                      {isAr ? 'تعديل' : 'Edit'}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -999,58 +1079,154 @@ export default function TreatmentPage() {
                 </div>
               )}
 
-              {/* Step 3: Tasks */}
+              {/* Step 3: Tasks - محسّن مع حقول إضافية */}
               {wizardStep === 3 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">{isAr ? 'المهام' : 'Tasks'}</label>
-                    <Button variant="outline" size="sm" onClick={addTask}>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-800 dark:text-gray-200">{isAr ? 'المهام التنفيذية' : 'Action Tasks'}</label>
+                      <p className="text-xs text-gray-500 mt-0.5">{isAr ? 'أضف المهام المطلوبة لتنفيذ خطة المعالجة' : 'Add tasks required to implement the treatment plan'}</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={addTask} className="border-green-500 text-green-600 hover:bg-green-50">
                       <Plus className="h-4 w-4 me-1" />
-                      {isAr ? 'إضافة مهمة' : 'Add Task'}
+                      {isAr ? 'مهمة جديدة' : 'New Task'}
                     </Button>
                   </div>
 
                   {formData.tasks.length === 0 ? (
-                    <div className="text-center py-8 text-[var(--foreground-secondary)]">
-                      <ListChecks className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">{isAr ? 'لا توجد مهام' : 'No tasks yet'}</p>
-                      <Button variant="outline" size="sm" className="mt-2" onClick={addTask}>
-                        <Plus className="h-4 w-4 me-1" />
+                    <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                      <ListChecks className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">{isAr ? 'لا توجد مهام بعد' : 'No tasks yet'}</p>
+                      <p className="text-xs text-gray-500 mt-1 mb-4">{isAr ? 'أضف المهام لتتبع تقدم خطة المعالجة' : 'Add tasks to track treatment plan progress'}</p>
+                      <Button onClick={addTask} className="bg-green-600 hover:bg-green-700">
+                        <Plus className="h-4 w-4 me-2" />
                         {isAr ? 'إضافة أول مهمة' : 'Add First Task'}
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-3 max-h-[250px] overflow-y-auto">
+                    <div className="space-y-4 max-h-[350px] overflow-y-auto pe-2">
                       {formData.tasks.map((task, index) => (
-                        <div key={task.id} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--background-secondary)]">
-                          <div className="flex items-start gap-2">
-                            <span className="text-xs font-mono text-[var(--foreground-muted)] mt-2">{index + 1}</span>
-                            <div className="flex-1 space-y-2">
+                        <div key={task.id} className="p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow">
+                          {/* Task Header */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-xs font-bold">{index + 1}</span>
+                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{isAr ? `المهمة ${index + 1}` : `Task ${index + 1}`}</span>
+                            </div>
+                            <button
+                              onClick={() => removeTask(index)}
+                              className="p-1.5 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                              title={isAr ? 'حذف المهمة' : 'Delete Task'}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          {/* Task Title */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}</label>
                               <Input
-                                placeholder={isAr ? 'عنوان المهمة (عربي)' : 'Task title (Arabic)'}
+                                placeholder={isAr ? 'مثال: مراجعة السياسات الداخلية' : 'e.g., Review internal policies'}
                                 value={task.titleAr}
                                 onChange={(e) => updateTask(index, 'titleAr', e.target.value)}
+                                className="text-sm"
                               />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'العنوان (إنجليزي)' : 'Title (English)'}</label>
                               <Input
-                                placeholder={isAr ? 'عنوان المهمة (إنجليزي)' : 'Task title (English)'}
+                                placeholder={isAr ? 'مثال: Review internal policies' : 'e.g., Review internal policies'}
                                 value={task.titleEn}
                                 onChange={(e) => updateTask(index, 'titleEn', e.target.value)}
+                                className="text-sm"
                               />
+                            </div>
+                          </div>
+
+                          {/* Task Details Row */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {/* Priority */}
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الأولوية' : 'Priority'}</label>
+                              <select
+                                value={task.priority || 'medium'}
+                                onChange={(e) => updateTask(index, 'priority', e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500"
+                              >
+                                <option value="high">{isAr ? '🔴 عالية' : '🔴 High'}</option>
+                                <option value="medium">{isAr ? '🟡 متوسطة' : '🟡 Medium'}</option>
+                                <option value="low">{isAr ? '🟢 منخفضة' : '🟢 Low'}</option>
+                              </select>
+                            </div>
+
+                            {/* Assigned To */}
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المكلف' : 'Assigned To'}</label>
+                              <select
+                                value={task.assignedTo || ''}
+                                onChange={(e) => updateTask(index, 'assignedTo', e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500"
+                              >
+                                <option value="">{isAr ? 'اختر...' : 'Select...'}</option>
+                                {responsibleOptions.map((opt) => (
+                                  <option key={opt.id} value={opt.id}>{isAr ? opt.name : opt.nameEn}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Due Date */}
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
                               <Input
                                 type="date"
                                 value={task.dueDate}
                                 onChange={(e) => updateTask(index, 'dueDate', e.target.value)}
+                                className="text-sm"
                               />
                             </div>
-                            <button
-                              onClick={() => removeTask(index)}
-                              className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+
+                            {/* Status */}
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الحالة' : 'Status'}</label>
+                              <select
+                                value={task.status || 'notStarted'}
+                                onChange={(e) => updateTask(index, 'status', e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500"
+                              >
+                                <option value="notStarted">{isAr ? '⏳ لم يبدأ' : '⏳ Not Started'}</option>
+                                <option value="inProgress">{isAr ? '🔄 قيد التنفيذ' : '🔄 In Progress'}</option>
+                                <option value="completed">{isAr ? '✅ مكتمل' : '✅ Completed'}</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Description */}
+                          <div className="mt-3">
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'وصف المهمة (اختياري)' : 'Task Description (Optional)'}</label>
+                            <textarea
+                              value={task.description || ''}
+                              onChange={(e) => updateTask(index, 'description', e.target.value)}
+                              placeholder={isAr ? 'أضف تفاصيل إضافية عن المهمة...' : 'Add additional details about the task...'}
+                              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 resize-none"
+                              rows={2}
+                            />
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Tasks Summary */}
+                  {formData.tasks.length > 0 && (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                      <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
+                        {isAr ? `إجمالي المهام: ${formData.tasks.length}` : `Total Tasks: ${formData.tasks.length}`}
+                      </span>
+                      <Button variant="outline" size="sm" onClick={addTask} className="text-xs">
+                        <Plus className="h-3 w-3 me-1" />
+                        {isAr ? 'إضافة المزيد' : 'Add More'}
+                      </Button>
                     </div>
                   )}
                 </div>
