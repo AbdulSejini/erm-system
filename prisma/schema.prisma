@@ -37,8 +37,10 @@ model User {
   championRisks         Risk[]                 @relation("RiskChampion")
   assessments           RiskAssessment[]       @relation("Assessor")
   responsibleTreatments TreatmentPlan[]        @relation("TreatmentResponsible")
+  monitorTreatments     TreatmentPlan[]        @relation("TreatmentMonitor")
   createdTreatments     TreatmentPlan[]        @relation("TreatmentCreator")
   assignedTasks         TreatmentTask[]        @relation("TaskAssignee")
+  monitorTasks          TreatmentTask[]        @relation("TaskMonitor")
   reportedIncidents     Incident[]             @relation("IncidentReporter")
   notifications         Notification[]
   auditLogs             AuditLog[]
@@ -246,12 +248,22 @@ model TreatmentPlan {
   descriptionEn   String
   strategy        String    // avoid, reduce, transfer, accept
   status          String    @default("notStarted") // notStarted, inProgress, completed, overdue, cancelled
-  responsibleId   String
+  responsibleId   String    // المسؤول عن خطة المعالجة (من المستخدمين)
+  riskOwnerId     String?   // صاحب الخطر (من ملاك المخاطر)
+  monitorId       String?   // متابع التنفيذ (من المستخدمين)
+  priority        String    @default("medium") // high, medium, low - أولوية المعالجة
   startDate       DateTime
-  dueDate         DateTime
+  dueDate         DateTime  // تاريخ الاستحقاق (الموعد النهائي لإغلاق الخطر)
   completionDate  DateTime?
   progress        Int       @default(0)
   cost            Float?
+
+  // قياس الأثر بعد المعالجة (Residual Risk المتوقع)
+  expectedResidualLikelihood  Int?    // احتمالية الخطر المتبقي المتوقعة
+  expectedResidualImpact      Int?    // تأثير الخطر المتبقي المتوقع
+  expectedResidualScore       Int?    // درجة الخطر المتبقي المتوقعة
+  expectedResidualRating      String? // تصنيف الخطر المتبقي المتوقع
+
   createdById     String
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -259,6 +271,8 @@ model TreatmentPlan {
   // العلاقات
   risk        Risk            @relation(fields: [riskId], references: [id], onDelete: Cascade)
   responsible User            @relation("TreatmentResponsible", fields: [responsibleId], references: [id])
+  riskOwner   RiskOwner?      @relation("TreatmentRiskOwner", fields: [riskOwnerId], references: [id])
+  monitor     User?           @relation("TreatmentMonitor", fields: [monitorId], references: [id])
   createdBy   User            @relation("TreatmentCreator", fields: [createdById], references: [id])
   tasks       TreatmentTask[]
 }
@@ -272,8 +286,13 @@ model TreatmentTask {
   descriptionAr     String?
   descriptionEn     String?
   status            String    @default("notStarted") // notStarted, inProgress, completed, overdue, cancelled
-  assignedToId      String?
-  dueDate           DateTime?
+  priority          String    @default("medium") // high, medium, low - أولوية المهمة
+  assignedToId      String?   // منفذ الإجراء (من Users - للتوافق القديم)
+  actionOwnerId     String?   // منفذ الإجراء (من ملاك المخاطر)
+  monitorId         String?   // متابع التنفيذ (من المستخدمين)
+  successIndicatorAr String?  // مؤشر الإنجاز بالعربي (كيف يعرف المتابع أن المهمة تمت)
+  successIndicatorEn String?  // مؤشر الإنجاز بالإنجليزي
+  dueDate           DateTime? // تاريخ الاستحقاق
   completionDate    DateTime?
   order             Int       @default(0)
   createdAt         DateTime  @default(now())
@@ -282,6 +301,8 @@ model TreatmentTask {
   // العلاقات
   treatmentPlan TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
   assignedTo    User?         @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  actionOwner   RiskOwner?    @relation("TaskActionOwner", fields: [actionOwnerId], references: [id])
+  monitor       User?         @relation("TaskMonitor", fields: [monitorId], references: [id])
 }
 
 // الحوادث
@@ -429,8 +450,10 @@ model RiskOwner {
   updatedAt     DateTime  @updatedAt
 
   // العلاقات
-  department    Department? @relation("RiskOwnerDepartment", fields: [departmentId], references: [id])
-  risks         Risk[]      @relation("RiskToOwner")
+  department         Department?      @relation("RiskOwnerDepartment", fields: [departmentId], references: [id])
+  risks              Risk[]           @relation("RiskToOwner")
+  treatmentPlans     TreatmentPlan[]  @relation("TreatmentRiskOwner")
+  treatmentTasks     TreatmentTask[]  @relation("TaskActionOwner")
 }
 
 // معايير الاحتمالية

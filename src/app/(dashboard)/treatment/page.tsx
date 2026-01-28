@@ -351,15 +351,62 @@ export default function TreatmentPage() {
   const [selectedStrategy, setSelectedStrategy] = useState<TreatmentStrategy | null>(null);
   const [planTitle, setPlanTitle] = useState('');
   const [responsibleId, setResponsibleId] = useState<string | null>(null);
+  const [riskOwnerId, setRiskOwnerId] = useState<string | null>(null);
+  const [monitorId, setMonitorId] = useState<string | null>(null);
+  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [tasks, setTasks] = useState<{ id: string; titleAr: string; titleEn: string }[]>([]);
+
+  // Expected residual risk fields
+  const [expectedResidualLikelihood, setExpectedResidualLikelihood] = useState<number | null>(null);
+  const [expectedResidualImpact, setExpectedResidualImpact] = useState<number | null>(null);
+
+  // Tasks with extended fields
+  const [tasks, setTasks] = useState<{
+    id: string;
+    titleAr: string;
+    titleEn: string;
+    priority?: 'high' | 'medium' | 'low';
+    actionOwnerId?: string | null;
+    monitorId?: string | null;
+    successIndicatorAr?: string;
+    successIndicatorEn?: string;
+    dueDate?: string;
+  }[]>([]);
   const [newTaskTitleAr, setNewTaskTitleAr] = useState('');
   const [newTaskTitleEn, setNewTaskTitleEn] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [newTaskActionOwnerId, setNewTaskActionOwnerId] = useState<string | null>(null);
+  const [newTaskMonitorId, setNewTaskMonitorId] = useState<string | null>(null);
+  const [newTaskSuccessIndicatorAr, setNewTaskSuccessIndicatorAr] = useState('');
+  const [newTaskSuccessIndicatorEn, setNewTaskSuccessIndicatorEn] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+
   const [riskSearchQuery, setRiskSearchQuery] = useState('');
   const [responsibleOptions, setResponsibleOptions] = useState<{ id: string; name: string; nameEn: string; role: string }[]>([]);
   const [allResponsibleUsers, setAllResponsibleUsers] = useState<{ id: string; name: string; nameEn: string; role: string }[]>([]);
   const [responsibleSearchQuery, setResponsibleSearchQuery] = useState('');
   const [showResponsibleDropdown, setShowResponsibleDropdown] = useState(false);
+
+  // Risk owners list (separate from users)
+  const [riskOwnersList, setRiskOwnersList] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
+  const [riskOwnerSearchQuery, setRiskOwnerSearchQuery] = useState('');
+  const [showRiskOwnerDropdown, setShowRiskOwnerDropdown] = useState(false);
+
+  // Monitor dropdown
+  const [monitorSearchQuery, setMonitorSearchQuery] = useState('');
+  const [showMonitorDropdown, setShowMonitorDropdown] = useState(false);
+
+  // Task action owner dropdown
+  const [taskActionOwnerSearchQuery, setTaskActionOwnerSearchQuery] = useState('');
+  const [showTaskActionOwnerDropdown, setShowTaskActionOwnerDropdown] = useState(false);
+
+  // Task monitor dropdown
+  const [taskMonitorSearchQuery, setTaskMonitorSearchQuery] = useState('');
+  const [showTaskMonitorDropdown, setShowTaskMonitorDropdown] = useState(false);
+
+  // Saving state
+  const [isSaving, setIsSaving] = useState(false);
 
   // State for editing treatment
   const [showEditModal, setShowEditModal] = useState(false);
@@ -418,6 +465,13 @@ export default function TreatmentPage() {
         const riskOwnersResult = await riskOwnersResponse.json();
 
         if (riskOwnersResult.success && riskOwnersResult.data) {
+          // Store risk owners separately for dropdown
+          setRiskOwnersList(riskOwnersResult.data.map((owner: { id: string; nameAr: string; nameEn: string | null }) => ({
+            id: owner.id,
+            nameAr: owner.nameAr,
+            nameEn: owner.nameEn || owner.nameAr,
+          })));
+
           const riskOwners = riskOwnersResult.data.map((owner: { id: string; nameAr: string; nameEn: string | null }) => ({
             id: `riskOwner_${owner.id}`, // Prefix to distinguish from users
             name: owner.nameAr,
@@ -517,10 +571,28 @@ export default function TreatmentPage() {
     setResponsibleId(null);
     setResponsibleSearchQuery('');
     setShowResponsibleDropdown(false);
+    setRiskOwnerId(null);
+    setRiskOwnerSearchQuery('');
+    setShowRiskOwnerDropdown(false);
+    setMonitorId(null);
+    setMonitorSearchQuery('');
+    setShowMonitorDropdown(false);
+    setPriority('medium');
+    setStartDate('');
     setDueDate('');
+    setExpectedResidualLikelihood(null);
+    setExpectedResidualImpact(null);
     setTasks([]);
     setNewTaskTitleAr('');
     setNewTaskTitleEn('');
+    setNewTaskPriority('medium');
+    setNewTaskActionOwnerId(null);
+    setNewTaskMonitorId(null);
+    setNewTaskSuccessIndicatorAr('');
+    setNewTaskSuccessIndicatorEn('');
+    setNewTaskDueDate('');
+    setTaskActionOwnerSearchQuery('');
+    setTaskMonitorSearchQuery('');
     setRiskSearchQuery('');
     setWizardStep(1);
   };
@@ -563,19 +635,49 @@ export default function TreatmentPage() {
     setResponsibleId(null);
     setResponsibleSearchQuery('');
     setShowResponsibleDropdown(false);
+    setRiskOwnerId(null);
+    setRiskOwnerSearchQuery('');
+    setShowRiskOwnerDropdown(false);
+    setMonitorId(null);
+    setMonitorSearchQuery('');
+    setShowMonitorDropdown(false);
+    setPriority('medium');
+    setStartDate('');
     setDueDate('');
+    setExpectedResidualLikelihood(null);
+    setExpectedResidualImpact(null);
     setTasks([]);
     setNewTaskTitleAr('');
     setNewTaskTitleEn('');
+    setNewTaskPriority('medium');
+    setNewTaskActionOwnerId(null);
+    setNewTaskMonitorId(null);
+    setNewTaskSuccessIndicatorAr('');
+    setNewTaskSuccessIndicatorEn('');
+    setNewTaskDueDate('');
+    setTaskActionOwnerSearchQuery('');
+    setTaskMonitorSearchQuery('');
     setEditWizardStep(1);
   };
 
-  // Close responsible dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest('.responsible-dropdown-container')) {
         setShowResponsibleDropdown(false);
+      }
+      if (!target.closest('.risk-owner-dropdown-container')) {
+        setShowRiskOwnerDropdown(false);
+      }
+      if (!target.closest('.monitor-dropdown-container')) {
+        setShowMonitorDropdown(false);
+      }
+      if (!target.closest('.task-action-owner-dropdown-container')) {
+        setShowTaskActionOwnerDropdown(false);
+      }
+      if (!target.closest('.task-monitor-dropdown-container')) {
+        setShowTaskMonitorDropdown(false);
       }
     };
 
@@ -592,10 +694,24 @@ export default function TreatmentPage() {
           id: Date.now().toString(),
           titleAr: newTaskTitleAr.trim() || newTaskTitleEn.trim(),
           titleEn: newTaskTitleEn.trim() || newTaskTitleAr.trim(),
+          priority: newTaskPriority,
+          actionOwnerId: newTaskActionOwnerId,
+          monitorId: newTaskMonitorId,
+          successIndicatorAr: newTaskSuccessIndicatorAr.trim(),
+          successIndicatorEn: newTaskSuccessIndicatorEn.trim(),
+          dueDate: newTaskDueDate,
         },
       ]);
       setNewTaskTitleAr('');
       setNewTaskTitleEn('');
+      setNewTaskPriority('medium');
+      setNewTaskActionOwnerId(null);
+      setNewTaskMonitorId(null);
+      setNewTaskSuccessIndicatorAr('');
+      setNewTaskSuccessIndicatorEn('');
+      setNewTaskDueDate('');
+      setTaskActionOwnerSearchQuery('');
+      setTaskMonitorSearchQuery('');
     }
   };
 
@@ -1380,7 +1496,7 @@ export default function TreatmentPage() {
             )}
 
             {wizardStep === 3 && (
-              <div>
+              <div className="max-h-[400px] overflow-y-auto">
                 <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
                   {isAr ? 'تفاصيل خطة المعالجة' : 'Treatment plan details'}
                 </h4>
@@ -1400,6 +1516,7 @@ export default function TreatmentPage() {
                   </div>
                 )}
                 <div className="space-y-3 sm:space-y-4">
+                  {/* Plan Title */}
                   <div>
                     <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
                       {isAr ? 'عنوان الخطة' : 'Plan Title'}
@@ -1410,10 +1527,13 @@ export default function TreatmentPage() {
                       onChange={(e) => setPlanTitle(e.target.value)}
                     />
                   </div>
+
+                  {/* Responsible and Risk Owner */}
                   <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
+                    {/* Responsible (Users) */}
                     <div className="relative responsible-dropdown-container">
                       <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'المسؤول' : 'Responsible'}
+                        {isAr ? 'المسؤول عن خطة المعالجة' : 'Treatment Plan Responsible'}
                       </label>
                       <div className="relative">
                         <Input
@@ -1422,7 +1542,6 @@ export default function TreatmentPage() {
                           onChange={(e) => {
                             setResponsibleSearchQuery(e.target.value);
                             setShowResponsibleDropdown(true);
-                            // Clear selection if user is typing
                             if (responsibleId) {
                               const selected = responsibleOptions.find(o => o.id === responsibleId);
                               const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
@@ -1434,18 +1553,14 @@ export default function TreatmentPage() {
                           onFocus={() => setShowResponsibleDropdown(true)}
                           leftIcon={<User className="h-4 w-4" />}
                         />
-                        {/* Dropdown */}
                         {showResponsibleDropdown && (
                           <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
                             {responsibleOptions
+                              .filter(option => !option.id.startsWith('riskOwner_')) // Only show users, not risk owners
                               .filter(option => {
                                 if (!responsibleSearchQuery) return true;
                                 const query = responsibleSearchQuery.toLowerCase();
-                                return (
-                                  option.name.toLowerCase().includes(query) ||
-                                  option.nameEn.toLowerCase().includes(query) ||
-                                  option.role.toLowerCase().includes(query)
-                                );
+                                return option.name.toLowerCase().includes(query) || option.nameEn.toLowerCase().includes(query);
                               })
                               .slice(0, 10)
                               .map((option) => (
@@ -1457,49 +1572,177 @@ export default function TreatmentPage() {
                                     setResponsibleSearchQuery(isAr ? option.name : option.nameEn);
                                     setShowResponsibleDropdown(false);
                                   }}
-                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${
-                                    responsibleId === option.id ? 'bg-[var(--primary-light)]' : ''
-                                  }`}
+                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${responsibleId === option.id ? 'bg-[var(--primary-light)]' : ''}`}
                                 >
                                   <div className="flex items-center justify-between">
-                                    <span className="font-medium text-[var(--foreground)]">
-                                      {isAr ? option.name : option.nameEn}
-                                    </span>
-                                    {responsibleId === option.id && (
-                                      <Check className="h-4 w-4 text-[var(--primary)]" />
-                                    )}
+                                    <span className="font-medium text-[var(--foreground)]">{isAr ? option.name : option.nameEn}</span>
+                                    {responsibleId === option.id && <Check className="h-4 w-4 text-[var(--primary)]" />}
                                   </div>
-                                  <span className="text-xs text-[var(--foreground-muted)]">
-                                    {option.role}
-                                  </span>
+                                  <span className="text-xs text-[var(--foreground-muted)]">{option.role}</span>
                                 </button>
                               ))}
-                            {responsibleOptions.filter(option => {
-                              if (!responsibleSearchQuery) return true;
-                              const query = responsibleSearchQuery.toLowerCase();
-                              return (
-                                option.name.toLowerCase().includes(query) ||
-                                option.nameEn.toLowerCase().includes(query) ||
-                                option.role.toLowerCase().includes(query)
-                              );
-                            }).length === 0 && (
-                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">
-                                {isAr ? 'لا توجد نتائج' : 'No results found'}
-                              </div>
+                            {responsibleOptions.filter(o => !o.id.startsWith('riskOwner_')).filter(o => !responsibleSearchQuery || o.name.toLowerCase().includes(responsibleSearchQuery.toLowerCase())).length === 0 && (
+                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد نتائج' : 'No results found'}</div>
                             )}
                           </div>
                         )}
                       </div>
-                      {/* Selected indicator */}
-                      {responsibleId && (
-                        <p className="mt-1 text-xs text-[var(--status-success)]">
-                          {isAr ? '✓ تم اختيار المسؤول' : '✓ Responsible selected'}
-                        </p>
-                      )}
+                      {responsibleId && <p className="mt-1 text-xs text-[var(--status-success)]">{isAr ? '✓ تم اختيار المسؤول' : '✓ Responsible selected'}</p>}
+                    </div>
+
+                    {/* Risk Owner (from RiskOwner table) */}
+                    <div className="relative risk-owner-dropdown-container">
+                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                        {isAr ? 'صاحب الخطر' : 'Risk Owner'}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          placeholder={isAr ? 'ابحث عن صاحب الخطر...' : 'Search for risk owner...'}
+                          value={riskOwnerSearchQuery}
+                          onChange={(e) => {
+                            setRiskOwnerSearchQuery(e.target.value);
+                            setShowRiskOwnerDropdown(true);
+                            if (riskOwnerId) {
+                              const selected = riskOwnersList.find(o => o.id === riskOwnerId);
+                              const displayName = selected ? (isAr ? selected.nameAr : selected.nameEn) : '';
+                              if (e.target.value !== displayName) {
+                                setRiskOwnerId(null);
+                              }
+                            }
+                          }}
+                          onFocus={() => setShowRiskOwnerDropdown(true)}
+                          leftIcon={<Shield className="h-4 w-4" />}
+                        />
+                        {showRiskOwnerDropdown && (
+                          <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
+                            {riskOwnersList
+                              .filter(owner => {
+                                if (!riskOwnerSearchQuery) return true;
+                                const query = riskOwnerSearchQuery.toLowerCase();
+                                return owner.nameAr.toLowerCase().includes(query) || owner.nameEn.toLowerCase().includes(query);
+                              })
+                              .slice(0, 10)
+                              .map((owner) => (
+                                <button
+                                  key={owner.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setRiskOwnerId(owner.id);
+                                    setRiskOwnerSearchQuery(isAr ? owner.nameAr : owner.nameEn);
+                                    setShowRiskOwnerDropdown(false);
+                                  }}
+                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${riskOwnerId === owner.id ? 'bg-[var(--primary-light)]' : ''}`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium text-[var(--foreground)]">{isAr ? owner.nameAr : owner.nameEn}</span>
+                                    {riskOwnerId === owner.id && <Check className="h-4 w-4 text-[var(--primary)]" />}
+                                  </div>
+                                </button>
+                              ))}
+                            {riskOwnersList.filter(o => !riskOwnerSearchQuery || o.nameAr.toLowerCase().includes(riskOwnerSearchQuery.toLowerCase())).length === 0 && (
+                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد نتائج' : 'No results found'}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {riskOwnerId && <p className="mt-1 text-xs text-[var(--status-success)]">{isAr ? '✓ تم اختيار صاحب الخطر' : '✓ Risk owner selected'}</p>}
+                    </div>
+                  </div>
+
+                  {/* Monitor and Priority */}
+                  <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
+                    {/* Monitor (Users) */}
+                    <div className="relative monitor-dropdown-container">
+                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                        {isAr ? 'متابع التنفيذ' : 'Monitor / Auditor'}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          placeholder={isAr ? 'ابحث عن متابع التنفيذ...' : 'Search for monitor...'}
+                          value={monitorSearchQuery}
+                          onChange={(e) => {
+                            setMonitorSearchQuery(e.target.value);
+                            setShowMonitorDropdown(true);
+                            if (monitorId) {
+                              const selected = responsibleOptions.find(o => o.id === monitorId);
+                              const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
+                              if (e.target.value !== displayName) {
+                                setMonitorId(null);
+                              }
+                            }
+                          }}
+                          onFocus={() => setShowMonitorDropdown(true)}
+                          leftIcon={<User className="h-4 w-4" />}
+                        />
+                        {showMonitorDropdown && (
+                          <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
+                            {responsibleOptions
+                              .filter(option => !option.id.startsWith('riskOwner_'))
+                              .filter(option => {
+                                if (!monitorSearchQuery) return true;
+                                const query = monitorSearchQuery.toLowerCase();
+                                return option.name.toLowerCase().includes(query) || option.nameEn.toLowerCase().includes(query);
+                              })
+                              .slice(0, 10)
+                              .map((option) => (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setMonitorId(option.id);
+                                    setMonitorSearchQuery(isAr ? option.name : option.nameEn);
+                                    setShowMonitorDropdown(false);
+                                  }}
+                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${monitorId === option.id ? 'bg-[var(--primary-light)]' : ''}`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium text-[var(--foreground)]">{isAr ? option.name : option.nameEn}</span>
+                                    {monitorId === option.id && <Check className="h-4 w-4 text-[var(--primary)]" />}
+                                  </div>
+                                  <span className="text-xs text-[var(--foreground-muted)]">{option.role}</span>
+                                </button>
+                              ))}
+                            {responsibleOptions.filter(o => !o.id.startsWith('riskOwner_')).filter(o => !monitorSearchQuery || o.name.toLowerCase().includes(monitorSearchQuery.toLowerCase())).length === 0 && (
+                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد نتائج' : 'No results found'}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {monitorId && <p className="mt-1 text-xs text-[var(--status-success)]">{isAr ? '✓ تم اختيار متابع التنفيذ' : '✓ Monitor selected'}</p>}
+                    </div>
+
+                    {/* Priority */}
+                    <div>
+                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                        {isAr ? 'أولوية المعالجة' : 'Treatment Priority'}
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+                        value={priority}
+                        onChange={(e) => setPriority(e.target.value as 'high' | 'medium' | 'low')}
+                      >
+                        <option value="high">{isAr ? 'عالية' : 'High'}</option>
+                        <option value="medium">{isAr ? 'متوسطة' : 'Medium'}</option>
+                        <option value="low">{isAr ? 'منخفضة' : 'Low'}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Start Date and Due Date */}
+                  <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
+                        {isAr ? 'تاريخ البدء' : 'Start Date'}
+                      </label>
+                      <Input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'تاريخ الانتهاء' : 'Due Date'}
+                        {isAr ? 'تاريخ الاستحقاق' : 'Due Date'}
                       </label>
                       <Input
                         type="date"
@@ -1508,12 +1751,76 @@ export default function TreatmentPage() {
                       />
                     </div>
                   </div>
+
+                  {/* Expected Residual Risk Section */}
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+                    <h5 className="mb-2 text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                      {isAr ? 'الخطر المتبقي المتوقع بعد المعالجة' : 'Expected Residual Risk After Treatment'}
+                    </h5>
+                    <p className="mb-3 text-[10px] sm:text-xs text-[var(--foreground-muted)]">
+                      {isAr ? 'حدد مستوى الخطر المتوقع بعد تنفيذ خطة المعالجة' : 'Specify the expected risk level after implementing the treatment plan'}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                          {isAr ? 'الاحتمالية المتوقعة' : 'Expected Likelihood'}
+                        </label>
+                        <select
+                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+                          value={expectedResidualLikelihood ?? ''}
+                          onChange={(e) => setExpectedResidualLikelihood(e.target.value ? Number(e.target.value) : null)}
+                        >
+                          <option value="">{isAr ? 'اختر...' : 'Select...'}</option>
+                          <option value="1">{isAr ? '1 - نادر جداً' : '1 - Very Rare'}</option>
+                          <option value="2">{isAr ? '2 - نادر' : '2 - Rare'}</option>
+                          <option value="3">{isAr ? '3 - محتمل' : '3 - Possible'}</option>
+                          <option value="4">{isAr ? '4 - مرجح' : '4 - Likely'}</option>
+                          <option value="5">{isAr ? '5 - شبه مؤكد' : '5 - Almost Certain'}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                          {isAr ? 'التأثير المتوقع' : 'Expected Impact'}
+                        </label>
+                        <select
+                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+                          value={expectedResidualImpact ?? ''}
+                          onChange={(e) => setExpectedResidualImpact(e.target.value ? Number(e.target.value) : null)}
+                        >
+                          <option value="">{isAr ? 'اختر...' : 'Select...'}</option>
+                          <option value="1">{isAr ? '1 - ضئيل' : '1 - Negligible'}</option>
+                          <option value="2">{isAr ? '2 - طفيف' : '2 - Minor'}</option>
+                          <option value="3">{isAr ? '3 - معتدل' : '3 - Moderate'}</option>
+                          <option value="4">{isAr ? '4 - كبير' : '4 - Major'}</option>
+                          <option value="5">{isAr ? '5 - كارثي' : '5 - Catastrophic'}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                          {isAr ? 'الدرجة المتوقعة' : 'Expected Score'}
+                        </label>
+                        <div className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                          expectedResidualLikelihood && expectedResidualImpact
+                            ? (expectedResidualLikelihood * expectedResidualImpact) >= 15
+                              ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                              : (expectedResidualLikelihood * expectedResidualImpact) >= 8
+                              ? 'border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                              : 'border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                            : 'border-[var(--border)] bg-[var(--background-secondary)] text-[var(--foreground-muted)]'
+                        }`}>
+                          {expectedResidualLikelihood && expectedResidualImpact
+                            ? expectedResidualLikelihood * expectedResidualImpact
+                            : isAr ? 'غير محدد' : 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
             {wizardStep === 4 && (
-              <div>
+              <div className="max-h-[400px] overflow-y-auto">
                 <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
                   {isAr ? 'إضافة المهام' : 'Add Tasks'}
                 </h4>
@@ -1524,7 +1831,8 @@ export default function TreatmentPage() {
                 </p>
 
                 {/* Task input form */}
-                <div className="mb-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]">
+                <div className="mb-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--background)] space-y-3">
+                  {/* Task Titles */}
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
@@ -1547,7 +1855,167 @@ export default function TreatmentPage() {
                       />
                     </div>
                   </div>
-                  <div className="mt-2 flex justify-end">
+
+                  {/* Action Owner and Monitor */}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {/* Action Owner (from RiskOwner) */}
+                    <div className="relative task-action-owner-dropdown-container">
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'منفذ الإجراء' : 'Action Owner'}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          placeholder={isAr ? 'ابحث عن منفذ الإجراء...' : 'Search for action owner...'}
+                          value={taskActionOwnerSearchQuery}
+                          onChange={(e) => {
+                            setTaskActionOwnerSearchQuery(e.target.value);
+                            setShowTaskActionOwnerDropdown(true);
+                            if (newTaskActionOwnerId) {
+                              const selected = riskOwnersList.find(o => o.id === newTaskActionOwnerId);
+                              const displayName = selected ? (isAr ? selected.nameAr : selected.nameEn) : '';
+                              if (e.target.value !== displayName) {
+                                setNewTaskActionOwnerId(null);
+                              }
+                            }
+                          }}
+                          onFocus={() => setShowTaskActionOwnerDropdown(true)}
+                          leftIcon={<Shield className="h-4 w-4" />}
+                        />
+                        {showTaskActionOwnerDropdown && (
+                          <div className="absolute z-10 mt-1 w-full max-h-32 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
+                            {riskOwnersList
+                              .filter(owner => {
+                                if (!taskActionOwnerSearchQuery) return true;
+                                const query = taskActionOwnerSearchQuery.toLowerCase();
+                                return owner.nameAr.toLowerCase().includes(query) || owner.nameEn.toLowerCase().includes(query);
+                              })
+                              .slice(0, 10)
+                              .map((owner) => (
+                                <button
+                                  key={owner.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewTaskActionOwnerId(owner.id);
+                                    setTaskActionOwnerSearchQuery(isAr ? owner.nameAr : owner.nameEn);
+                                    setShowTaskActionOwnerDropdown(false);
+                                  }}
+                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${newTaskActionOwnerId === owner.id ? 'bg-[var(--primary-light)]' : ''}`}
+                                >
+                                  <span className="font-medium text-[var(--foreground)]">{isAr ? owner.nameAr : owner.nameEn}</span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Task Monitor (from Users) */}
+                    <div className="relative task-monitor-dropdown-container">
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'متابع التنفيذ' : 'Task Monitor'}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          placeholder={isAr ? 'ابحث عن متابع التنفيذ...' : 'Search for monitor...'}
+                          value={taskMonitorSearchQuery}
+                          onChange={(e) => {
+                            setTaskMonitorSearchQuery(e.target.value);
+                            setShowTaskMonitorDropdown(true);
+                            if (newTaskMonitorId) {
+                              const selected = responsibleOptions.find(o => o.id === newTaskMonitorId);
+                              const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
+                              if (e.target.value !== displayName) {
+                                setNewTaskMonitorId(null);
+                              }
+                            }
+                          }}
+                          onFocus={() => setShowTaskMonitorDropdown(true)}
+                          leftIcon={<User className="h-4 w-4" />}
+                        />
+                        {showTaskMonitorDropdown && (
+                          <div className="absolute z-10 mt-1 w-full max-h-32 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
+                            {responsibleOptions
+                              .filter(option => !option.id.startsWith('riskOwner_'))
+                              .filter(option => {
+                                if (!taskMonitorSearchQuery) return true;
+                                const query = taskMonitorSearchQuery.toLowerCase();
+                                return option.name.toLowerCase().includes(query) || option.nameEn.toLowerCase().includes(query);
+                              })
+                              .slice(0, 10)
+                              .map((option) => (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewTaskMonitorId(option.id);
+                                    setTaskMonitorSearchQuery(isAr ? option.name : option.nameEn);
+                                    setShowTaskMonitorDropdown(false);
+                                  }}
+                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${newTaskMonitorId === option.id ? 'bg-[var(--primary-light)]' : ''}`}
+                                >
+                                  <span className="font-medium text-[var(--foreground)]">{isAr ? option.name : option.nameEn}</span>
+                                  <span className="text-xs text-[var(--foreground-muted)] block">{option.role}</span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Success Indicators */}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'مؤشر الإنجاز (عربي)' : 'Success Indicator (Arabic)'}
+                      </label>
+                      <Input
+                        placeholder={isAr ? 'كيف يعرف المتابع أن المهمة أُنجزت؟' : 'How does the monitor know the task is done?'}
+                        value={newTaskSuccessIndicatorAr}
+                        onChange={(e) => setNewTaskSuccessIndicatorAr(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'مؤشر الإنجاز (إنجليزي)' : 'Success Indicator (English)'}
+                      </label>
+                      <Input
+                        placeholder={isAr ? 'كيف يعرف المتابع أن المهمة أُنجزت؟' : 'How does the monitor know the task is done?'}
+                        value={newTaskSuccessIndicatorEn}
+                        onChange={(e) => setNewTaskSuccessIndicatorEn(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Priority and Due Date */}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'الأولوية' : 'Priority'}
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+                        value={newTaskPriority}
+                        onChange={(e) => setNewTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
+                      >
+                        <option value="high">{isAr ? 'عالية' : 'High'}</option>
+                        <option value="medium">{isAr ? 'متوسطة' : 'Medium'}</option>
+                        <option value="low">{isAr ? 'منخفضة' : 'Low'}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
+                        {isAr ? 'تاريخ الاستحقاق' : 'Due Date'}
+                      </label>
+                      <Input
+                        type="date"
+                        value={newTaskDueDate}
+                        onChange={(e) => setNewTaskDueDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1569,22 +2037,43 @@ export default function TreatmentPage() {
                     {tasks.map((task, index) => (
                       <div
                         key={task.id}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] p-2"
+                        className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-2"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--background-tertiary)] text-xs font-medium">
-                            {index + 1}
-                          </span>
-                          <span className="text-sm text-[var(--foreground)] truncate">
-                            {isAr ? task.titleAr : task.titleEn}
-                          </span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--background-tertiary)] text-xs font-medium">
+                              {index + 1}
+                            </span>
+                            <span className="text-sm font-medium text-[var(--foreground)] truncate">
+                              {isAr ? task.titleAr : task.titleEn}
+                            </span>
+                            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+                              task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                              task.priority === 'low' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                              'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            }`}>
+                              {task.priority === 'high' ? (isAr ? 'عالية' : 'High') :
+                               task.priority === 'low' ? (isAr ? 'منخفضة' : 'Low') :
+                               (isAr ? 'متوسطة' : 'Medium')}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => removeTask(task.id)}
+                            className="shrink-0 p-1 text-[var(--foreground-muted)] hover:text-[var(--status-error)] transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => removeTask(task.id)}
-                          className="shrink-0 p-1 text-[var(--foreground-muted)] hover:text-[var(--status-error)] transition-colors"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                        {(task.successIndicatorAr || task.successIndicatorEn || task.dueDate) && (
+                          <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-[var(--foreground-muted)]">
+                            {(task.successIndicatorAr || task.successIndicatorEn) && (
+                              <span>{isAr ? 'المؤشر:' : 'Indicator:'} {isAr ? task.successIndicatorAr : task.successIndicatorEn}</span>
+                            )}
+                            {task.dueDate && (
+                              <span>{isAr ? 'الاستحقاق:' : 'Due:'} {new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1749,15 +2238,89 @@ export default function TreatmentPage() {
             ) : (
               <Button
                 size="sm"
-                onClick={() => {
-                  // TODO: Implement save functionality
-                  setShowAddModal(false);
-                  resetWizardForm();
+                onClick={async () => {
+                  if (!selectedRiskId || !selectedStrategy || !responsibleId) return;
+
+                  setIsSaving(true);
+                  try {
+                    // Create treatment plan
+                    const treatmentResponse = await fetch(`/api/risks/${selectedRiskId}/treatments`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        titleAr: planTitle || (isAr ? 'خطة معالجة' : 'Treatment Plan'),
+                        titleEn: planTitle || 'Treatment Plan',
+                        descriptionAr: '',
+                        descriptionEn: '',
+                        strategy: selectedStrategy,
+                        status: 'notStarted',
+                        priority: priority,
+                        responsibleId: responsibleId,
+                        riskOwnerId: riskOwnerId || null,
+                        monitorId: monitorId || null,
+                        startDate: startDate || new Date().toISOString(),
+                        dueDate: dueDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+                        progress: 0,
+                        expectedResidualLikelihood: expectedResidualLikelihood,
+                        expectedResidualImpact: expectedResidualImpact,
+                        expectedResidualRating: expectedResidualLikelihood && expectedResidualImpact
+                          ? (expectedResidualLikelihood * expectedResidualImpact) >= 15 ? 'Critical'
+                            : (expectedResidualLikelihood * expectedResidualImpact) >= 10 ? 'Major'
+                            : (expectedResidualLikelihood * expectedResidualImpact) >= 5 ? 'Moderate'
+                            : 'Minor'
+                          : null,
+                      }),
+                    });
+
+                    const treatmentResult = await treatmentResponse.json();
+
+                    if (treatmentResult.success && treatmentResult.data) {
+                      const treatmentPlanId = treatmentResult.data.id;
+
+                      // Create tasks if any
+                      for (let i = 0; i < tasks.length; i++) {
+                        const task = tasks[i];
+                        await fetch(`/api/risks/${selectedRiskId}/treatments/${treatmentPlanId}/tasks`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            titleAr: task.titleAr,
+                            titleEn: task.titleEn,
+                            status: 'notStarted',
+                            priority: task.priority || 'medium',
+                            actionOwnerId: task.actionOwnerId || null,
+                            monitorId: task.monitorId || null,
+                            successIndicatorAr: task.successIndicatorAr || '',
+                            successIndicatorEn: task.successIndicatorEn || '',
+                            dueDate: task.dueDate || null,
+                            order: i,
+                          }),
+                        });
+                      }
+
+                      // Refresh the page to show new data
+                      window.location.reload();
+                    } else {
+                      console.error('Failed to create treatment plan:', treatmentResult.error);
+                      alert(isAr ? 'فشل في إنشاء خطة المعالجة' : 'Failed to create treatment plan');
+                    }
+                  } catch (error) {
+                    console.error('Error creating treatment plan:', error);
+                    alert(isAr ? 'حدث خطأ أثناء الحفظ' : 'An error occurred while saving');
+                  } finally {
+                    setIsSaving(false);
+                    setShowAddModal(false);
+                    resetWizardForm();
+                  }
                 }}
-                disabled={!selectedRiskId || !selectedStrategy}
+                disabled={!selectedRiskId || !selectedStrategy || !responsibleId || isSaving}
               >
-                <Check className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                <span className="text-xs sm:text-sm">{t('common.save')}</span>
+                {isSaving ? (
+                  <Loader2 className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0 animate-spin" />
+                ) : (
+                  <Check className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                )}
+                <span className="text-xs sm:text-sm">{isSaving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t('common.save')}</span>
               </Button>
             )}
           </div>

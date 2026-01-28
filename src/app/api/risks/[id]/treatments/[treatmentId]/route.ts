@@ -11,12 +11,19 @@ const fieldNamesAr: Record<string, string> = {
   descriptionEn: 'الوصف بالإنجليزي',
   strategy: 'الاستراتيجية',
   status: 'الحالة',
+  priority: 'الأولوية',
   responsibleId: 'المسؤول',
+  riskOwnerId: 'صاحب الخطر',
+  monitorId: 'متابع التنفيذ',
   startDate: 'تاريخ البدء',
   dueDate: 'تاريخ الاستحقاق',
   completionDate: 'تاريخ الإنجاز',
   progress: 'نسبة التقدم',
   cost: 'التكلفة',
+  expectedResidualLikelihood: 'احتمالية الخطر المتبقي المتوقعة',
+  expectedResidualImpact: 'تأثير الخطر المتبقي المتوقع',
+  expectedResidualScore: 'درجة الخطر المتبقي المتوقعة',
+  expectedResidualRating: 'تصنيف الخطر المتبقي المتوقع',
 };
 
 // PATCH - تحديث خطة معالجة
@@ -53,23 +60,48 @@ export async function PATCH(
     // بناء كائن التحديث
     const updateData: Record<string, unknown> = {};
 
-    const textFields = ['titleAr', 'titleEn', 'descriptionAr', 'descriptionEn', 'strategy', 'status'];
+    const textFields = ['titleAr', 'titleEn', 'descriptionAr', 'descriptionEn', 'strategy', 'status', 'priority', 'expectedResidualRating'];
     textFields.forEach(field => {
       if (body[field] !== undefined) {
         updateData[field] = body[field];
       }
     });
 
-    if (body.responsibleId !== undefined) {
-      updateData.responsibleId = body.responsibleId;
-    }
+    // حقول المعرفات (المسؤول، صاحب الخطر، متابع التنفيذ)
+    const idFields = ['responsibleId', 'riskOwnerId', 'monitorId'];
+    idFields.forEach(field => {
+      if (body[field] !== undefined) {
+        updateData[field] = body[field] || null;
+      }
+    });
 
+    // حقول الأرقام
     if (body.progress !== undefined) {
       updateData.progress = Number(body.progress);
     }
 
     if (body.cost !== undefined) {
       updateData.cost = body.cost === null ? null : Number(body.cost);
+    }
+
+    // حقول الخطر المتبقي المتوقع
+    if (body.expectedResidualLikelihood !== undefined) {
+      updateData.expectedResidualLikelihood = body.expectedResidualLikelihood === null ? null : Number(body.expectedResidualLikelihood);
+    }
+
+    if (body.expectedResidualImpact !== undefined) {
+      updateData.expectedResidualImpact = body.expectedResidualImpact === null ? null : Number(body.expectedResidualImpact);
+    }
+
+    // حساب درجة الخطر المتبقي المتوقع تلقائياً
+    if (body.expectedResidualLikelihood !== undefined || body.expectedResidualImpact !== undefined) {
+      const likelihood = body.expectedResidualLikelihood ?? existingTreatment.expectedResidualLikelihood;
+      const impact = body.expectedResidualImpact ?? existingTreatment.expectedResidualImpact;
+      if (likelihood && impact) {
+        updateData.expectedResidualScore = Number(likelihood) * Number(impact);
+      } else {
+        updateData.expectedResidualScore = null;
+      }
     }
 
     const dateFields = ['startDate', 'dueDate', 'completionDate'];
@@ -85,6 +117,20 @@ export async function PATCH(
       data: updateData,
       include: {
         responsible: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        riskOwner: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        monitor: {
           select: {
             id: true,
             fullName: true,
@@ -111,7 +157,7 @@ export async function PATCH(
       userAgent: string | null;
     }> = [];
 
-    const fieldsToTrack = ['titleAr', 'titleEn', 'descriptionAr', 'descriptionEn', 'strategy', 'status', 'responsibleId', 'startDate', 'dueDate', 'completionDate', 'progress', 'cost'];
+    const fieldsToTrack = ['titleAr', 'titleEn', 'descriptionAr', 'descriptionEn', 'strategy', 'status', 'priority', 'responsibleId', 'riskOwnerId', 'monitorId', 'startDate', 'dueDate', 'completionDate', 'progress', 'cost', 'expectedResidualLikelihood', 'expectedResidualImpact', 'expectedResidualScore', 'expectedResidualRating'];
 
     for (const field of fieldsToTrack) {
       const oldVal = existingTreatment[field as keyof typeof existingTreatment];

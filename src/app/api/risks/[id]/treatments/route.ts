@@ -45,15 +45,39 @@ export async function POST(
         descriptionEn: body.descriptionEn || '',
         strategy: body.strategy || 'reduce',
         status: body.status || 'notStarted',
+        priority: body.priority || 'medium',
         responsibleId: body.responsibleId,
+        riskOwnerId: body.riskOwnerId || null,
+        monitorId: body.monitorId || null,
         startDate: new Date(body.startDate),
         dueDate: new Date(body.dueDate),
         progress: body.progress || 0,
         cost: body.cost || null,
+        // قياس الأثر بعد المعالجة (Residual Risk المتوقع)
+        expectedResidualLikelihood: body.expectedResidualLikelihood || null,
+        expectedResidualImpact: body.expectedResidualImpact || null,
+        expectedResidualScore: body.expectedResidualLikelihood && body.expectedResidualImpact
+          ? body.expectedResidualLikelihood * body.expectedResidualImpact
+          : null,
+        expectedResidualRating: body.expectedResidualRating || null,
         createdById: session.user.id,
       },
       include: {
         responsible: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        riskOwner: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        monitor: {
           select: {
             id: true,
             fullName: true,
@@ -118,6 +142,20 @@ export async function GET(
             fullNameEn: true,
           },
         },
+        riskOwner: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+        monitor: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
         createdBy: {
           select: {
             id: true,
@@ -129,6 +167,20 @@ export async function GET(
           orderBy: { order: 'asc' },
           include: {
             assignedTo: {
+              select: {
+                id: true,
+                fullName: true,
+                fullNameEn: true,
+              },
+            },
+            actionOwner: {
+              select: {
+                id: true,
+                fullName: true,
+                fullNameEn: true,
+              },
+            },
+            monitor: {
               select: {
                 id: true,
                 fullName: true,
