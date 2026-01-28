@@ -649,7 +649,76 @@ export default function RisksPage() {
 
         setRisks(transformedRisks);
       } else {
-        // Use fallback data if API returns empty
+        // Database is empty, seed initial data then refetch
+        try {
+          console.log('Seeding initial risks data...');
+          const seedResponse = await fetch('/api/risks/seed', { method: 'POST' });
+          const seedResult = await seedResponse.json();
+          console.log('Seed result:', seedResult);
+
+          if (seedResult.success && seedResult.results?.added > 0) {
+            // Refetch risks after seeding
+            const refetchResponse = await fetch('/api/risks');
+            const refetchResult = await refetchResponse.json();
+            if (refetchResult.success && refetchResult.data.length > 0) {
+              const transformedRisks = refetchResult.data.map((risk: APIRisk) => ({
+                id: risk.id,
+                riskNumber: risk.riskNumber,
+                titleAr: risk.titleAr,
+                titleEn: risk.titleEn,
+                descriptionAr: risk.descriptionAr,
+                descriptionEn: risk.descriptionEn,
+                categoryCode: risk.category?.code || 'OPS',
+                categoryId: risk.categoryId,
+                departmentId: risk.departmentId,
+                status: (risk.status || 'open') as RiskStatus,
+                approvalStatus: risk.approvalStatus || 'Draft',
+                departmentAr: risk.department?.nameAr || 'عام',
+                departmentEn: risk.department?.nameEn || 'General',
+                processAr: risk.processText || '',
+                processEn: risk.processText || '',
+                processText: risk.processText || '',
+                subProcessAr: risk.subProcessText || '',
+                subProcessEn: risk.subProcessText || '',
+                subProcessText: risk.subProcessText || '',
+                ownerAr: risk.owner?.fullName || risk.riskOwner?.fullName || 'غير محدد',
+                ownerEn: risk.owner?.fullNameEn || risk.owner?.fullName || risk.riskOwner?.fullNameEn || risk.riskOwner?.fullName || 'Not Assigned',
+                ownerId: risk.owner?.id,
+                championAr: risk.champion?.fullName || 'غير محدد',
+                championEn: risk.champion?.fullNameEn || risk.champion?.fullName || 'Not Assigned',
+                championId: risk.champion?.id,
+                identifiedDate: risk.identifiedDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+                followUpDate: risk.followUpDate?.split('T')[0] || '',
+                nextReviewDate: risk.nextReviewDate?.split('T')[0] || '',
+                inherentLikelihood: risk.inherentLikelihood || 3,
+                inherentImpact: risk.inherentImpact || 3,
+                inherentScore: risk.inherentScore || 9,
+                inherentRating: normalizeRating(risk.inherentRating),
+                residualLikelihood: risk.residualLikelihood || risk.inherentLikelihood || 3,
+                residualImpact: risk.residualImpact || risk.inherentImpact || 3,
+                residualScore: risk.residualScore || risk.inherentScore || 9,
+                residualRating: normalizeRating(risk.residualRating || risk.inherentRating),
+                issuedBy: risk.issuedBy || risk.source?.code || 'Internal',
+                sourceId: risk.source?.id,
+                potentialCauseAr: risk.potentialCauseAr || '',
+                potentialCauseEn: risk.potentialCauseEn || '',
+                potentialImpactAr: risk.potentialImpactAr || '',
+                potentialImpactEn: risk.potentialImpactEn || '',
+                layersOfProtectionAr: risk.layersOfProtectionAr || '',
+                layersOfProtectionEn: risk.layersOfProtectionEn || '',
+                krisAr: risk.krisAr || '',
+                krisEn: risk.krisEn || '',
+                mitigationActionsAr: risk.mitigationActionsAr || '',
+                mitigationActionsEn: risk.mitigationActionsEn || '',
+              }));
+              setRisks(transformedRisks);
+              return;
+            }
+          }
+        } catch (seedError) {
+          console.error('Error seeding risks:', seedError);
+        }
+        // Use fallback data if seeding fails
         setRisks(allRisks);
       }
     } catch (error) {
