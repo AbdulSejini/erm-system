@@ -35,6 +35,14 @@ import {
   RefreshCw,
   MessageSquare,
   ExternalLink,
+  History,
+  Activity,
+  ArrowRight,
+  Target,
+  PenLine,
+  Wrench,
+  Minus,
+  Loader2,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { RiskDiscussion } from '@/components/RiskDiscussion';
@@ -70,6 +78,28 @@ interface APIRiskStatus {
   isActive: boolean;
   order: number;
 }
+
+interface ChangeLogEntry {
+  id: string;
+  changeType: string;
+  changeCategory: string;
+  fieldName: string | null;
+  fieldNameAr: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  description: string | null;
+  descriptionAr: string | null;
+  relatedEntityId: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+    avatar: string | null;
+    role: string;
+  };
+}
+
 import { hrRisks } from '@/data/hrRisks';
 
 // Convert HR risks to match the page structure
@@ -455,8 +485,10 @@ export default function RisksPage() {
   const [categories, setCategories] = useState<APICategory[]>([]);
   const [riskStatuses, setRiskStatuses] = useState<APIRiskStatus[]>([]);
   const [allDepartments, setAllDepartments] = useState<{ id: string; code: string; nameAr: string; nameEn: string }[]>([]);
-  const [viewModalTab, setViewModalTab] = useState<'details' | 'discussion'>('details');
+  const [viewModalTab, setViewModalTab] = useState<'details' | 'discussion' | 'history'>('details');
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+  const [modalChangeLogs, setModalChangeLogs] = useState<ChangeLogEntry[]>([]);
+  const [modalChangeLogsLoading, setModalChangeLogsLoading] = useState(false);
 
   // Normalize rating to valid values
   const normalizeRating = (rating: string | null | undefined): RiskRating => {
@@ -611,6 +643,29 @@ export default function RisksPage() {
     };
     fetchCurrentUser();
   }, []);
+
+  // Fetch change logs when history tab is selected
+  useEffect(() => {
+    const fetchChangeLogs = async () => {
+      if (viewModalTab !== 'history' || !selectedRisk) return;
+
+      try {
+        setModalChangeLogsLoading(true);
+        const response = await fetch(`/api/risks/${selectedRisk.id}/changelog`);
+        const result = await response.json();
+
+        if (result.success) {
+          setModalChangeLogs(result.data.logs);
+        }
+      } catch (err) {
+        console.error('Error fetching change logs:', err);
+      } finally {
+        setModalChangeLogsLoading(false);
+      }
+    };
+
+    fetchChangeLogs();
+  }, [viewModalTab, selectedRisk]);
 
   // Handle refresh button click
   const handleRefresh = () => {
@@ -1318,6 +1373,7 @@ export default function RisksPage() {
           setShowViewModal(false);
           setSelectedRisk(null);
           setViewModalTab('details');
+          setModalChangeLogs([]);
         }}
         title={isAr ? 'تفاصيل الخطر' : 'Risk Details'}
         size="xl"
@@ -1362,6 +1418,17 @@ export default function RisksPage() {
               >
                 <MessageSquare className="h-4 w-4" />
                 {isAr ? 'النقاش' : 'Discussion'}
+              </button>
+              <button
+                onClick={() => setViewModalTab('history')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  viewModalTab === 'history'
+                    ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
+                    : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <History className="h-4 w-4" />
+                {isAr ? 'السجل' : 'History'}
               </button>
             </div>
 
@@ -1503,7 +1570,7 @@ export default function RisksPage() {
                     <span className="font-medium">{new Date(selectedRisk.identifiedDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
                   </div>
                 </div>
-              ) : (
+              ) : viewModalTab === 'discussion' ? (
                 /* Discussion Tab */
                 <div className="py-2">
                   {currentUser ? (
@@ -1515,6 +1582,97 @@ export default function RisksPage() {
                   ) : (
                     <div className="text-center py-8 text-[var(--foreground-secondary)]">
                       {isAr ? 'جاري التحميل...' : 'Loading...'}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* History Tab */
+                <div className="py-2">
+                  {modalChangeLogsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+                    </div>
+                  ) : modalChangeLogs.length === 0 ? (
+                    <div className="text-center py-8 text-[var(--foreground-muted)]">
+                      <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>{isAr ? 'لا توجد تعديلات مسجلة' : 'No changes recorded yet'}</p>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      {/* Timeline line */}
+                      <div className="absolute start-[18px] top-0 bottom-0 w-0.5 bg-[var(--border)]" />
+
+                      <div className="space-y-4">
+                        {modalChangeLogs.map((log) => (
+                          <div key={log.id} className="relative flex gap-4">
+                            {/* Timeline dot */}
+                            <div className={`relative z-10 flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
+                              log.changeType === 'treatment_add' ? 'bg-green-100 text-green-600' :
+                              log.changeType === 'treatment_delete' ? 'bg-red-100 text-red-600' :
+                              log.changeType === 'treatment_update' ? 'bg-blue-100 text-blue-600' :
+                              log.changeCategory === 'assessment' ? 'bg-purple-100 text-purple-600' :
+                              log.changeCategory === 'status' ? 'bg-yellow-100 text-yellow-600' :
+                              'bg-[var(--primary-light)] text-[var(--primary)]'
+                            }`}>
+                              {log.changeType === 'treatment_add' ? <Plus className="h-4 w-4" /> :
+                               log.changeType === 'treatment_delete' ? <Minus className="h-4 w-4" /> :
+                               log.changeType === 'treatment_update' ? <Wrench className="h-4 w-4" /> :
+                               log.changeCategory === 'assessment' ? <Target className="h-4 w-4" /> :
+                               log.changeCategory === 'status' ? <Activity className="h-4 w-4" /> :
+                               <PenLine className="h-4 w-4" />}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 bg-[var(--card)] rounded-xl border border-[var(--border)] p-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <p className="font-medium text-sm text-[var(--foreground)]">
+                                    {isAr ? log.descriptionAr : log.description}
+                                  </p>
+                                  {log.fieldNameAr && (
+                                    <p className="text-xs text-[var(--foreground-secondary)] mt-0.5">
+                                      {isAr ? log.fieldNameAr : log.fieldName}
+                                    </p>
+                                  )}
+                                </div>
+                                <span className="text-xs text-[var(--foreground-muted)] whitespace-nowrap">
+                                  {new Date(log.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </div>
+
+                              {/* Value change display */}
+                              {(log.oldValue || log.newValue) && log.changeType === 'update' && (
+                                <div className="mt-2 flex items-center gap-2 text-xs">
+                                  {log.oldValue && (
+                                    <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 line-through max-w-[150px] truncate">
+                                      {log.oldValue}
+                                    </span>
+                                  )}
+                                  <ArrowRight className="h-3 w-3 text-[var(--foreground-muted)]" />
+                                  {log.newValue && (
+                                    <span className="px-2 py-0.5 rounded bg-green-50 text-green-700 max-w-[150px] truncate">
+                                      {log.newValue}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* User info */}
+                              <div className="mt-2 flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
+                                <div className="w-5 h-5 rounded-full bg-[var(--primary-light)] flex items-center justify-center">
+                                  <User className="h-3 w-3 text-[var(--primary)]" />
+                                </div>
+                                <span>{isAr ? log.user.fullName : log.user.fullNameEn || log.user.fullName}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
