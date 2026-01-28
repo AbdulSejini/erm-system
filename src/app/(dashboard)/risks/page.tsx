@@ -3286,55 +3286,110 @@ export default function RisksPage() {
           <Button onClick={async () => {
             if (selectedRisk) {
               try {
-                // Send update to API
-                const response = await fetch(`/api/risks/${selectedRisk.id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    riskNumber: selectedRisk.riskNumber,
-                    departmentId: selectedRisk.departmentId,
-                    ownerId: selectedRisk.ownerId || null,
-                    titleAr: selectedRisk.titleAr,
-                    titleEn: selectedRisk.titleEn,
-                    descriptionAr: selectedRisk.descriptionAr,
-                    descriptionEn: selectedRisk.descriptionEn,
-                    status: selectedRisk.status,
-                    inherentLikelihood: selectedRisk.inherentLikelihood,
-                    inherentImpact: selectedRisk.inherentImpact,
-                    inherentScore: selectedRisk.inherentScore,
-                    inherentRating: selectedRisk.inherentRating,
-                    residualLikelihood: selectedRisk.residualLikelihood,
-                    residualImpact: selectedRisk.residualImpact,
-                    residualScore: selectedRisk.residualScore,
-                    residualRating: selectedRisk.residualRating,
-                    potentialCauseAr: selectedRisk.potentialCauseAr,
-                    potentialCauseEn: selectedRisk.potentialCauseEn,
-                    potentialImpactAr: selectedRisk.potentialImpactAr,
-                    potentialImpactEn: selectedRisk.potentialImpactEn,
-                    layersOfProtectionAr: selectedRisk.layersOfProtectionAr,
-                    layersOfProtectionEn: selectedRisk.layersOfProtectionEn,
-                    krisAr: selectedRisk.krisAr,
-                    krisEn: selectedRisk.krisEn,
-                    mitigationActionsAr: selectedRisk.mitigationActionsAr,
-                    mitigationActionsEn: selectedRisk.mitigationActionsEn,
-                    processText: selectedRisk.processText,
-                    subProcessText: selectedRisk.subProcessText,
-                    followUpDate: selectedRisk.followUpDate || null,
-                    nextReviewDate: selectedRisk.nextReviewDate || null,
-                  }),
-                });
+                // Check if this is a mock/fallback risk (HR risks or other mock data)
+                const isMockRisk = selectedRisk.id.startsWith('hr-') || selectedRisk.id.startsWith('mock-') || !selectedRisk.id.includes('-');
 
-                if (response.ok) {
-                  // Update local state
-                  setRisks(prev => prev.map(r => r.id === selectedRisk.id ? selectedRisk : r));
-                  setShowEditModal(false);
-                  setSelectedRisk(null);
-                  // Refresh from API
-                  fetchRisks(false);
+                if (isMockRisk) {
+                  // Create the risk in database first
+                  const createResponse = await fetch('/api/risks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      riskNumber: selectedRisk.riskNumber,
+                      departmentId: selectedRisk.departmentId || null,
+                      ownerId: selectedRisk.ownerId || null,
+                      titleAr: selectedRisk.titleAr,
+                      titleEn: selectedRisk.titleEn,
+                      descriptionAr: selectedRisk.descriptionAr,
+                      descriptionEn: selectedRisk.descriptionEn,
+                      status: selectedRisk.status || 'open',
+                      inherentLikelihood: selectedRisk.inherentLikelihood || 3,
+                      inherentImpact: selectedRisk.inherentImpact || 3,
+                      residualLikelihood: selectedRisk.residualLikelihood,
+                      residualImpact: selectedRisk.residualImpact,
+                      potentialCauseAr: selectedRisk.potentialCauseAr,
+                      potentialCauseEn: selectedRisk.potentialCauseEn,
+                      potentialImpactAr: selectedRisk.potentialImpactAr,
+                      potentialImpactEn: selectedRisk.potentialImpactEn,
+                      layersOfProtectionAr: selectedRisk.layersOfProtectionAr,
+                      layersOfProtectionEn: selectedRisk.layersOfProtectionEn,
+                      krisAr: selectedRisk.krisAr,
+                      krisEn: selectedRisk.krisEn,
+                      mitigationActionsAr: selectedRisk.mitigationActionsAr,
+                      mitigationActionsEn: selectedRisk.mitigationActionsEn,
+                      processText: selectedRisk.processText || selectedRisk.processAr,
+                      subProcessText: selectedRisk.subProcessText || selectedRisk.subProcessAr,
+                      followUpDate: selectedRisk.followUpDate || null,
+                      nextReviewDate: selectedRisk.nextReviewDate || null,
+                    }),
+                  });
+
+                  if (createResponse.ok) {
+                    const createData = await createResponse.json();
+                    // Update local state with new ID
+                    const newRisk = { ...selectedRisk, id: createData.data.id };
+                    setRisks(prev => prev.map(r => r.id === selectedRisk.id ? newRisk : r));
+                    setShowEditModal(false);
+                    setSelectedRisk(null);
+                    // Refresh from API
+                    fetchRisks(false);
+                    alert(isAr ? 'تم حفظ الخطر بنجاح في قاعدة البيانات' : 'Risk saved successfully to database');
+                  } else {
+                    const errorData = await createResponse.json();
+                    console.error('Error creating risk:', errorData);
+                    alert(isAr ? 'حدث خطأ أثناء حفظ الخطر في قاعدة البيانات' : 'Error saving risk to database');
+                  }
                 } else {
-                  const errorData = await response.json();
-                  console.error('Error updating risk:', errorData);
-                  alert(isAr ? 'حدث خطأ أثناء حفظ التعديلات. الخطر قد لا يكون موجوداً في قاعدة البيانات.' : 'Error saving changes. The risk may not exist in the database.');
+                  // Update existing risk in database
+                  const response = await fetch(`/api/risks/${selectedRisk.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      riskNumber: selectedRisk.riskNumber,
+                      departmentId: selectedRisk.departmentId,
+                      ownerId: selectedRisk.ownerId || null,
+                      titleAr: selectedRisk.titleAr,
+                      titleEn: selectedRisk.titleEn,
+                      descriptionAr: selectedRisk.descriptionAr,
+                      descriptionEn: selectedRisk.descriptionEn,
+                      status: selectedRisk.status,
+                      inherentLikelihood: selectedRisk.inherentLikelihood,
+                      inherentImpact: selectedRisk.inherentImpact,
+                      inherentScore: selectedRisk.inherentScore,
+                      inherentRating: selectedRisk.inherentRating,
+                      residualLikelihood: selectedRisk.residualLikelihood,
+                      residualImpact: selectedRisk.residualImpact,
+                      residualScore: selectedRisk.residualScore,
+                      residualRating: selectedRisk.residualRating,
+                      potentialCauseAr: selectedRisk.potentialCauseAr,
+                      potentialCauseEn: selectedRisk.potentialCauseEn,
+                      potentialImpactAr: selectedRisk.potentialImpactAr,
+                      potentialImpactEn: selectedRisk.potentialImpactEn,
+                      layersOfProtectionAr: selectedRisk.layersOfProtectionAr,
+                      layersOfProtectionEn: selectedRisk.layersOfProtectionEn,
+                      krisAr: selectedRisk.krisAr,
+                      krisEn: selectedRisk.krisEn,
+                      mitigationActionsAr: selectedRisk.mitigationActionsAr,
+                      mitigationActionsEn: selectedRisk.mitigationActionsEn,
+                      processText: selectedRisk.processText,
+                      subProcessText: selectedRisk.subProcessText,
+                      followUpDate: selectedRisk.followUpDate || null,
+                      nextReviewDate: selectedRisk.nextReviewDate || null,
+                    }),
+                  });
+
+                  if (response.ok) {
+                    // Update local state
+                    setRisks(prev => prev.map(r => r.id === selectedRisk.id ? selectedRisk : r));
+                    setShowEditModal(false);
+                    setSelectedRisk(null);
+                    // Refresh from API
+                    fetchRisks(false);
+                  } else {
+                    const errorData = await response.json();
+                    console.error('Error updating risk:', errorData);
+                    alert(isAr ? 'حدث خطأ أثناء حفظ التعديلات. الخطر قد لا يكون موجوداً في قاعدة البيانات.' : 'Error saving changes. The risk may not exist in the database.');
+                  }
                 }
               } catch (error) {
                 console.error('Error updating risk:', error);
