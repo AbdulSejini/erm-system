@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useTransition, useCallback } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -10,9 +10,7 @@ import { Modal, ModalFooter } from '@/components/ui/Modal';
 import {
   Plus,
   Search,
-  Wrench,
   Calendar,
-  User,
   CheckCircle,
   Clock,
   AlertCircle,
@@ -23,21 +21,36 @@ import {
   Share2,
   Ban,
   Check,
-  HelpCircle,
-  ChevronDown,
-  ChevronUp,
   Target,
   ListChecks,
   AlertTriangle,
-  FileText,
-  Zap,
   Loader2,
   X,
   Pencil,
+  Trash2,
+  ChevronRight,
+  FileText,
+  Users,
+  Activity,
+  Sparkles,
+  Zap,
+  BarChart3,
+  CircleDot,
+  Play,
+  Pause,
+  CheckCircle2,
+  XCircle,
+  Filter,
+  SlidersHorizontal,
+  Eye,
+  MoreHorizontal,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 
-// Interface for API Risk data
+// ============================================
+// Types & Interfaces
+// ============================================
+
 interface APIRisk {
   id: string;
   riskNumber: string;
@@ -83,9 +96,72 @@ interface APIRisk {
     nameEn: string | null;
     email: string | null;
   };
+  treatmentPlans?: TreatmentPlanData[];
 }
 
-// Normalize rating function
+interface TreatmentPlanData {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  strategy: TreatmentStrategy;
+  status: string;
+  priority: string;
+  progress: number;
+  startDate: string;
+  dueDate: string;
+  responsibleId: string;
+  responsible?: {
+    fullName: string;
+    fullNameEn: string | null;
+  };
+  tasks?: TaskData[];
+}
+
+interface TaskData {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  status: string;
+  priority: string;
+  dueDate: string | null;
+}
+
+interface Treatment {
+  id: string;
+  riskId: string;
+  riskNumber: string;
+  riskTitleAr: string;
+  riskTitleEn: string;
+  titleAr: string;
+  titleEn: string;
+  strategy: TreatmentStrategy;
+  status: TreatmentStatus;
+  inherentRating: RiskRating;
+  inherentScore: number;
+  residualRating: RiskRating;
+  currentResidualScore: number;
+  progress: number;
+  priority: string;
+  responsibleAr: string;
+  responsibleEn: string;
+  startDate: string;
+  dueDate: string;
+  tasks: TaskData[];
+  departmentAr: string;
+  departmentEn: string;
+}
+
+interface ResponsibleOption {
+  id: string;
+  name: string;
+  nameEn: string;
+  role: string;
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
 const normalizeRating = (rating: string | null | undefined): RiskRating => {
   if (!rating) return 'Moderate';
   if (rating === 'Catastrophic') return 'Critical';
@@ -95,2716 +171,1038 @@ const normalizeRating = (rating: string | null | undefined): RiskRating => {
   return 'Moderate';
 };
 
-// Determine treatment strategy based on risk
 const determineStrategy = (status: string, inherentScore: number): TreatmentStrategy => {
   if (status === 'accepted') return 'accept';
-  if (inherentScore >= 20) return 'reduce';
-  if (inherentScore >= 12) return 'transfer';
-  if (inherentScore >= 6) return 'reduce';
+  if (inherentScore >= 20) return 'avoid';
+  if (inherentScore >= 12) return 'reduce';
+  if (inherentScore >= 6) return 'transfer';
   return 'accept';
 };
 
-// Determine treatment status
-const determineTreatmentStatus = (status: string, followUpDate: string | null): TreatmentStatus => {
+const determineStatus = (status: string, followUpDate: string | null): TreatmentStatus => {
   if (status === 'closed' || status === 'mitigated') return 'completed';
+  if (status === 'accepted') return 'completed';
   if (followUpDate && new Date(followUpDate) < new Date()) return 'overdue';
   if (status === 'inProgress') return 'inProgress';
   return 'notStarted';
 };
 
-// Calculate progress based on status
-const calculateProgress = (status: string, residualScore: number | null, inherentScore: number): number => {
-  if (status === 'closed' || status === 'mitigated') return 100;
-  if (status === 'accepted') return 100;
+const calculateProgress = (inherentScore: number, residualScore: number | null): number => {
   if (!residualScore) return 0;
   const reduction = ((inherentScore - residualScore) / inherentScore) * 100;
-  return Math.min(Math.max(Math.round(reduction), 0), 95);
+  return Math.max(0, Math.min(100, Math.round(reduction)));
 };
 
-// Keep for fallback when no API data
-const mockTreatments = [
-  {
-    id: '1',
-    riskNumber: 'FIN-R-001',
-    riskTitleAr: 'خطر تأخر توريد المواد الخام',
-    riskTitleEn: 'Raw Material Supply Delay Risk',
-    riskRating: 'Critical' as RiskRating,
-    inherentScore: 20,
-    currentResidualScore: 12,
-    targetResidualScore: 6,
-    titleAr: 'تنويع مصادر التوريد',
-    titleEn: 'Diversify Supply Sources',
-    descriptionAr: 'التعاقد مع موردين بديلين لضمان استمرارية التوريد',
-    descriptionEn: 'Contract with alternative suppliers to ensure supply continuity',
-    strategy: 'reduce' as TreatmentStrategy,
-    status: 'inProgress' as TreatmentStatus,
-    progress: 65,
-    responsibleAr: 'أحمد محمد',
-    responsibleEn: 'Ahmed Mohammed',
-    departmentAr: 'المشتريات',
-    departmentEn: 'Procurement',
-    startDate: '2025-11-01',
-    dueDate: '2026-02-15',
-    tasks: [
-      { id: '1', titleAr: 'تحديد الموردين البديلين', titleEn: 'Identify alternative suppliers', completed: true },
-      { id: '2', titleAr: 'تقييم جودة المنتجات', titleEn: 'Evaluate product quality', completed: true },
-      { id: '3', titleAr: 'التفاوض على الأسعار', titleEn: 'Negotiate prices', completed: true },
-      { id: '4', titleAr: 'توقيع العقود', titleEn: 'Sign contracts', completed: true },
-      { id: '5', titleAr: 'تجربة الدفعة الأولى', titleEn: 'Test first batch', completed: false },
-      { id: '6', titleAr: 'تقييم الأداء', titleEn: 'Evaluate performance', completed: false },
-    ],
-    kris: [
-      { nameAr: 'عدد الموردين المعتمدين', nameEn: 'Number of approved suppliers', current: 3, target: 5 },
-      { nameAr: 'متوسط وقت التسليم', nameEn: 'Average delivery time', current: 14, target: 7, unit: (isAr: boolean) => isAr ? 'يوم' : 'days' },
-    ],
-  },
-  {
-    id: '2',
-    riskNumber: 'FIN-R-002',
-    riskTitleAr: 'خطر تقلبات أسعار النحاس',
-    riskTitleEn: 'Copper Price Fluctuation Risk',
-    riskRating: 'Major' as RiskRating,
-    inherentScore: 16,
-    currentResidualScore: 12,
-    targetResidualScore: 8,
-    titleAr: 'التحوط بعقود آجلة',
-    titleEn: 'Hedging with Forward Contracts',
-    descriptionAr: 'استخدام العقود الآجلة للتحوط ضد تقلبات الأسعار',
-    descriptionEn: 'Use forward contracts to hedge against price fluctuations',
-    strategy: 'transfer' as TreatmentStrategy,
-    status: 'notStarted' as TreatmentStatus,
-    progress: 0,
-    responsibleAr: 'سارة علي',
-    responsibleEn: 'Sarah Ali',
-    departmentAr: 'المالية',
-    departmentEn: 'Finance',
-    startDate: '2026-02-01',
-    dueDate: '2026-03-01',
-    tasks: [
-      { id: '1', titleAr: 'دراسة خيارات التحوط', titleEn: 'Study hedging options', completed: false },
-      { id: '2', titleAr: 'اختيار المؤسسة المالية', titleEn: 'Select financial institution', completed: false },
-      { id: '3', titleAr: 'توقيع اتفاقية التحوط', titleEn: 'Sign hedging agreement', completed: false },
-      { id: '4', titleAr: 'تنفيذ العقود الآجلة', titleEn: 'Execute forward contracts', completed: false },
-    ],
-    kris: [
-      { nameAr: 'نسبة التحوط', nameEn: 'Hedging ratio', current: 0, target: 70, unit: () => '%' },
-    ],
-  },
-  {
-    id: '3',
-    riskNumber: 'OPS-R-001',
-    riskTitleAr: 'خطر انقطاع الكهرباء',
-    riskTitleEn: 'Power Outage Risk',
-    riskRating: 'Moderate' as RiskRating,
-    inherentScore: 12,
-    currentResidualScore: 4,
-    targetResidualScore: 4,
-    titleAr: 'تركيب مولدات احتياطية',
-    titleEn: 'Install Backup Generators',
-    descriptionAr: 'تركيب مولدات احتياطية لضمان استمرارية العمليات',
-    descriptionEn: 'Install backup generators to ensure operational continuity',
-    strategy: 'reduce' as TreatmentStrategy,
-    status: 'completed' as TreatmentStatus,
-    progress: 100,
-    responsibleAr: 'خالد أحمد',
-    responsibleEn: 'Khalid Ahmed',
-    departmentAr: 'الصيانة',
-    departmentEn: 'Maintenance',
-    startDate: '2025-10-01',
-    dueDate: '2026-01-10',
-    tasks: [
-      { id: '1', titleAr: 'دراسة الاحتياجات', titleEn: 'Study requirements', completed: true },
-      { id: '2', titleAr: 'اختيار المورد', titleEn: 'Select vendor', completed: true },
-      { id: '3', titleAr: 'شراء المولدات', titleEn: 'Purchase generators', completed: true },
-      { id: '4', titleAr: 'التركيب', titleEn: 'Installation', completed: true },
-      { id: '5', titleAr: 'الاختبار والتشغيل', titleEn: 'Testing and operation', completed: true },
-    ],
-    kris: [
-      { nameAr: 'وقت الاستجابة للطوارئ', nameEn: 'Emergency response time', current: 30, target: 30, unit: (isAr: boolean) => isAr ? 'ثانية' : 'seconds' },
-    ],
-  },
-  {
-    id: '4',
-    riskNumber: 'TECH-R-001',
-    riskTitleAr: 'خطر الأمن السيبراني',
-    riskTitleEn: 'Cybersecurity Risk',
-    riskRating: 'Critical' as RiskRating,
-    inherentScore: 25,
-    currentResidualScore: 15,
-    targetResidualScore: 8,
-    titleAr: 'تحديث جدار الحماية',
-    titleEn: 'Update Firewall',
-    descriptionAr: 'تحديث وتعزيز أنظمة الحماية السيبرانية',
-    descriptionEn: 'Update and enhance cybersecurity protection systems',
-    strategy: 'reduce' as TreatmentStrategy,
-    status: 'overdue' as TreatmentStatus,
-    progress: 30,
-    responsibleAr: 'محمد عبدالله',
-    responsibleEn: 'Mohammed Abdullah',
-    departmentAr: 'تقنية المعلومات',
-    departmentEn: 'IT',
-    startDate: '2025-11-15',
-    dueDate: '2026-01-05',
-    tasks: [
-      { id: '1', titleAr: 'تقييم الوضع الحالي', titleEn: 'Assess current state', completed: true },
-      { id: '2', titleAr: 'اختيار الحلول', titleEn: 'Select solutions', completed: true },
-      { id: '3', titleAr: 'شراء التراخيص', titleEn: 'Purchase licenses', completed: false },
-      { id: '4', titleAr: 'التركيب والإعداد', titleEn: 'Installation and setup', completed: false },
-      { id: '5', titleAr: 'الاختبار', titleEn: 'Testing', completed: false },
-      { id: '6', titleAr: 'التشغيل الفعلي', titleEn: 'Go live', completed: false },
-      { id: '7', titleAr: 'التدريب', titleEn: 'Training', completed: false },
-    ],
-    kris: [
-      { nameAr: 'عدد محاولات الاختراق المحجوبة', nameEn: 'Blocked intrusion attempts', current: 1200, target: 1500, unit: () => '' },
-      { nameAr: 'وقت اكتشاف التهديدات', nameEn: 'Threat detection time', current: 45, target: 15, unit: (isAr: boolean) => isAr ? 'دقيقة' : 'min' },
-    ],
-  },
-  {
-    id: '5',
-    riskNumber: 'HSE-R-001',
-    riskTitleAr: 'خطر الإصابات المهنية',
-    riskTitleEn: 'Occupational Injury Risk',
-    riskRating: 'Minor' as RiskRating,
-    inherentScore: 8,
-    currentResidualScore: 4,
-    targetResidualScore: 2,
-    titleAr: 'قبول الخطر مع المراقبة',
-    titleEn: 'Accept Risk with Monitoring',
-    descriptionAr: 'قبول مستوى الخطر الحالي مع تعزيز إجراءات المراقبة',
-    descriptionEn: 'Accept current risk level with enhanced monitoring procedures',
-    strategy: 'accept' as TreatmentStrategy,
-    status: 'inProgress' as TreatmentStatus,
-    progress: 80,
-    responsibleAr: 'فاطمة حسن',
-    responsibleEn: 'Fatima Hassan',
-    departmentAr: 'السلامة',
-    departmentEn: 'Safety',
-    startDate: '2025-12-01',
-    dueDate: '2026-01-31',
-    tasks: [
-      { id: '1', titleAr: 'توثيق قرار القبول', titleEn: 'Document acceptance decision', completed: true },
-      { id: '2', titleAr: 'إعداد خطة المراقبة', titleEn: 'Prepare monitoring plan', completed: true },
-      { id: '3', titleAr: 'تحديد مؤشرات الأداء', titleEn: 'Define KPIs', completed: true },
-      { id: '4', titleAr: 'بدء المراقبة الدورية', titleEn: 'Start periodic monitoring', completed: true },
-      { id: '5', titleAr: 'التقرير الأول', titleEn: 'First report', completed: false },
-    ],
-    kris: [
-      { nameAr: 'معدل الإصابات لكل 1000 ساعة عمل', nameEn: 'Injury rate per 1000 work hours', current: 0.5, target: 0.3, unit: () => '' },
-    ],
-  },
-];
-
-// Strategy descriptions for guidance
-const strategyDescriptions = {
+// Strategy metadata
+const strategyConfig = {
   avoid: {
-    ar: 'تجنب الخطر عن طريق عدم القيام بالنشاط المسبب له أو تغيير طريقة تنفيذه بشكل جذري',
-    en: 'Avoid the risk by not performing the activity that causes it or fundamentally changing how it is executed',
-    examples: {
-      ar: 'إلغاء مشروع عالي المخاطر، الانسحاب من سوق غير مستقر',
-      en: 'Cancel high-risk project, exit unstable market',
-    },
+    icon: Ban,
+    colorClass: 'text-red-500',
+    bgClass: 'bg-red-50 dark:bg-red-900/20',
+    borderClass: 'border-red-200 dark:border-red-800',
+    labelAr: 'تجنب',
+    labelEn: 'Avoid',
+    descAr: 'تجنب الخطر عن طريق عدم القيام بالنشاط المسبب له',
+    descEn: 'Avoid the risk by not performing the activity',
   },
   reduce: {
-    ar: 'تقليل احتمالية حدوث الخطر أو تأثيره من خلال إجراءات رقابية إضافية',
-    en: 'Reduce the likelihood or impact of the risk through additional control measures',
-    examples: {
-      ar: 'تركيب أنظمة إطفاء حريق، تدريب الموظفين، إضافة نقاط تفتيش',
-      en: 'Install fire suppression systems, train employees, add checkpoints',
-    },
+    icon: TrendingDown,
+    colorClass: 'text-amber-500',
+    bgClass: 'bg-amber-50 dark:bg-amber-900/20',
+    borderClass: 'border-amber-200 dark:border-amber-800',
+    labelAr: 'تقليل',
+    labelEn: 'Reduce',
+    descAr: 'تقليل احتمالية أو تأثير الخطر من خلال إجراءات رقابية',
+    descEn: 'Reduce likelihood or impact through controls',
   },
   transfer: {
-    ar: 'نقل الخطر كلياً أو جزئياً إلى طرف ثالث مثل شركات التأمين أو المقاولين',
-    en: 'Transfer the risk wholly or partially to a third party such as insurance companies or contractors',
-    examples: {
-      ar: 'شراء تأمين، التعاقد الخارجي، عقود آجلة للتحوط',
-      en: 'Purchase insurance, outsourcing, forward contracts for hedging',
-    },
+    icon: Share2,
+    colorClass: 'text-blue-500',
+    bgClass: 'bg-blue-50 dark:bg-blue-900/20',
+    borderClass: 'border-blue-200 dark:border-blue-800',
+    labelAr: 'نقل',
+    labelEn: 'Transfer',
+    descAr: 'نقل الخطر إلى طرف ثالث مثل شركات التأمين',
+    descEn: 'Transfer the risk to a third party like insurance',
   },
   accept: {
-    ar: 'قبول الخطر عندما تكون تكلفة المعالجة أعلى من الأثر المحتمل أو عندما يكون الخطر ضمن الحدود المقبولة',
-    en: 'Accept the risk when treatment cost exceeds potential impact or when risk is within acceptable limits',
-    examples: {
-      ar: 'المخاطر ذات التأثير المنخفض، المخاطر المتبقية بعد التخفيف',
-      en: 'Low-impact risks, residual risks after mitigation',
-    },
+    icon: CheckCircle,
+    colorClass: 'text-green-500',
+    bgClass: 'bg-green-50 dark:bg-green-900/20',
+    borderClass: 'border-green-200 dark:border-green-800',
+    labelAr: 'قبول',
+    labelEn: 'Accept',
+    descAr: 'قبول الخطر عندما تكون تكلفة المعالجة أعلى من الأثر',
+    descEn: 'Accept when treatment cost exceeds impact',
   },
 };
+
+// Status metadata
+const statusConfig = {
+  notStarted: {
+    icon: CircleDot,
+    colorClass: 'text-slate-500',
+    bgClass: 'bg-slate-100 dark:bg-slate-800',
+    labelAr: 'لم يبدأ',
+    labelEn: 'Not Started',
+  },
+  inProgress: {
+    icon: Play,
+    colorClass: 'text-blue-500',
+    bgClass: 'bg-blue-100 dark:bg-blue-900/30',
+    labelAr: 'قيد التنفيذ',
+    labelEn: 'In Progress',
+  },
+  completed: {
+    icon: CheckCircle2,
+    colorClass: 'text-green-500',
+    bgClass: 'bg-green-100 dark:bg-green-900/30',
+    labelAr: 'مكتمل',
+    labelEn: 'Completed',
+  },
+  overdue: {
+    icon: AlertCircle,
+    colorClass: 'text-red-500',
+    bgClass: 'bg-red-100 dark:bg-red-900/30',
+    labelAr: 'متأخر',
+    labelEn: 'Overdue',
+  },
+  cancelled: {
+    icon: XCircle,
+    colorClass: 'text-gray-400',
+    bgClass: 'bg-gray-100 dark:bg-gray-800',
+    labelAr: 'ملغي',
+    labelEn: 'Cancelled',
+  },
+};
+
+// Rating colors
+const ratingColors: Record<RiskRating, string> = {
+  Critical: 'bg-red-500',
+  Major: 'bg-orange-500',
+  Moderate: 'bg-yellow-500',
+  Minor: 'bg-green-500',
+  Negligible: 'bg-blue-500',
+};
+
+// ============================================
+// Main Component
+// ============================================
 
 export default function TreatmentPage() {
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedTreatment, setSelectedTreatment] = useState<string | null>(null);
-  const [showStrategyGuide, setShowStrategyGuide] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<TreatmentStatus | 'all'>('all');
-  const [filterStrategy, setFilterStrategy] = useState<TreatmentStrategy | 'all'>('all');
-  const [wizardStep, setWizardStep] = useState(1);
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [isPending, startTransition] = useTransition();
 
-  // State for API data
+  // Core data states
   const [risks, setRisks] = useState<APIRisk[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // State for wizard form
-  const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
-  const [selectedStrategy, setSelectedStrategy] = useState<TreatmentStrategy | null>(null);
-  const [planTitle, setPlanTitle] = useState('');
-  const [responsibleId, setResponsibleId] = useState<string | null>(null);
-  const [riskOwnerId, setRiskOwnerId] = useState<string | null>(null);
-  const [monitorId, setMonitorId] = useState<string | null>(null);
-  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
-  const [startDate, setStartDate] = useState('');
-  const [dueDate, setDueDate] = useState('');
-
-  // Expected residual risk fields
-  const [expectedResidualLikelihood, setExpectedResidualLikelihood] = useState<number | null>(null);
-  const [expectedResidualImpact, setExpectedResidualImpact] = useState<number | null>(null);
-
-  // Tasks with extended fields
-  const [tasks, setTasks] = useState<{
-    id: string;
-    titleAr: string;
-    titleEn: string;
-    priority?: 'high' | 'medium' | 'low';
-    actionOwnerId?: string | null;
-    monitorId?: string | null;
-    successIndicatorAr?: string;
-    successIndicatorEn?: string;
-    dueDate?: string;
-  }[]>([]);
-  const [newTaskTitleAr, setNewTaskTitleAr] = useState('');
-  const [newTaskTitleEn, setNewTaskTitleEn] = useState('');
-  const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
-  const [newTaskActionOwnerId, setNewTaskActionOwnerId] = useState<string | null>(null);
-  const [newTaskMonitorId, setNewTaskMonitorId] = useState<string | null>(null);
-  const [newTaskSuccessIndicatorAr, setNewTaskSuccessIndicatorAr] = useState('');
-  const [newTaskSuccessIndicatorEn, setNewTaskSuccessIndicatorEn] = useState('');
-  const [newTaskDueDate, setNewTaskDueDate] = useState('');
-
-  const [riskSearchQuery, setRiskSearchQuery] = useState('');
-  const [responsibleOptions, setResponsibleOptions] = useState<{ id: string; name: string; nameEn: string; role: string }[]>([]);
-  const [allResponsibleUsers, setAllResponsibleUsers] = useState<{ id: string; name: string; nameEn: string; role: string }[]>([]);
-  const [responsibleSearchQuery, setResponsibleSearchQuery] = useState('');
-  const [showResponsibleDropdown, setShowResponsibleDropdown] = useState(false);
-
-  // Risk owners list (separate from users)
+  const [responsibleOptions, setResponsibleOptions] = useState<ResponsibleOption[]>([]);
   const [riskOwnersList, setRiskOwnersList] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
-  const [riskOwnerSearchQuery, setRiskOwnerSearchQuery] = useState('');
-  const [showRiskOwnerDropdown, setShowRiskOwnerDropdown] = useState(false);
 
-  // Monitor dropdown
-  const [monitorSearchQuery, setMonitorSearchQuery] = useState('');
-  const [showMonitorDropdown, setShowMonitorDropdown] = useState(false);
+  // UI states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [riskSearchQuery, setRiskSearchQuery] = useState(''); // للبحث في قائمة المخاطر
+  const [filterStatus, setFilterStatus] = useState<TreatmentStatus | 'all'>('all');
+  const [filterStrategy, setFilterStrategy] = useState<TreatmentStrategy | 'all'>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Task action owner dropdown
-  const [taskActionOwnerSearchQuery, setTaskActionOwnerSearchQuery] = useState('');
-  const [showTaskActionOwnerDropdown, setShowTaskActionOwnerDropdown] = useState(false);
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
 
-  // Task monitor dropdown
-  const [taskMonitorSearchQuery, setTaskMonitorSearchQuery] = useState('');
-  const [showTaskMonitorDropdown, setShowTaskMonitorDropdown] = useState(false);
-
-  // Saving state
+  // Wizard states
+  const [wizardStep, setWizardStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
 
-  // State for editing treatment
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null);
-  const [editWizardStep, setEditWizardStep] = useState(1);
+  // Form states - simplified
+  const [formData, setFormData] = useState({
+    riskId: '',
+    strategy: '' as TreatmentStrategy | '',
+    titleAr: '',
+    titleEn: '',
+    responsibleId: '',
+    priority: 'medium' as 'high' | 'medium' | 'low',
+    startDate: new Date().toISOString().split('T')[0],
+    dueDate: '',
+    tasks: [] as { id: string; titleAr: string; titleEn: string; dueDate: string }[],
+  });
 
-  // Fetch risks from API
+  // ============================================
+  // Data Fetching
+  // ============================================
+
   useEffect(() => {
-    const fetchRisks = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/risks');
-        const result = await response.json();
+        const [risksRes, usersRes, ownersRes] = await Promise.all([
+          fetch('/api/risks?includeTreatments=true'),
+          fetch('/api/users'),
+          fetch('/api/risk-owners'),
+        ]);
 
-        if (result.success && result.data) {
-          setRisks(result.data);
+        if (risksRes.ok) {
+          const data = await risksRes.json();
+          setRisks(data.data || []);
         }
-      } catch (err) {
-        console.error('Error fetching risks:', err);
+
+        if (usersRes.ok) {
+          const data = await usersRes.json();
+          const users = data.data || [];
+          const options = users
+            .filter((u: { role: string }) => ['riskManager', 'riskAnalyst', 'riskChampion', 'employee'].includes(u.role))
+            .map((u: { id: string; fullName: string; fullNameEn: string | null; role: string }) => ({
+              id: u.id,
+              name: u.fullName,
+              nameEn: u.fullNameEn || u.fullName,
+              role: u.role,
+            }));
+          setResponsibleOptions(options);
+        }
+
+        if (ownersRes.ok) {
+          const data = await ownersRes.json();
+          if (data.success && data.data) {
+            setRiskOwnersList(data.data.map((o: { id: string; nameAr: string; nameEn: string | null }) => ({
+              id: o.id,
+              nameAr: o.nameAr,
+              nameEn: o.nameEn || o.nameAr,
+            })));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRisks();
+    fetchData();
   }, []);
 
-  // Fetch all potential responsible users (riskManager, riskAnalyst, riskChampion, employee) + Risk Owners
-  useEffect(() => {
-    const fetchResponsibleUsers = async () => {
-      try {
-        // Fetch users with allowed roles
-        const usersResponse = await fetch('/api/users');
-        const usersResult = await usersResponse.json();
+  // ============================================
+  // Computed Data
+  // ============================================
 
-        const allUsers: { id: string; name: string; nameEn: string; role: string }[] = [];
-
-        if (usersResult.success && usersResult.data) {
-          // Filter users: riskManager, riskAnalyst, riskChampion, employee (NOT admin)
-          const filteredUsers = usersResult.data
-            .filter((user: { role: string; status: string }) =>
-              ['riskManager', 'riskAnalyst', 'riskChampion', 'employee'].includes(user.role) &&
-              user.status === 'active'
-            )
-            .map((user: { id: string; fullName: string; fullNameEn: string | null; role: string }) => ({
-              id: user.id,
-              name: user.fullName,
-              nameEn: user.fullNameEn || user.fullName,
-              role: getRoleLabel(user.role, isAr),
-            }));
-          allUsers.push(...filteredUsers);
-        }
-
-        // Fetch Risk Owners
-        const riskOwnersResponse = await fetch('/api/risk-owners');
-        const riskOwnersResult = await riskOwnersResponse.json();
-
-        if (riskOwnersResult.success && riskOwnersResult.data) {
-          // Store risk owners separately for dropdown
-          setRiskOwnersList(riskOwnersResult.data.map((owner: { id: string; nameAr: string; nameEn: string | null }) => ({
-            id: owner.id,
-            nameAr: owner.nameAr,
-            nameEn: owner.nameEn || owner.nameAr,
-          })));
-
-          const riskOwners = riskOwnersResult.data.map((owner: { id: string; nameAr: string; nameEn: string | null }) => ({
-            id: `riskOwner_${owner.id}`, // Prefix to distinguish from users
-            name: owner.nameAr,
-            nameEn: owner.nameEn || owner.nameAr,
-            role: isAr ? 'مالك خطر' : 'Risk Owner',
-          }));
-          allUsers.push(...riskOwners);
-        }
-
-        setAllResponsibleUsers(allUsers);
-      } catch (err) {
-        console.error('Error fetching responsible users:', err);
-      }
-    };
-
-    fetchResponsibleUsers();
-  }, [isAr]);
-
-  // Helper function to get role label
-  const getRoleLabel = (role: string, isArabic: boolean): string => {
-    const roleLabels: Record<string, { ar: string; en: string }> = {
-      riskManager: { ar: 'مدير المخاطر', en: 'Risk Manager' },
-      riskAnalyst: { ar: 'محلل المخاطر', en: 'Risk Analyst' },
-      riskChampion: { ar: 'رائد المخاطر', en: 'Risk Champion' },
-      employee: { ar: 'موظف', en: 'Employee' },
-    };
-    return roleLabels[role]?.[isArabic ? 'ar' : 'en'] || role;
-  };
-
-  // Update responsible options when a risk is selected (combine risk-specific + all users)
-  useEffect(() => {
-    const options: { id: string; name: string; nameEn: string; role: string }[] = [];
-
-    if (selectedRiskId) {
-      const selectedRisk = risks.find(r => r.id === selectedRiskId);
-      if (selectedRisk) {
-        // Add risk owner (priority)
-        if (selectedRisk.owner) {
-          options.push({
-            id: selectedRisk.owner.id,
-            name: selectedRisk.owner.fullName,
-            nameEn: selectedRisk.owner.fullNameEn || selectedRisk.owner.fullName,
-            role: isAr ? 'مالك الخطر' : 'Risk Owner',
-          });
-        }
-
-        // Add risk champion (from risk)
-        if (selectedRisk.champion) {
-          const exists = options.some(o => o.id === selectedRisk.champion!.id);
-          if (!exists) {
-            options.push({
-              id: selectedRisk.champion.id,
-              name: selectedRisk.champion.fullName,
-              nameEn: selectedRisk.champion.fullNameEn || selectedRisk.champion.fullName,
-              role: isAr ? 'رائد الخطر' : 'Risk Champion',
-            });
-          }
-        }
-
-        // Add department risk champion
-        if (selectedRisk.department?.riskChampion) {
-          const exists = options.some(o => o.id === selectedRisk.department!.riskChampion!.id);
-          if (!exists) {
-            options.push({
-              id: selectedRisk.department.riskChampion.id,
-              name: selectedRisk.department.riskChampion.fullName,
-              nameEn: selectedRisk.department.riskChampion.fullNameEn || selectedRisk.department.riskChampion.fullName,
-              role: isAr ? 'رائد مخاطر القسم' : 'Department Risk Champion',
-            });
-          }
-        }
-      }
-    }
-
-    // Add all other responsible users that are not already in the list
-    for (const user of allResponsibleUsers) {
-      const exists = options.some(o => o.id === user.id);
-      if (!exists) {
-        options.push(user);
-      }
-    }
-
-    setResponsibleOptions(options);
-
-    // Auto-select risk owner if available and no selection yet
-    if (selectedRiskId && options.length > 0 && !responsibleId) {
-      setResponsibleId(options[0].id);
-      setResponsibleSearchQuery(isAr ? options[0].name : options[0].nameEn);
-    }
-  }, [selectedRiskId, risks, isAr, allResponsibleUsers]);
-
-  // Reset wizard form when modal closes
-  const resetWizardForm = () => {
-    setSelectedRiskId(null);
-    setSelectedStrategy(null);
-    setPlanTitle('');
-    setResponsibleId(null);
-    setResponsibleSearchQuery('');
-    setShowResponsibleDropdown(false);
-    setRiskOwnerId(null);
-    setRiskOwnerSearchQuery('');
-    setShowRiskOwnerDropdown(false);
-    setMonitorId(null);
-    setMonitorSearchQuery('');
-    setShowMonitorDropdown(false);
-    setPriority('medium');
-    setStartDate('');
-    setDueDate('');
-    setExpectedResidualLikelihood(null);
-    setExpectedResidualImpact(null);
-    setTasks([]);
-    setNewTaskTitleAr('');
-    setNewTaskTitleEn('');
-    setNewTaskPriority('medium');
-    setNewTaskActionOwnerId(null);
-    setNewTaskMonitorId(null);
-    setNewTaskSuccessIndicatorAr('');
-    setNewTaskSuccessIndicatorEn('');
-    setNewTaskDueDate('');
-    setTaskActionOwnerSearchQuery('');
-    setTaskMonitorSearchQuery('');
-    setRiskSearchQuery('');
-    setWizardStep(1);
-  };
-
-  // Open edit modal with existing treatment data
-  const openEditModal = (treatmentId: string) => {
-    const treatment = treatments.find(t => t.id === treatmentId);
-    if (!treatment) return;
-
-    setEditingTreatmentId(treatmentId);
-    setSelectedRiskId(treatmentId); // Risk ID is same as treatment ID in current implementation
-    setSelectedStrategy(treatment.strategy);
-    setPlanTitle(isAr ? treatment.titleAr : treatment.titleEn);
-    setDueDate(treatment.dueDate);
-    setTasks(treatment.tasks.map(t => ({
-      id: t.id,
-      titleAr: t.titleAr,
-      titleEn: t.titleEn,
-    })));
-
-    // Find responsible from options
-    const responsible = responsibleOptions.find(
-      o => (isAr ? o.name : o.nameEn) === (isAr ? treatment.responsibleAr : treatment.responsibleEn)
-    );
-    if (responsible) {
-      setResponsibleId(responsible.id);
-      setResponsibleSearchQuery(isAr ? responsible.name : responsible.nameEn);
-    }
-
-    setEditWizardStep(1);
-    setShowEditModal(true);
-  };
-
-  // Reset edit form
-  const resetEditForm = () => {
-    setEditingTreatmentId(null);
-    setSelectedRiskId(null);
-    setSelectedStrategy(null);
-    setPlanTitle('');
-    setResponsibleId(null);
-    setResponsibleSearchQuery('');
-    setShowResponsibleDropdown(false);
-    setRiskOwnerId(null);
-    setRiskOwnerSearchQuery('');
-    setShowRiskOwnerDropdown(false);
-    setMonitorId(null);
-    setMonitorSearchQuery('');
-    setShowMonitorDropdown(false);
-    setPriority('medium');
-    setStartDate('');
-    setDueDate('');
-    setExpectedResidualLikelihood(null);
-    setExpectedResidualImpact(null);
-    setTasks([]);
-    setNewTaskTitleAr('');
-    setNewTaskTitleEn('');
-    setNewTaskPriority('medium');
-    setNewTaskActionOwnerId(null);
-    setNewTaskMonitorId(null);
-    setNewTaskSuccessIndicatorAr('');
-    setNewTaskSuccessIndicatorEn('');
-    setNewTaskDueDate('');
-    setTaskActionOwnerSearchQuery('');
-    setTaskMonitorSearchQuery('');
-    setEditWizardStep(1);
-  };
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.responsible-dropdown-container')) {
-        setShowResponsibleDropdown(false);
-      }
-      if (!target.closest('.risk-owner-dropdown-container')) {
-        setShowRiskOwnerDropdown(false);
-      }
-      if (!target.closest('.monitor-dropdown-container')) {
-        setShowMonitorDropdown(false);
-      }
-      if (!target.closest('.task-action-owner-dropdown-container')) {
-        setShowTaskActionOwnerDropdown(false);
-      }
-      if (!target.closest('.task-monitor-dropdown-container')) {
-        setShowTaskMonitorDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Add a new task
-  const addTask = () => {
-    if (newTaskTitleAr.trim() || newTaskTitleEn.trim()) {
-      setTasks([
-        ...tasks,
-        {
-          id: Date.now().toString(),
-          titleAr: newTaskTitleAr.trim() || newTaskTitleEn.trim(),
-          titleEn: newTaskTitleEn.trim() || newTaskTitleAr.trim(),
-          priority: newTaskPriority,
-          actionOwnerId: newTaskActionOwnerId,
-          monitorId: newTaskMonitorId,
-          successIndicatorAr: newTaskSuccessIndicatorAr.trim(),
-          successIndicatorEn: newTaskSuccessIndicatorEn.trim(),
-          dueDate: newTaskDueDate,
-        },
-      ]);
-      setNewTaskTitleAr('');
-      setNewTaskTitleEn('');
-      setNewTaskPriority('medium');
-      setNewTaskActionOwnerId(null);
-      setNewTaskMonitorId(null);
-      setNewTaskSuccessIndicatorAr('');
-      setNewTaskSuccessIndicatorEn('');
-      setNewTaskDueDate('');
-      setTaskActionOwnerSearchQuery('');
-      setTaskMonitorSearchQuery('');
-    }
-  };
-
-  // Remove a task
-  const removeTask = (taskId: string) => {
-    setTasks(tasks.filter(t => t.id !== taskId));
-  };
-
-  // Filter risks for selection
-  const filteredRisksForSelection = risks.filter(risk => {
-    if (!riskSearchQuery) return true;
-    const query = riskSearchQuery.toLowerCase();
-    return (
-      risk.riskNumber.toLowerCase().includes(query) ||
-      risk.titleAr.includes(riskSearchQuery) ||
-      risk.titleEn.toLowerCase().includes(query)
-    );
-  });
-
-  // Get selected risk details
-  const selectedRisk = selectedRiskId ? risks.find(r => r.id === selectedRiskId) : null;
-
-  // Generate treatments from risks
-  const treatments = useMemo(() => {
-    if (risks.length === 0) return mockTreatments;
-
-    return risks.map(risk => {
-      const strategy = determineStrategy(risk.status, risk.inherentScore || 9);
-      const treatmentStatus = determineTreatmentStatus(risk.status, risk.followUpDate);
-      const progress = calculateProgress(risk.status, risk.residualScore, risk.inherentScore || 9);
-
-      // Generate pseudo tasks based on mitigation actions
-      const tasks = risk.mitigationActionsAr || risk.mitigationActionsEn
-        ? [
-            { id: '1', titleAr: 'تحليل الخطر', titleEn: 'Analyze risk', completed: true },
-            { id: '2', titleAr: 'تحديد خطة المعالجة', titleEn: 'Define treatment plan', completed: progress > 20 },
-            { id: '3', titleAr: 'تنفيذ الإجراءات', titleEn: 'Implement actions', completed: progress > 50 },
-            { id: '4', titleAr: 'مراجعة الفعالية', titleEn: 'Review effectiveness', completed: progress > 80 },
-          ]
-        : [
-            { id: '1', titleAr: 'تحليل الخطر', titleEn: 'Analyze risk', completed: false },
-            { id: '2', titleAr: 'تحديد خطة المعالجة', titleEn: 'Define treatment plan', completed: false },
-          ];
-
-      return {
-        id: risk.id,
-        riskNumber: risk.riskNumber,
-        riskTitleAr: risk.titleAr,
-        riskTitleEn: risk.titleEn,
-        riskRating: normalizeRating(risk.inherentRating),
-        inherentScore: risk.inherentScore || 9,
-        currentResidualScore: risk.residualScore || risk.inherentScore || 9,
-        targetResidualScore: Math.max(4, Math.floor((risk.inherentScore || 9) * 0.4)),
-        titleAr: risk.mitigationActionsAr || 'خطة معالجة الخطر',
-        titleEn: risk.mitigationActionsEn || 'Risk Treatment Plan',
-        descriptionAr: risk.mitigationActionsAr || 'إجراءات التخفيف من الخطر',
-        descriptionEn: risk.mitigationActionsEn || 'Risk mitigation actions',
-        strategy: strategy,
-        status: treatmentStatus,
-        progress: progress,
-        responsibleAr: risk.owner?.fullName || 'غير محدد',
-        responsibleEn: risk.owner?.fullNameEn || risk.owner?.fullName || 'Not assigned',
-        departmentAr: risk.department?.nameAr || 'عام',
-        departmentEn: risk.department?.nameEn || 'General',
-        startDate: risk.createdAt ? new Date(risk.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        dueDate: risk.followUpDate
-          ? new Date(risk.followUpDate).toISOString().split('T')[0]
-          : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        tasks: tasks,
-        kris: [
-          {
-            nameAr: 'نسبة التخفيض',
-            nameEn: 'Reduction percentage',
-            current: risk.residualScore ? Math.round(((risk.inherentScore || 9) - risk.residualScore) / (risk.inherentScore || 9) * 100) : 0,
-            target: 60,
-            unit: () => '%'
-          },
-        ],
-      };
-    });
+  const treatments = useMemo<Treatment[]>(() => {
+    return risks.map((risk) => ({
+      id: risk.id,
+      riskId: risk.id,
+      riskNumber: risk.riskNumber,
+      riskTitleAr: risk.titleAr,
+      riskTitleEn: risk.titleEn,
+      titleAr: risk.mitigationActionsAr || `خطة معالجة ${risk.riskNumber}`,
+      titleEn: risk.mitigationActionsEn || `Treatment Plan for ${risk.riskNumber}`,
+      strategy: determineStrategy(risk.status, risk.inherentScore),
+      status: determineStatus(risk.status, risk.followUpDate),
+      inherentRating: normalizeRating(risk.inherentRating),
+      inherentScore: risk.inherentScore,
+      residualRating: normalizeRating(risk.residualRating),
+      currentResidualScore: risk.residualScore || risk.inherentScore,
+      progress: calculateProgress(risk.inherentScore, risk.residualScore),
+      priority: risk.inherentScore >= 15 ? 'high' : risk.inherentScore >= 8 ? 'medium' : 'low',
+      responsibleAr: risk.owner?.fullName || risk.champion?.fullName || 'غير محدد',
+      responsibleEn: risk.owner?.fullNameEn || risk.champion?.fullNameEn || 'Not Assigned',
+      startDate: risk.createdAt,
+      dueDate: risk.followUpDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      tasks: risk.treatmentPlans?.[0]?.tasks || [],
+      departmentAr: risk.department?.nameAr || 'غير محدد',
+      departmentEn: risk.department?.nameEn || 'Not Assigned',
+    }));
   }, [risks]);
 
-  const getRatingColor = (rating: RiskRating) => {
-    switch (rating) {
-      case 'Critical':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      case 'Major':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'Moderate':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'Minor':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'Negligible':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const filteredTreatments = useMemo(() => {
+    return treatments.filter((t) => {
+      const matchesSearch =
+        t.riskNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.titleAr.includes(searchQuery) ||
+        t.titleEn.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
+      const matchesStrategy = filterStrategy === 'all' || t.strategy === filterStrategy;
+      return matchesSearch && matchesStatus && matchesStrategy;
+    });
+  }, [treatments, searchQuery, filterStatus, filterStrategy]);
 
-  const getStatusIcon = (status: TreatmentStatus) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-[var(--status-success)]" />;
-      case 'inProgress':
-        return <Clock className="h-4 w-4 text-[var(--status-warning)]" />;
-      case 'overdue':
-        return <AlertCircle className="h-4 w-4 text-[var(--status-error)]" />;
-      default:
-        return <Clock className="h-4 w-4 text-[var(--foreground-muted)]" />;
-    }
-  };
-
-  const getStatusColor = (status: TreatmentStatus): 'success' | 'warning' | 'danger' | 'default' => {
-    switch (status) {
-      case 'completed':
-        return 'success';
-      case 'inProgress':
-        return 'warning';
-      case 'overdue':
-        return 'danger';
-      default:
-        return 'default';
-    }
-  };
-
-  const getStrategyIcon = (strategy: TreatmentStrategy) => {
-    switch (strategy) {
-      case 'avoid':
-        return <Ban className="h-4 w-4" />;
-      case 'reduce':
-        return <TrendingDown className="h-4 w-4" />;
-      case 'transfer':
-        return <Share2 className="h-4 w-4" />;
-      case 'accept':
-        return <Check className="h-4 w-4" />;
-      default:
-        return <Shield className="h-4 w-4" />;
-    }
-  };
-
-  const getStrategyColor = (strategy: TreatmentStrategy): 'info' | 'success' | 'warning' | 'default' => {
-    switch (strategy) {
-      case 'avoid':
-        return 'info';
-      case 'reduce':
-        return 'success';
-      case 'transfer':
-        return 'warning';
-      default:
-        return 'default';
-    }
-  };
-
-  const toggleCardExpand = (id: string) => {
-    const newExpanded = new Set(expandedCards);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedCards(newExpanded);
-  };
-
-  const filteredTreatments = treatments.filter((treatment) => {
-    const matchesSearch =
-      treatment.riskNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      treatment.titleAr.includes(searchQuery) ||
-      treatment.titleEn.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || treatment.status === filterStatus;
-    const matchesStrategy = filterStrategy === 'all' || treatment.strategy === filterStrategy;
-    return matchesSearch && matchesStatus && matchesStrategy;
-  });
-
-  // Stats
-  const stats = {
+  const stats = useMemo(() => ({
     total: treatments.length,
     completed: treatments.filter((t) => t.status === 'completed').length,
     inProgress: treatments.filter((t) => t.status === 'inProgress').length,
     overdue: treatments.filter((t) => t.status === 'overdue').length,
     notStarted: treatments.filter((t) => t.status === 'notStarted').length,
-    avgProgress: treatments.length > 0 ? Math.round(treatments.reduce((sum, t) => sum + t.progress, 0) / treatments.length) : 0,
+  }), [treatments]);
+
+  const avgProgress = useMemo(() => {
+    if (treatments.length === 0) return 0;
+    return Math.round(treatments.reduce((sum, t) => sum + t.progress, 0) / treatments.length);
+  }, [treatments]);
+
+  // ============================================
+  // Handlers
+  // ============================================
+
+  const resetForm = useCallback(() => {
+    setFormData({
+      riskId: '',
+      strategy: '',
+      titleAr: '',
+      titleEn: '',
+      responsibleId: '',
+      priority: 'medium',
+      startDate: new Date().toISOString().split('T')[0],
+      dueDate: '',
+      tasks: [],
+    });
+    setWizardStep(1);
+  }, []);
+
+  const openAddModal = useCallback(() => {
+    resetForm();
+    setShowAddModal(true);
+  }, [resetForm]);
+
+  const closeAddModal = useCallback(() => {
+    setShowAddModal(false);
+    resetForm();
+  }, [resetForm]);
+
+  const openViewModal = useCallback((treatment: Treatment) => {
+    setSelectedTreatment(treatment);
+    setShowViewModal(true);
+  }, []);
+
+  const handleSave = async () => {
+    if (!formData.riskId || !formData.strategy || !formData.responsibleId) return;
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/risks/${formData.riskId}/treatments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titleAr: formData.titleAr || `خطة معالجة`,
+          titleEn: formData.titleEn || `Treatment Plan`,
+          descriptionAr: '',
+          descriptionEn: '',
+          strategy: formData.strategy,
+          status: 'notStarted',
+          priority: formData.priority,
+          responsibleId: formData.responsibleId,
+          startDate: formData.startDate,
+          dueDate: formData.dueDate,
+          progress: 0,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Create tasks if any
+        if (formData.tasks.length > 0 && result.data?.id) {
+          for (const task of formData.tasks) {
+            await fetch(`/api/risks/${formData.riskId}/treatments/${result.data.id}/tasks`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                titleAr: task.titleAr,
+                titleEn: task.titleEn,
+                status: 'notStarted',
+                priority: 'medium',
+                dueDate: task.dueDate,
+                order: formData.tasks.indexOf(task),
+              }),
+            });
+          }
+        }
+
+        closeAddModal();
+        // Refresh data
+        const risksRes = await fetch('/api/risks?includeTreatments=true');
+        if (risksRes.ok) {
+          const data = await risksRes.json();
+          setRisks(data.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving treatment:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // Calculate effectiveness
-  const effectiveness = treatments
-    .filter((t) => t.status === 'completed')
-    .map((t) => ((t.inherentScore - t.currentResidualScore) / t.inherentScore) * 100);
-  const avgEffectiveness = effectiveness.length > 0 ? Math.round(effectiveness.reduce((a, b) => a + b, 0) / effectiveness.length) : 0;
+  const addTask = () => {
+    const newTask = {
+      id: `task-${Date.now()}`,
+      titleAr: '',
+      titleEn: '',
+      dueDate: formData.dueDate,
+    };
+    setFormData((prev) => ({ ...prev, tasks: [...prev.tasks, newTask] }));
+  };
 
-  // Show loading state
+  const updateTask = (index: number, field: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      tasks: prev.tasks.map((t, i) => (i === index ? { ...t, [field]: value } : t)),
+    }));
+  };
+
+  const removeTask = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      tasks: prev.tasks.filter((_, i) => i !== index),
+    }));
+  };
+
+  // Get selected risk details
+  const selectedRisk = useMemo(() => {
+    return risks.find((r) => r.id === formData.riskId);
+  }, [risks, formData.riskId]);
+
+  // قائمة المخاطر المتاحة للإضافة (بدون خطط معالجة) - محسّنة
+  const availableRisks = useMemo(() => {
+    const filtered = risks.filter((r) => !r.treatmentPlans?.length);
+    if (!riskSearchQuery) return filtered.slice(0, 20); // عرض أول 20 فقط للأداء
+    const query = riskSearchQuery.toLowerCase();
+    return filtered.filter((r) =>
+      r.riskNumber.toLowerCase().includes(query) ||
+      r.titleAr.includes(riskSearchQuery) ||
+      r.titleEn.toLowerCase().includes(query)
+    ).slice(0, 20);
+  }, [risks, riskSearchQuery]);
+
+  // ============================================
+  // Loading State
+  // ============================================
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
-          <p className="text-sm text-[var(--foreground-secondary)]">
-            {isAr ? 'جاري تحميل البيانات...' : 'Loading data...'}
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-4 border-[var(--primary)]/20 animate-pulse" />
+            <Loader2 className="absolute inset-0 m-auto h-8 w-8 animate-spin text-[var(--primary)]" />
+          </div>
+          <p className="text-sm text-[var(--foreground-secondary)] animate-pulse">
+            {isAr ? 'جاري تحميل خطط المعالجة...' : 'Loading treatment plans...'}
           </p>
         </div>
       </div>
     );
   }
 
-  // Wizard steps for adding treatment
-  const wizardSteps = [
-    { id: 1, labelAr: 'اختيار الخطر', labelEn: 'Select Risk' },
-    { id: 2, labelAr: 'استراتيجية المعالجة', labelEn: 'Treatment Strategy' },
-    { id: 3, labelAr: 'تفاصيل الخطة', labelEn: 'Plan Details' },
-    { id: 4, labelAr: 'المهام', labelEn: 'Tasks' },
-    { id: 5, labelAr: 'المراجعة', labelEn: 'Review' },
-  ];
+  // ============================================
+  // Render
+  // ============================================
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Page Header */}
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)] truncate">
-            {t('treatment.title')}
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--foreground)] flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] text-white">
+              <Shield className="h-6 w-6" />
+            </div>
+            {isAr ? 'خطط المعالجة' : 'Treatment Plans'}
           </h1>
-          <p className="mt-1 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-            {isAr
-              ? 'إدارة ومتابعة خطط معالجة المخاطر وتتبع تقدم التنفيذ'
-              : 'Manage and track risk treatment plans and implementation progress'}
+          <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+            {isAr ? 'إدارة ومتابعة خطط معالجة المخاطر' : 'Manage and track risk treatment plans'}
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
-            onClick={() => setShowStrategyGuide(true)}
-          >
-            <span className="text-xs sm:text-sm">{isAr ? 'دليل الاستراتيجيات' : 'Strategy Guide'}</span>
-          </Button>
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />} onClick={() => setShowAddModal(true)}>
-            <span className="text-xs sm:text-sm">{t('treatment.addPlan')}</span>
-          </Button>
-        </div>
+        <Button onClick={openAddModal} className="gap-2 shadow-lg hover:shadow-xl transition-shadow">
+          <Plus className="h-4 w-4" />
+          {isAr ? 'إضافة خطة جديدة' : 'Add New Plan'}
+        </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[var(--primary-light)] shrink-0">
-              <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.total}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'إجمالي الخطط' : 'Total Plans'}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[var(--status-success)]/10 shrink-0">
-              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--status-success)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.completed}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {t('treatment.statuses.completed')}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[var(--status-warning)]/10 shrink-0">
-              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--status-warning)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.inProgress}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {t('treatment.statuses.inProgress')}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[var(--status-error)]/10 shrink-0">
-              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--status-error)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.overdue}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {t('treatment.statuses.overdue')}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30 shrink-0">
-              <Target className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{avgEffectiveness}%</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'فعالية المعالجة' : 'Treatment Effectiveness'}
-              </p>
-            </div>
-          </div>
-        </Card>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-[var(--primary)]', bg: 'bg-[var(--primary)]/10' },
+          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
+          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
+          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-slate-500', bg: 'bg-slate-500/10' },
+        ].map((stat, i) => (
+          <Card key={i} className="overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-[var(--foreground-secondary)]">{stat.label}</p>
+                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                </div>
+                <div className={`p-2 rounded-lg ${stat.bg}`}>
+                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-2 sm:p-3 md:p-4">
-          <div className="flex flex-col gap-2 sm:gap-3 md:gap-4 sm:flex-row sm:items-center">
-            <div className="flex-1 min-w-0">
-              <Input
-                placeholder={isAr ? 'بحث في خطط المعالجة...' : 'Search treatment plans...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                leftIcon={<Search className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
-              />
+      {/* Progress Overview */}
+      <Card className="overflow-hidden">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-[var(--primary)]" />
+              <span className="font-medium">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
             </div>
-            <div className="flex gap-2 shrink-0">
-              <select
-                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as TreatmentStatus | 'all')}
-              >
-                <option value="all">{isAr ? 'جميع الحالات' : 'All Statuses'}</option>
-                <option value="notStarted">{isAr ? 'لم يبدأ' : 'Not Started'}</option>
-                <option value="inProgress">{isAr ? 'قيد التنفيذ' : 'In Progress'}</option>
-                <option value="completed">{isAr ? 'مكتمل' : 'Completed'}</option>
-                <option value="overdue">{isAr ? 'متأخر' : 'Overdue'}</option>
-              </select>
-              <select
-                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
-                value={filterStrategy}
-                onChange={(e) => setFilterStrategy(e.target.value as TreatmentStrategy | 'all')}
-              >
-                <option value="all">{isAr ? 'جميع الاستراتيجيات' : 'All Strategies'}</option>
-                <option value="avoid">{t('treatment.strategies.avoid')}</option>
-                <option value="reduce">{t('treatment.strategies.reduce')}</option>
-                <option value="transfer">{t('treatment.strategies.transfer')}</option>
-                <option value="accept">{t('treatment.strategies.accept')}</option>
-              </select>
-            </div>
+            <span className="text-2xl font-bold text-[var(--primary)]">{avgProgress}%</span>
+          </div>
+          <div className="h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--primary-dark)] transition-all duration-500"
+              style={{ width: `${avgProgress}%` }}
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Treatment Cards */}
-      <div className="space-y-2 sm:space-y-3 md:space-y-4">
-        {filteredTreatments.map((treatment) => {
-          const isExpanded = expandedCards.has(treatment.id);
-          const completedTasks = treatment.tasks.filter((t) => t.completed).length;
-          const reductionPercent = Math.round(
-            ((treatment.inherentScore - treatment.currentResidualScore) / treatment.inherentScore) * 100
-          );
-          const targetReductionPercent = Math.round(
-            ((treatment.inherentScore - treatment.targetResidualScore) / treatment.inherentScore) * 100
-          );
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--foreground-muted)]" />
+          <Input
+            placeholder={isAr ? 'بحث في خطط المعالجة...' : 'Search treatment plans...'}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="ps-10"
+          />
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as TreatmentStatus | 'all')}
+            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          >
+            <option value="all">{isAr ? 'كل الحالات' : 'All Status'}</option>
+            <option value="notStarted">{isAr ? 'لم يبدأ' : 'Not Started'}</option>
+            <option value="inProgress">{isAr ? 'قيد التنفيذ' : 'In Progress'}</option>
+            <option value="completed">{isAr ? 'مكتمل' : 'Completed'}</option>
+            <option value="overdue">{isAr ? 'متأخر' : 'Overdue'}</option>
+          </select>
+          <select
+            value={filterStrategy}
+            onChange={(e) => setFilterStrategy(e.target.value as TreatmentStrategy | 'all')}
+            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          >
+            <option value="all">{isAr ? 'كل الاستراتيجيات' : 'All Strategies'}</option>
+            <option value="avoid">{isAr ? 'تجنب' : 'Avoid'}</option>
+            <option value="reduce">{isAr ? 'تقليل' : 'Reduce'}</option>
+            <option value="transfer">{isAr ? 'نقل' : 'Transfer'}</option>
+            <option value="accept">{isAr ? 'قبول' : 'Accept'}</option>
+          </select>
+        </div>
+      </div>
 
-          return (
-            <Card key={treatment.id} className="overflow-hidden">
-              {/* Main Card Content */}
-              <div className="p-2 sm:p-3 md:p-4">
-                {/* Header */}
-                <div className="mb-2 sm:mb-3 md:mb-4 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <div
-                      className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg shrink-0 ${
-                        treatment.status === 'overdue'
-                          ? 'bg-[var(--status-error)]/10'
-                          : treatment.status === 'completed'
-                          ? 'bg-[var(--status-success)]/10'
-                          : 'bg-[var(--primary-light)]'
-                      }`}
-                    >
-                      {getStrategyIcon(treatment.strategy)}
+      {/* Treatment Cards Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredTreatments.length === 0 ? (
+          <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
+            <div className="p-4 rounded-full bg-[var(--background-secondary)] mb-4">
+              <FileText className="h-8 w-8 text-[var(--foreground-muted)]" />
+            </div>
+            <p className="text-[var(--foreground-secondary)]">
+              {isAr ? 'لا توجد خطط معالجة' : 'No treatment plans found'}
+            </p>
+            <Button variant="outline" className="mt-4" onClick={openAddModal}>
+              <Plus className="h-4 w-4 me-2" />
+              {isAr ? 'إضافة خطة جديدة' : 'Add New Plan'}
+            </Button>
+          </div>
+        ) : (
+          filteredTreatments.map((treatment) => {
+            const StrategyIcon = strategyConfig[treatment.strategy].icon;
+            const StatusIcon = statusConfig[treatment.status].icon;
+
+            return (
+              <Card
+                key={treatment.id}
+                className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group"
+                onClick={() => openViewModal(treatment)}
+              >
+                {/* Card Header with Strategy Color */}
+                <div className={`h-1 ${strategyConfig[treatment.strategy].bgClass}`} />
+
+                <CardContent className="p-4 space-y-4">
+                  {/* Top Row: Risk Number & Status */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${ratingColors[treatment.inherentRating]}`} />
+                      <span className="text-xs font-mono text-[var(--foreground-secondary)]">
+                        {treatment.riskNumber}
+                      </span>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                        <code className="rounded bg-[var(--background-tertiary)] px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs">
-                          {treatment.riskNumber}
-                        </code>
-                        <span className={`rounded-full px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium ${getRatingColor(treatment.riskRating)}`}>
-                          {isAr ? t(`risks.ratings.${treatment.riskRating}`) : treatment.riskRating}
-                        </span>
-                        {getStatusIcon(treatment.status)}
-                        <Badge variant={getStatusColor(treatment.status)} size="sm">
-                          {t(`treatment.statuses.${treatment.status}`)}
-                        </Badge>
-                      </div>
-                      <h3 className="mt-1 text-sm sm:text-base font-semibold text-[var(--foreground)] truncate">
-                        {isAr ? treatment.titleAr : treatment.titleEn}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-[var(--foreground-secondary)] truncate">
-                        {isAr ? treatment.riskTitleAr : treatment.riskTitleEn}
-                      </p>
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${statusConfig[treatment.status].bgClass} ${statusConfig[treatment.status].colorClass}`}>
+                      <StatusIcon className="h-3 w-3" />
+                      <span>{isAr ? statusConfig[treatment.status].labelAr : statusConfig[treatment.status].labelEn}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant={getStrategyColor(treatment.strategy)}>
-                      {getStrategyIcon(treatment.strategy)}
-                      <span className="ms-1 text-[10px] sm:text-xs">{t(`treatment.strategies.${treatment.strategy}`)}</span>
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditModal(treatment.id)}
-                      className="p-1.5"
-                    >
-                      <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </Button>
-                  </div>
-                </div>
 
-                {/* Progress & Stats Row */}
-                <div className="mb-2 sm:mb-3 md:mb-4 grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-3">
-                  {/* Progress */}
+                  {/* Title */}
                   <div>
-                    <div className="mb-1 flex items-center justify-between text-xs sm:text-sm">
-                      <span className="text-[var(--foreground-secondary)]">
-                        {t('treatment.progress')}
-                      </span>
-                      <span className="font-medium text-[var(--foreground)]">
-                        {treatment.progress}%
-                      </span>
+                    <h3 className="font-semibold text-[var(--foreground)] line-clamp-1 group-hover:text-[var(--primary)] transition-colors">
+                      {isAr ? treatment.riskTitleAr : treatment.riskTitleEn}
+                    </h3>
+                    <p className="text-xs text-[var(--foreground-secondary)] mt-1">
+                      {isAr ? treatment.departmentAr : treatment.departmentEn}
+                    </p>
+                  </div>
+
+                  {/* Strategy Badge */}
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${strategyConfig[treatment.strategy].bgClass} ${strategyConfig[treatment.strategy].borderClass} border`}>
+                    <StrategyIcon className={`h-4 w-4 ${strategyConfig[treatment.strategy].colorClass}`} />
+                    <span className={`text-sm font-medium ${strategyConfig[treatment.strategy].colorClass}`}>
+                      {isAr ? strategyConfig[treatment.strategy].labelAr : strategyConfig[treatment.strategy].labelEn}
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-[var(--foreground-secondary)]">{isAr ? 'التقدم' : 'Progress'}</span>
+                      <span className="font-semibold text-[var(--primary)]">{treatment.progress}%</span>
                     </div>
-                    <div className="h-1.5 sm:h-2 overflow-hidden rounded-full bg-[var(--background-tertiary)]">
+                    <div className="h-2 rounded-full bg-[var(--background-secondary)] overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          treatment.status === 'completed'
-                            ? 'bg-[var(--status-success)]'
-                            : treatment.status === 'overdue'
-                            ? 'bg-[var(--status-error)]'
-                            : 'bg-[var(--primary)]'
-                        }`}
+                        className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--primary-dark)] transition-all duration-500"
                         style={{ width: `${treatment.progress}%` }}
                       />
                     </div>
-                    <p className="mt-1 text-[10px] sm:text-xs text-[var(--foreground-muted)]">
-                      {completedTasks}/{treatment.tasks.length} {isAr ? 'مهام مكتملة' : 'tasks completed'}
-                    </p>
                   </div>
 
-                  {/* Risk Reduction */}
-                  <div className="rounded-lg bg-[var(--background-secondary)] p-2 sm:p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'تخفيض الخطر' : 'Risk Reduction'}
-                      </span>
-                      <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-[var(--status-success)] shrink-0" />
-                    </div>
-                    <div className="mt-1 flex items-baseline gap-1 sm:gap-2">
-                      <span className="text-base sm:text-lg font-bold text-[var(--foreground)]">
-                        {reductionPercent}%
-                      </span>
-                      <span className="text-[10px] sm:text-xs text-[var(--foreground-muted)]">
-                        ({treatment.inherentScore} → {treatment.currentResidualScore})
+                  {/* Footer: Responsible & Due Date */}
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+                    <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
+                      <Users className="h-3.5 w-3.5" />
+                      <span className="truncate max-w-[100px]">
+                        {isAr ? treatment.responsibleAr : treatment.responsibleEn}
                       </span>
                     </div>
-                    <p className="mt-1 text-[10px] sm:text-xs text-[var(--foreground-muted)]">
-                      {isAr ? 'الهدف:' : 'Target:'} {targetReductionPercent}%
-                    </p>
+                    <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
                   </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
 
-                  {/* Timeline */}
-                  <div className="rounded-lg bg-[var(--background-secondary)] p-2 sm:p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'الجدول الزمني' : 'Timeline'}
-                      </span>
-                      <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-[var(--foreground-muted)] shrink-0" />
-                    </div>
-                    <div className="mt-1 text-xs sm:text-sm">
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <span className="text-[var(--foreground-secondary)]">{isAr ? 'البداية:' : 'Start:'}</span>
-                        <span className="font-medium">{new Date(treatment.startDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
-                      </div>
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <span className="text-[var(--foreground-secondary)]">{isAr ? 'الانتهاء:' : 'Due:'}</span>
-                        <span className={`font-medium ${treatment.status === 'overdue' ? 'text-[var(--status-error)]' : ''}`}>
-                          {new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Responsible & Actions */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 border-t border-[var(--border)] pt-2 sm:pt-3 md:pt-4">
-                  <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-[var(--foreground-secondary)] min-w-0">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <User className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                      <span className="truncate">{isAr ? treatment.responsibleAr : treatment.responsibleEn}</span>
-                    </div>
-                    <span className="text-[var(--foreground-muted)] shrink-0">•</span>
-                    <span className="truncate">{isAr ? treatment.departmentAr : treatment.departmentEn}</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleCardExpand(treatment.id)}
-                    rightIcon={isExpanded ? <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" /> : <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />}
+      {/* Add Treatment Modal - Simplified Wizard */}
+      {showAddModal && (
+        <Modal
+          isOpen={showAddModal}
+          onClose={closeAddModal}
+          title={isAr ? 'إضافة خطة معالجة جديدة' : 'Add New Treatment Plan'}
+          size="lg"
+        >
+          <div className="space-y-6">
+            {/* Wizard Steps Indicator */}
+            <div className="flex items-center justify-center gap-2">
+              {[1, 2, 3].map((step) => (
+                <React.Fragment key={step}>
+                  <div
+                    className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all ${
+                      wizardStep === step
+                        ? 'bg-[var(--primary)] text-white scale-110'
+                        : wizardStep > step
+                        ? 'bg-green-500 text-white'
+                        : 'bg-[var(--background-secondary)] text-[var(--foreground-muted)]'
+                    }`}
                   >
-                    <span className="text-xs sm:text-sm">{isExpanded ? (isAr ? 'إخفاء التفاصيل' : 'Hide Details') : (isAr ? 'عرض التفاصيل' : 'Show Details')}</span>
-                  </Button>
-                </div>
-              </div>
+                    {wizardStep > step ? <Check className="h-4 w-4" /> : step}
+                  </div>
+                  {step < 3 && (
+                    <div
+                      className={`w-12 h-1 rounded ${
+                        wizardStep > step ? 'bg-green-500' : 'bg-[var(--background-secondary)]'
+                      }`}
+                    />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
 
-              {/* Expanded Details */}
-              {isExpanded && (
-                <div className="border-t border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4">
-                  <div className="grid gap-3 sm:gap-4 md:gap-6 lg:grid-cols-2">
-                    {/* Tasks */}
-                    <div>
-                      <h4 className="mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                        <ListChecks className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
-                        {isAr ? 'المهام' : 'Tasks'}
-                      </h4>
-                      <div className="space-y-1.5 sm:space-y-2">
-                        {treatment.tasks.map((task) => (
-                          <div
-                            key={task.id}
-                            className={`flex items-center gap-2 sm:gap-3 rounded-lg border p-2 sm:p-3 ${
-                              task.completed
-                                ? 'border-[var(--status-success)]/30 bg-[var(--status-success)]/5'
-                                : 'border-[var(--border)] bg-[var(--background)]'
+            {/* Step Labels */}
+            <div className="flex justify-between text-xs text-[var(--foreground-secondary)]">
+              <span>{isAr ? 'اختيار الخطر' : 'Select Risk'}</span>
+              <span>{isAr ? 'تفاصيل الخطة' : 'Plan Details'}</span>
+              <span>{isAr ? 'المهام' : 'Tasks'}</span>
+            </div>
+
+            {/* Step Content */}
+            <div className="min-h-[300px]">
+              {/* Step 1: Select Risk */}
+              {wizardStep === 1 && (
+                <div className="space-y-4">
+                  <Input
+                    placeholder={isAr ? 'ابحث عن الخطر...' : 'Search for risk...'}
+                    leftIcon={<Search className="h-4 w-4" />}
+                    value={riskSearchQuery}
+                    onChange={(e) => setRiskSearchQuery(e.target.value)}
+                  />
+                  <div className="max-h-[250px] overflow-y-auto space-y-2">
+                    {availableRisks.length === 0 ? (
+                      <div className="text-center py-8 text-[var(--foreground-secondary)]">
+                        <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">{isAr ? 'لا توجد مخاطر متاحة' : 'No available risks'}</p>
+                      </div>
+                    ) : (
+                      availableRisks.map((risk) => (
+                        <div
+                          key={risk.id}
+                          onClick={() => {
+                            startTransition(() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                riskId: risk.id,
+                                strategy: determineStrategy(risk.status, risk.inherentScore),
+                                titleAr: `خطة معالجة ${risk.riskNumber}`,
+                                titleEn: `Treatment Plan for ${risk.riskNumber}`,
+                              }));
+                            });
+                          }}
+                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                            formData.riskId === risk.id
+                              ? 'border-[var(--primary)] bg-[var(--primary)]/5'
+                              : 'border-[var(--border)] hover:border-[var(--primary)]/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-3 h-3 rounded-full ${ratingColors[normalizeRating(risk.inherentRating)]}`} />
+                              <div>
+                                <p className="font-medium text-sm">{risk.riskNumber}</p>
+                                <p className="text-xs text-[var(--foreground-secondary)] line-clamp-1">
+                                  {isAr ? risk.titleAr : risk.titleEn}
+                                </p>
+                              </div>
+                            </div>
+                            {formData.riskId === risk.id && (
+                              <Check className="h-5 w-5 text-[var(--primary)]" />
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Plan Details */}
+              {wizardStep === 2 && (
+                <div className="space-y-4">
+                  {/* Strategy Selection */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">{isAr ? 'الاستراتيجية' : 'Strategy'}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['avoid', 'reduce', 'transfer', 'accept'] as TreatmentStrategy[]).map((strategy) => {
+                        const config = strategyConfig[strategy];
+                        const Icon = config.icon;
+                        return (
+                          <button
+                            key={strategy}
+                            onClick={() => setFormData((prev) => ({ ...prev, strategy }))}
+                            className={`p-3 rounded-lg border text-start transition-all ${
+                              formData.strategy === strategy
+                                ? `${config.borderClass} ${config.bgClass}`
+                                : 'border-[var(--border)] hover:border-[var(--primary)]/50'
                             }`}
                           >
-                            <div
-                              className={`flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full shrink-0 ${
-                                task.completed
-                                  ? 'bg-[var(--status-success)] text-white'
-                                  : 'border-2 border-[var(--border)]'
-                              }`}
-                            >
-                              {task.completed && <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
+                            <div className="flex items-center gap-2">
+                              <Icon className={`h-4 w-4 ${config.colorClass}`} />
+                              <span className="text-sm font-medium">
+                                {isAr ? config.labelAr : config.labelEn}
+                              </span>
                             </div>
-                            <span
-                              className={`flex-1 text-xs sm:text-sm min-w-0 truncate ${
-                                task.completed
-                                  ? 'text-[var(--foreground-secondary)] line-through'
-                                  : 'text-[var(--foreground)]'
-                              }`}
-                            >
-                              {isAr ? task.titleAr : task.titleEn}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                          </button>
+                        );
+                      })}
                     </div>
+                  </div>
 
-                    {/* KRIs */}
+                  {/* Responsible */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">{isAr ? 'المسؤول' : 'Responsible'}</label>
+                    <select
+                      value={formData.responsibleId}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, responsibleId: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    >
+                      <option value="">{isAr ? 'اختر المسؤول' : 'Select Responsible'}</option>
+                      {responsibleOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {isAr ? opt.name : opt.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Priority */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">{isAr ? 'الأولوية' : 'Priority'}</label>
+                    <div className="flex gap-2">
+                      {(['high', 'medium', 'low'] as const).map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => setFormData((prev) => ({ ...prev, priority: p }))}
+                          className={`flex-1 py-2 px-3 rounded-lg border text-sm transition-all ${
+                            formData.priority === p
+                              ? p === 'high'
+                                ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20'
+                                : p === 'medium'
+                                ? 'border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/20'
+                                : 'border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20'
+                              : 'border-[var(--border)]'
+                          }`}
+                        >
+                          {p === 'high' ? (isAr ? 'عالية' : 'High') : p === 'medium' ? (isAr ? 'متوسطة' : 'Medium') : (isAr ? 'منخفضة' : 'Low')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <h4 className="mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                        <Zap className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
-                        {isAr ? 'مؤشرات المخاطر الرئيسية' : 'Key Risk Indicators'}
-                      </h4>
-                      <div className="space-y-2 sm:space-y-3">
-                        {treatment.kris.map((kri, index) => {
-                          const progress = Math.min(100, (kri.current / kri.target) * 100);
-                          const isOnTarget = kri.current >= kri.target;
-                          return (
-                            <div
-                              key={index}
-                              className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-2 sm:p-3"
-                            >
-                              <div className="mb-1.5 sm:mb-2 flex items-center justify-between gap-2">
-                                <span className="text-xs sm:text-sm font-medium text-[var(--foreground)] min-w-0 truncate">
-                                  {isAr ? kri.nameAr : kri.nameEn}
-                                </span>
-                                <span
-                                  className={`text-xs sm:text-sm font-bold shrink-0 ${
-                                    isOnTarget ? 'text-[var(--status-success)]' : 'text-[var(--status-warning)]'
-                                  }`}
-                                >
-                                  {kri.current} {kri.unit ? kri.unit(isAr) : ''}
-                                </span>
-                              </div>
-                              <div className="h-1.5 sm:h-2 overflow-hidden rounded-full bg-[var(--background-tertiary)]">
-                                <div
-                                  className={`h-full rounded-full ${
-                                    isOnTarget ? 'bg-[var(--status-success)]' : 'bg-[var(--status-warning)]'
-                                  }`}
-                                  style={{ width: `${progress}%` }}
-                                />
-                              </div>
-                              <p className="mt-1 text-[10px] sm:text-xs text-[var(--foreground-muted)]">
-                                {isAr ? 'الهدف:' : 'Target:'} {kri.target} {kri.unit ? kri.unit(isAr) : ''}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Description */}
-                      <div className="mt-3 sm:mt-4 rounded-lg border border-[var(--border)] bg-[var(--background)] p-2 sm:p-3">
-                        <h5 className="mb-1.5 sm:mb-2 flex items-center gap-2 text-xs sm:text-sm font-medium text-[var(--foreground)]">
-                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                          {isAr ? 'الوصف' : 'Description'}
-                        </h5>
-                        <p className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                          {isAr ? treatment.descriptionAr : treatment.descriptionEn}
-                        </p>
-                      </div>
+                      <label className="block text-sm font-medium mb-2">{isAr ? 'تاريخ البدء' : 'Start Date'}</label>
+                      <Input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, startDate: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">{isAr ? 'تاريخ الانتهاء' : 'Due Date'}</label>
+                      <Input
+                        type="date"
+                        value={formData.dueDate}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
+                      />
                     </div>
                   </div>
                 </div>
               )}
-            </Card>
-          );
-        })}
-      </div>
 
-      {/* Empty State */}
-      {filteredTreatments.length === 0 && (
-        <Card className="p-4 sm:p-6 md:p-8 text-center">
-          <Wrench className="mx-auto h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-[var(--foreground-muted)]" />
-          <h3 className="mt-2 sm:mt-3 md:mt-4 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-            {isAr ? 'لا توجد خطط معالجة' : 'No Treatment Plans'}
-          </h3>
-          <p className="mt-1 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-            {isAr
-              ? 'لم يتم العثور على خطط معالجة تطابق البحث'
-              : 'No treatment plans found matching your search'}
-          </p>
-        </Card>
-      )}
-
-      {/* Add Treatment Modal with Wizard */}
-      <Modal
-        isOpen={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          resetWizardForm();
-        }}
-        title={t('treatment.addPlan')}
-        size="lg"
-      >
-        <div className="space-y-3 sm:space-y-4 md:space-y-6">
-          {/* Wizard Steps */}
-          <div className="flex items-center justify-between overflow-x-auto">
-            {wizardSteps.map((step, index) => (
-              <React.Fragment key={step.id}>
-                <div className="flex flex-col items-center shrink-0">
-                  <div
-                    className={`flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-medium ${
-                      wizardStep === step.id
-                        ? 'bg-[var(--primary)] text-white'
-                        : wizardStep > step.id
-                        ? 'bg-[var(--status-success)] text-white'
-                        : 'bg-[var(--background-tertiary)] text-[var(--foreground-muted)]'
-                    }`}
-                  >
-                    {wizardStep > step.id ? <Check className="h-3 w-3 sm:h-4 sm:w-4" /> : step.id}
+              {/* Step 3: Tasks */}
+              {wizardStep === 3 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">{isAr ? 'المهام' : 'Tasks'}</label>
+                    <Button variant="outline" size="sm" onClick={addTask}>
+                      <Plus className="h-4 w-4 me-1" />
+                      {isAr ? 'إضافة مهمة' : 'Add Task'}
+                    </Button>
                   </div>
-                  <span className="mt-1 text-[10px] sm:text-xs text-[var(--foreground-secondary)] text-center max-w-[60px] sm:max-w-none truncate">
-                    {isAr ? step.labelAr : step.labelEn}
-                  </span>
-                </div>
-                {index < wizardSteps.length - 1 && (
-                  <div
-                    className={`h-0.5 flex-1 mx-1 sm:mx-2 min-w-[20px] ${
-                      wizardStep > step.id ? 'bg-[var(--status-success)]' : 'bg-[var(--background-tertiary)]'
-                    }`}
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
 
-          {/* Step Content */}
-          <div className="min-h-[150px] sm:min-h-[200px] rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4">
-            {wizardStep === 1 && (
-              <div>
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'اختر الخطر المراد معالجته' : 'Select the risk to treat'}
-                </h4>
-                <p className="mb-3 sm:mb-4 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? 'اختر من قائمة المخاطر المسجلة التي تحتاج إلى خطة معالجة'
-                    : 'Choose from the list of registered risks that need a treatment plan'}
-                </p>
-                {/* Search input */}
-                <div className="mb-3">
-                  <Input
-                    placeholder={isAr ? 'البحث عن خطر...' : 'Search for a risk...'}
-                    value={riskSearchQuery}
-                    onChange={(e) => setRiskSearchQuery(e.target.value)}
-                    leftIcon={<Search className="h-4 w-4" />}
-                  />
-                </div>
-                {/* Risk selection list */}
-                <div className="max-h-[250px] overflow-y-auto space-y-2">
-                  {filteredRisksForSelection.length === 0 ? (
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-4 text-center text-sm text-[var(--foreground-muted)]">
-                      {isAr ? 'لا توجد مخاطر متاحة' : 'No risks available'}
+                  {formData.tasks.length === 0 ? (
+                    <div className="text-center py-8 text-[var(--foreground-secondary)]">
+                      <ListChecks className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">{isAr ? 'لا توجد مهام' : 'No tasks yet'}</p>
+                      <Button variant="outline" size="sm" className="mt-2" onClick={addTask}>
+                        <Plus className="h-4 w-4 me-1" />
+                        {isAr ? 'إضافة أول مهمة' : 'Add First Task'}
+                      </Button>
                     </div>
                   ) : (
-                    filteredRisksForSelection.map((risk) => (
-                      <button
-                        key={risk.id}
-                        onClick={() => setSelectedRiskId(risk.id)}
-                        className={`w-full rounded-lg border p-3 text-start transition-colors ${
-                          selectedRiskId === risk.id
-                            ? 'border-[var(--primary)] bg-[var(--primary-light)]'
-                            : 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]/50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <code className="shrink-0 rounded bg-[var(--background-tertiary)] px-1.5 py-0.5 text-[10px] sm:text-xs">
-                              {risk.riskNumber}
-                            </code>
-                            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getRatingColor(normalizeRating(risk.inherentRating))}`}>
-                              {normalizeRating(risk.inherentRating)}
-                            </span>
+                    <div className="space-y-3 max-h-[250px] overflow-y-auto">
+                      {formData.tasks.map((task, index) => (
+                        <div key={task.id} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--background-secondary)]">
+                          <div className="flex items-start gap-2">
+                            <span className="text-xs font-mono text-[var(--foreground-muted)] mt-2">{index + 1}</span>
+                            <div className="flex-1 space-y-2">
+                              <Input
+                                placeholder={isAr ? 'عنوان المهمة (عربي)' : 'Task title (Arabic)'}
+                                value={task.titleAr}
+                                onChange={(e) => updateTask(index, 'titleAr', e.target.value)}
+                              />
+                              <Input
+                                placeholder={isAr ? 'عنوان المهمة (إنجليزي)' : 'Task title (English)'}
+                                value={task.titleEn}
+                                onChange={(e) => updateTask(index, 'titleEn', e.target.value)}
+                              />
+                              <Input
+                                type="date"
+                                value={task.dueDate}
+                                onChange={(e) => updateTask(index, 'dueDate', e.target.value)}
+                              />
+                            </div>
+                            <button
+                              onClick={() => removeTask(index)}
+                              className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
                           </div>
-                          {selectedRiskId === risk.id && (
-                            <Check className="h-4 w-4 text-[var(--primary)] shrink-0" />
-                          )}
                         </div>
-                        <p className="mt-1 text-sm font-medium text-[var(--foreground)] truncate">
-                          {isAr ? risk.titleAr : risk.titleEn}
-                        </p>
-                        <p className="mt-0.5 text-xs text-[var(--foreground-muted)] truncate">
-                          {risk.department ? (isAr ? risk.department.nameAr : risk.department.nameEn) : '-'}
-                        </p>
-                      </button>
-                    ))
+                      ))}
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {wizardStep === 2 && (
-              <div>
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'اختر استراتيجية المعالجة' : 'Select treatment strategy'}
-                </h4>
-                {selectedRisk && (
-                  <div className="mb-3 p-2 rounded-lg bg-[var(--background)] border border-[var(--border)]">
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      {isAr ? 'الخطر المختار:' : 'Selected risk:'}
-                    </p>
-                    <p className="text-sm font-medium text-[var(--foreground)]">
-                      {selectedRisk.riskNumber} - {isAr ? selectedRisk.titleAr : selectedRisk.titleEn}
-                    </p>
-                  </div>
-                )}
-                <div className="grid gap-2 sm:gap-3 sm:grid-cols-2">
-                  {(['avoid', 'reduce', 'transfer', 'accept'] as TreatmentStrategy[]).map((strategy) => (
-                    <button
-                      key={strategy}
-                      onClick={() => setSelectedStrategy(strategy)}
-                      className={`rounded-lg border p-2 sm:p-3 md:p-4 text-start transition-colors ${
-                        selectedStrategy === strategy
-                          ? 'border-[var(--primary)] bg-[var(--primary-light)]'
-                          : 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {getStrategyIcon(strategy)}
-                          <span className="text-xs sm:text-sm font-medium text-[var(--foreground)]">
-                            {t(`treatment.strategies.${strategy}`)}
-                          </span>
-                        </div>
-                        {selectedStrategy === strategy && (
-                          <Check className="h-4 w-4 text-[var(--primary)] shrink-0" />
-                        )}
-                      </div>
-                      <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? strategyDescriptions[strategy].ar : strategyDescriptions[strategy].en}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {wizardStep === 3 && (
-              <div className="max-h-[400px] overflow-y-auto">
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'تفاصيل خطة المعالجة' : 'Treatment plan details'}
-                </h4>
-                {/* Selected risk and strategy summary */}
-                {selectedRisk && selectedStrategy && (
-                  <div className="mb-3 p-2 rounded-lg bg-[var(--background)] border border-[var(--border)]">
-                    <div className="flex items-center gap-4 text-xs">
-                      <div>
-                        <span className="text-[var(--foreground-muted)]">{isAr ? 'الخطر:' : 'Risk:'}</span>
-                        <span className="ms-1 font-medium text-[var(--foreground)]">{selectedRisk.riskNumber}</span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--foreground-muted)]">{isAr ? 'الاستراتيجية:' : 'Strategy:'}</span>
-                        <span className="ms-1 font-medium text-[var(--foreground)]">{t(`treatment.strategies.${selectedStrategy}`)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Plan Title */}
-                  <div>
-                    <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                      {isAr ? 'عنوان الخطة' : 'Plan Title'}
-                    </label>
-                    <Input
-                      placeholder={isAr ? 'أدخل عنوان الخطة' : 'Enter plan title'}
-                      value={planTitle}
-                      onChange={(e) => setPlanTitle(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Responsible and Risk Owner */}
-                  <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
-                    {/* Responsible (Users) */}
-                    <div className="relative responsible-dropdown-container">
-                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'المسؤول عن خطة المعالجة' : 'Treatment Plan Responsible'}
-                      </label>
-                      <div className="relative">
-                        <Input
-                          placeholder={isAr ? 'ابحث عن المسؤول...' : 'Search for responsible...'}
-                          value={responsibleSearchQuery}
-                          onChange={(e) => {
-                            setResponsibleSearchQuery(e.target.value);
-                            setShowResponsibleDropdown(true);
-                            if (responsibleId) {
-                              const selected = responsibleOptions.find(o => o.id === responsibleId);
-                              const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
-                              if (e.target.value !== displayName) {
-                                setResponsibleId(null);
-                              }
-                            }
-                          }}
-                          onFocus={() => setShowResponsibleDropdown(true)}
-                          leftIcon={<User className="h-4 w-4" />}
-                        />
-                        {showResponsibleDropdown && (
-                          <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
-                            {responsibleOptions
-                              .filter(option => !option.id.startsWith('riskOwner_')) // Only show users, not risk owners
-                              .filter(option => {
-                                if (!responsibleSearchQuery) return true;
-                                const query = responsibleSearchQuery.toLowerCase();
-                                return option.name.toLowerCase().includes(query) || option.nameEn.toLowerCase().includes(query);
-                              })
-                              .slice(0, 10)
-                              .map((option) => (
-                                <button
-                                  key={option.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setResponsibleId(option.id);
-                                    setResponsibleSearchQuery(isAr ? option.name : option.nameEn);
-                                    setShowResponsibleDropdown(false);
-                                  }}
-                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${responsibleId === option.id ? 'bg-[var(--primary-light)]' : ''}`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium text-[var(--foreground)]">{isAr ? option.name : option.nameEn}</span>
-                                    {responsibleId === option.id && <Check className="h-4 w-4 text-[var(--primary)]" />}
-                                  </div>
-                                  <span className="text-xs text-[var(--foreground-muted)]">{option.role}</span>
-                                </button>
-                              ))}
-                            {responsibleOptions.filter(o => !o.id.startsWith('riskOwner_')).filter(o => !responsibleSearchQuery || o.name.toLowerCase().includes(responsibleSearchQuery.toLowerCase())).length === 0 && (
-                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد نتائج' : 'No results found'}</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {responsibleId && <p className="mt-1 text-xs text-[var(--status-success)]">{isAr ? '✓ تم اختيار المسؤول' : '✓ Responsible selected'}</p>}
-                    </div>
-
-                    {/* Risk Owner (from RiskOwner table) */}
-                    <div className="relative risk-owner-dropdown-container">
-                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'صاحب الخطر' : 'Risk Owner'}
-                      </label>
-                      <div className="relative">
-                        <Input
-                          placeholder={isAr ? 'ابحث عن صاحب الخطر...' : 'Search for risk owner...'}
-                          value={riskOwnerSearchQuery}
-                          onChange={(e) => {
-                            setRiskOwnerSearchQuery(e.target.value);
-                            setShowRiskOwnerDropdown(true);
-                            if (riskOwnerId) {
-                              const selected = riskOwnersList.find(o => o.id === riskOwnerId);
-                              const displayName = selected ? (isAr ? selected.nameAr : selected.nameEn) : '';
-                              if (e.target.value !== displayName) {
-                                setRiskOwnerId(null);
-                              }
-                            }
-                          }}
-                          onFocus={() => setShowRiskOwnerDropdown(true)}
-                          leftIcon={<Shield className="h-4 w-4" />}
-                        />
-                        {showRiskOwnerDropdown && (
-                          <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
-                            {riskOwnersList
-                              .filter(owner => {
-                                if (!riskOwnerSearchQuery) return true;
-                                const query = riskOwnerSearchQuery.toLowerCase();
-                                return owner.nameAr.toLowerCase().includes(query) || owner.nameEn.toLowerCase().includes(query);
-                              })
-                              .slice(0, 10)
-                              .map((owner) => (
-                                <button
-                                  key={owner.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setRiskOwnerId(owner.id);
-                                    setRiskOwnerSearchQuery(isAr ? owner.nameAr : owner.nameEn);
-                                    setShowRiskOwnerDropdown(false);
-                                  }}
-                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${riskOwnerId === owner.id ? 'bg-[var(--primary-light)]' : ''}`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium text-[var(--foreground)]">{isAr ? owner.nameAr : owner.nameEn}</span>
-                                    {riskOwnerId === owner.id && <Check className="h-4 w-4 text-[var(--primary)]" />}
-                                  </div>
-                                </button>
-                              ))}
-                            {riskOwnersList.filter(o => !riskOwnerSearchQuery || o.nameAr.toLowerCase().includes(riskOwnerSearchQuery.toLowerCase())).length === 0 && (
-                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد نتائج' : 'No results found'}</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {riskOwnerId && <p className="mt-1 text-xs text-[var(--status-success)]">{isAr ? '✓ تم اختيار صاحب الخطر' : '✓ Risk owner selected'}</p>}
-                    </div>
-                  </div>
-
-                  {/* Monitor and Priority */}
-                  <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
-                    {/* Monitor (Users) */}
-                    <div className="relative monitor-dropdown-container">
-                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'متابع التنفيذ' : 'Monitor / Auditor'}
-                      </label>
-                      <div className="relative">
-                        <Input
-                          placeholder={isAr ? 'ابحث عن متابع التنفيذ...' : 'Search for monitor...'}
-                          value={monitorSearchQuery}
-                          onChange={(e) => {
-                            setMonitorSearchQuery(e.target.value);
-                            setShowMonitorDropdown(true);
-                            if (monitorId) {
-                              const selected = responsibleOptions.find(o => o.id === monitorId);
-                              const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
-                              if (e.target.value !== displayName) {
-                                setMonitorId(null);
-                              }
-                            }
-                          }}
-                          onFocus={() => setShowMonitorDropdown(true)}
-                          leftIcon={<User className="h-4 w-4" />}
-                        />
-                        {showMonitorDropdown && (
-                          <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
-                            {responsibleOptions
-                              .filter(option => !option.id.startsWith('riskOwner_'))
-                              .filter(option => {
-                                if (!monitorSearchQuery) return true;
-                                const query = monitorSearchQuery.toLowerCase();
-                                return option.name.toLowerCase().includes(query) || option.nameEn.toLowerCase().includes(query);
-                              })
-                              .slice(0, 10)
-                              .map((option) => (
-                                <button
-                                  key={option.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setMonitorId(option.id);
-                                    setMonitorSearchQuery(isAr ? option.name : option.nameEn);
-                                    setShowMonitorDropdown(false);
-                                  }}
-                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${monitorId === option.id ? 'bg-[var(--primary-light)]' : ''}`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium text-[var(--foreground)]">{isAr ? option.name : option.nameEn}</span>
-                                    {monitorId === option.id && <Check className="h-4 w-4 text-[var(--primary)]" />}
-                                  </div>
-                                  <span className="text-xs text-[var(--foreground-muted)]">{option.role}</span>
-                                </button>
-                              ))}
-                            {responsibleOptions.filter(o => !o.id.startsWith('riskOwner_')).filter(o => !monitorSearchQuery || o.name.toLowerCase().includes(monitorSearchQuery.toLowerCase())).length === 0 && (
-                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد نتائج' : 'No results found'}</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {monitorId && <p className="mt-1 text-xs text-[var(--status-success)]">{isAr ? '✓ تم اختيار متابع التنفيذ' : '✓ Monitor selected'}</p>}
-                    </div>
-
-                    {/* Priority */}
-                    <div>
-                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'أولوية المعالجة' : 'Treatment Priority'}
-                      </label>
-                      <select
-                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-                        value={priority}
-                        onChange={(e) => setPriority(e.target.value as 'high' | 'medium' | 'low')}
-                      >
-                        <option value="high">{isAr ? 'عالية' : 'High'}</option>
-                        <option value="medium">{isAr ? 'متوسطة' : 'Medium'}</option>
-                        <option value="low">{isAr ? 'منخفضة' : 'Low'}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Start Date and Due Date */}
-                  <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'تاريخ البدء' : 'Start Date'}
-                      </label>
-                      <Input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'تاريخ الاستحقاق' : 'Due Date'}
-                      </label>
-                      <Input
-                        type="date"
-                        value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Expected Residual Risk Section */}
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                    <h5 className="mb-2 text-xs sm:text-sm font-semibold text-[var(--foreground)]">
-                      {isAr ? 'الخطر المتبقي المتوقع بعد المعالجة' : 'Expected Residual Risk After Treatment'}
-                    </h5>
-                    <p className="mb-3 text-[10px] sm:text-xs text-[var(--foreground-muted)]">
-                      {isAr ? 'حدد مستوى الخطر المتوقع بعد تنفيذ خطة المعالجة' : 'Specify the expected risk level after implementing the treatment plan'}
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div>
-                        <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                          {isAr ? 'الاحتمالية المتوقعة' : 'Expected Likelihood'}
-                        </label>
-                        <select
-                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-                          value={expectedResidualLikelihood ?? ''}
-                          onChange={(e) => setExpectedResidualLikelihood(e.target.value ? Number(e.target.value) : null)}
-                        >
-                          <option value="">{isAr ? 'اختر...' : 'Select...'}</option>
-                          <option value="1">{isAr ? '1 - نادر جداً' : '1 - Very Rare'}</option>
-                          <option value="2">{isAr ? '2 - نادر' : '2 - Rare'}</option>
-                          <option value="3">{isAr ? '3 - محتمل' : '3 - Possible'}</option>
-                          <option value="4">{isAr ? '4 - مرجح' : '4 - Likely'}</option>
-                          <option value="5">{isAr ? '5 - شبه مؤكد' : '5 - Almost Certain'}</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                          {isAr ? 'التأثير المتوقع' : 'Expected Impact'}
-                        </label>
-                        <select
-                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-                          value={expectedResidualImpact ?? ''}
-                          onChange={(e) => setExpectedResidualImpact(e.target.value ? Number(e.target.value) : null)}
-                        >
-                          <option value="">{isAr ? 'اختر...' : 'Select...'}</option>
-                          <option value="1">{isAr ? '1 - ضئيل' : '1 - Negligible'}</option>
-                          <option value="2">{isAr ? '2 - طفيف' : '2 - Minor'}</option>
-                          <option value="3">{isAr ? '3 - معتدل' : '3 - Moderate'}</option>
-                          <option value="4">{isAr ? '4 - كبير' : '4 - Major'}</option>
-                          <option value="5">{isAr ? '5 - كارثي' : '5 - Catastrophic'}</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                          {isAr ? 'الدرجة المتوقعة' : 'Expected Score'}
-                        </label>
-                        <div className={`rounded-lg border px-3 py-2 text-sm font-medium ${
-                          expectedResidualLikelihood && expectedResidualImpact
-                            ? (expectedResidualLikelihood * expectedResidualImpact) >= 15
-                              ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                              : (expectedResidualLikelihood * expectedResidualImpact) >= 8
-                              ? 'border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
-                              : 'border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                            : 'border-[var(--border)] bg-[var(--background-secondary)] text-[var(--foreground-muted)]'
-                        }`}>
-                          {expectedResidualLikelihood && expectedResidualImpact
-                            ? expectedResidualLikelihood * expectedResidualImpact
-                            : isAr ? 'غير محدد' : 'N/A'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {wizardStep === 4 && (
-              <div className="max-h-[400px] overflow-y-auto">
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'إضافة المهام' : 'Add Tasks'}
-                </h4>
-                <p className="mb-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? 'قم بتقسيم خطة المعالجة إلى مهام قابلة للتتبع'
-                    : 'Break down the treatment plan into trackable tasks'}
-                </p>
-
-                {/* Task input form */}
-                <div className="mb-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--background)] space-y-3">
-                  {/* Task Titles */}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'عنوان المهمة (عربي)' : 'Task Title (Arabic)'}
-                      </label>
-                      <Input
-                        placeholder={isAr ? 'أدخل عنوان المهمة بالعربية' : 'Enter task title in Arabic'}
-                        value={newTaskTitleAr}
-                        onChange={(e) => setNewTaskTitleAr(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'عنوان المهمة (إنجليزي)' : 'Task Title (English)'}
-                      </label>
-                      <Input
-                        placeholder={isAr ? 'أدخل عنوان المهمة بالإنجليزية' : 'Enter task title in English'}
-                        value={newTaskTitleEn}
-                        onChange={(e) => setNewTaskTitleEn(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Action Owner and Monitor */}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {/* Action Owner (from RiskOwner) */}
-                    <div className="relative task-action-owner-dropdown-container">
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'منفذ الإجراء' : 'Action Owner'}
-                      </label>
-                      <div className="relative">
-                        <Input
-                          placeholder={isAr ? 'ابحث عن منفذ الإجراء...' : 'Search for action owner...'}
-                          value={taskActionOwnerSearchQuery}
-                          onChange={(e) => {
-                            setTaskActionOwnerSearchQuery(e.target.value);
-                            setShowTaskActionOwnerDropdown(true);
-                            if (newTaskActionOwnerId) {
-                              const selected = riskOwnersList.find(o => o.id === newTaskActionOwnerId);
-                              const displayName = selected ? (isAr ? selected.nameAr : selected.nameEn) : '';
-                              if (e.target.value !== displayName) {
-                                setNewTaskActionOwnerId(null);
-                              }
-                            }
-                          }}
-                          onFocus={() => setShowTaskActionOwnerDropdown(true)}
-                          leftIcon={<Shield className="h-4 w-4" />}
-                        />
-                        {showTaskActionOwnerDropdown && (
-                          <div className="absolute z-10 mt-1 w-full max-h-32 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
-                            {riskOwnersList
-                              .filter(owner => {
-                                if (!taskActionOwnerSearchQuery) return true;
-                                const query = taskActionOwnerSearchQuery.toLowerCase();
-                                return owner.nameAr.toLowerCase().includes(query) || owner.nameEn.toLowerCase().includes(query);
-                              })
-                              .slice(0, 10)
-                              .map((owner) => (
-                                <button
-                                  key={owner.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setNewTaskActionOwnerId(owner.id);
-                                    setTaskActionOwnerSearchQuery(isAr ? owner.nameAr : owner.nameEn);
-                                    setShowTaskActionOwnerDropdown(false);
-                                  }}
-                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${newTaskActionOwnerId === owner.id ? 'bg-[var(--primary-light)]' : ''}`}
-                                >
-                                  <span className="font-medium text-[var(--foreground)]">{isAr ? owner.nameAr : owner.nameEn}</span>
-                                </button>
-                              ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Task Monitor (from Users) */}
-                    <div className="relative task-monitor-dropdown-container">
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'متابع التنفيذ' : 'Task Monitor'}
-                      </label>
-                      <div className="relative">
-                        <Input
-                          placeholder={isAr ? 'ابحث عن متابع التنفيذ...' : 'Search for monitor...'}
-                          value={taskMonitorSearchQuery}
-                          onChange={(e) => {
-                            setTaskMonitorSearchQuery(e.target.value);
-                            setShowTaskMonitorDropdown(true);
-                            if (newTaskMonitorId) {
-                              const selected = responsibleOptions.find(o => o.id === newTaskMonitorId);
-                              const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
-                              if (e.target.value !== displayName) {
-                                setNewTaskMonitorId(null);
-                              }
-                            }
-                          }}
-                          onFocus={() => setShowTaskMonitorDropdown(true)}
-                          leftIcon={<User className="h-4 w-4" />}
-                        />
-                        {showTaskMonitorDropdown && (
-                          <div className="absolute z-10 mt-1 w-full max-h-32 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
-                            {responsibleOptions
-                              .filter(option => !option.id.startsWith('riskOwner_'))
-                              .filter(option => {
-                                if (!taskMonitorSearchQuery) return true;
-                                const query = taskMonitorSearchQuery.toLowerCase();
-                                return option.name.toLowerCase().includes(query) || option.nameEn.toLowerCase().includes(query);
-                              })
-                              .slice(0, 10)
-                              .map((option) => (
-                                <button
-                                  key={option.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setNewTaskMonitorId(option.id);
-                                    setTaskMonitorSearchQuery(isAr ? option.name : option.nameEn);
-                                    setShowTaskMonitorDropdown(false);
-                                  }}
-                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${newTaskMonitorId === option.id ? 'bg-[var(--primary-light)]' : ''}`}
-                                >
-                                  <span className="font-medium text-[var(--foreground)]">{isAr ? option.name : option.nameEn}</span>
-                                  <span className="text-xs text-[var(--foreground-muted)] block">{option.role}</span>
-                                </button>
-                              ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Success Indicators */}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'مؤشر الإنجاز (عربي)' : 'Success Indicator (Arabic)'}
-                      </label>
-                      <Input
-                        placeholder={isAr ? 'كيف يعرف المتابع أن المهمة أُنجزت؟' : 'How does the monitor know the task is done?'}
-                        value={newTaskSuccessIndicatorAr}
-                        onChange={(e) => setNewTaskSuccessIndicatorAr(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'مؤشر الإنجاز (إنجليزي)' : 'Success Indicator (English)'}
-                      </label>
-                      <Input
-                        placeholder={isAr ? 'كيف يعرف المتابع أن المهمة أُنجزت؟' : 'How does the monitor know the task is done?'}
-                        value={newTaskSuccessIndicatorEn}
-                        onChange={(e) => setNewTaskSuccessIndicatorEn(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Priority and Due Date */}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'الأولوية' : 'Priority'}
-                      </label>
-                      <select
-                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-                        value={newTaskPriority}
-                        onChange={(e) => setNewTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
-                      >
-                        <option value="high">{isAr ? 'عالية' : 'High'}</option>
-                        <option value="medium">{isAr ? 'متوسطة' : 'Medium'}</option>
-                        <option value="low">{isAr ? 'منخفضة' : 'Low'}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'تاريخ الاستحقاق' : 'Due Date'}
-                      </label>
-                      <Input
-                        type="date"
-                        value={newTaskDueDate}
-                        onChange={(e) => setNewTaskDueDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      leftIcon={<Plus className="h-4 w-4" />}
-                      onClick={addTask}
-                      disabled={!newTaskTitleAr.trim() && !newTaskTitleEn.trim()}
-                    >
-                      <span className="text-xs sm:text-sm">{isAr ? 'إضافة مهمة' : 'Add Task'}</span>
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Tasks list */}
-                {tasks.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-[var(--foreground-secondary)]">
-                      {isAr ? `المهام المضافة (${tasks.length})` : `Added Tasks (${tasks.length})`}
-                    </p>
-                    {tasks.map((task, index) => (
-                      <div
-                        key={task.id}
-                        className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--background-tertiary)] text-xs font-medium">
-                              {index + 1}
-                            </span>
-                            <span className="text-sm font-medium text-[var(--foreground)] truncate">
-                              {isAr ? task.titleAr : task.titleEn}
-                            </span>
-                            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
-                              task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                              task.priority === 'low' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                              'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                            }`}>
-                              {task.priority === 'high' ? (isAr ? 'عالية' : 'High') :
-                               task.priority === 'low' ? (isAr ? 'منخفضة' : 'Low') :
-                               (isAr ? 'متوسطة' : 'Medium')}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => removeTask(task.id)}
-                            className="shrink-0 p-1 text-[var(--foreground-muted)] hover:text-[var(--status-error)] transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        {(task.successIndicatorAr || task.successIndicatorEn || task.dueDate) && (
-                          <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-[var(--foreground-muted)]">
-                            {(task.successIndicatorAr || task.successIndicatorEn) && (
-                              <span>{isAr ? 'المؤشر:' : 'Indicator:'} {isAr ? task.successIndicatorAr : task.successIndicatorEn}</span>
-                            )}
-                            {task.dueDate && (
-                              <span>{isAr ? 'الاستحقاق:' : 'Due:'} {new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-[var(--border)] p-4 text-center">
-                    <ListChecks className="mx-auto h-8 w-8 text-[var(--foreground-muted)]" />
-                    <p className="mt-2 text-sm text-[var(--foreground-muted)]">
-                      {isAr ? 'لم يتم إضافة أي مهام بعد' : 'No tasks added yet'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {wizardStep === 5 && (
-              <div>
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'مراجعة وحفظ' : 'Review and Save'}
-                </h4>
-                <p className="mb-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? 'راجع تفاصيل خطة المعالجة قبل الحفظ'
-                    : 'Review treatment plan details before saving'}
-                </p>
-
-                {/* Summary */}
-                <div className="space-y-3">
-                  {/* Risk */}
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'الخطر' : 'Risk'}</p>
-                    {selectedRisk ? (
-                      <p className="text-sm font-medium text-[var(--foreground)]">
-                        {selectedRisk.riskNumber} - {isAr ? selectedRisk.titleAr : selectedRisk.titleEn}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-[var(--status-error)]">{isAr ? 'لم يتم اختيار خطر' : 'No risk selected'}</p>
-                    )}
-                  </div>
-
-                  {/* Strategy */}
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'الاستراتيجية' : 'Strategy'}</p>
-                    {selectedStrategy ? (
-                      <div className="flex items-center gap-2">
-                        {getStrategyIcon(selectedStrategy)}
-                        <span className="text-sm font-medium text-[var(--foreground)]">
-                          {t(`treatment.strategies.${selectedStrategy}`)}
-                        </span>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-[var(--status-error)]">{isAr ? 'لم يتم اختيار استراتيجية' : 'No strategy selected'}</p>
-                    )}
-                  </div>
-
-                  {/* Plan Details */}
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                      <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'عنوان الخطة' : 'Plan Title'}</p>
-                      <p className="text-sm font-medium text-[var(--foreground)]">
-                        {planTitle || (isAr ? 'غير محدد' : 'Not specified')}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                      <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'تاريخ الانتهاء' : 'Due Date'}</p>
-                      <p className="text-sm font-medium text-[var(--foreground)]">
-                        {dueDate ? new Date(dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : (isAr ? 'غير محدد' : 'Not specified')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Responsible */}
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'المسؤول' : 'Responsible'}</p>
-                    {responsibleId ? (
-                      <p className="text-sm font-medium text-[var(--foreground)]">
-                        {(() => {
-                          const responsible = responsibleOptions.find(o => o.id === responsibleId);
-                          return responsible ? (isAr ? `${responsible.name} (${responsible.role})` : `${responsible.nameEn} (${responsible.role})`) : '-';
-                        })()}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-[var(--status-error)]">{isAr ? 'لم يتم اختيار مسؤول' : 'No responsible selected'}</p>
-                    )}
-                  </div>
-
-                  {/* Tasks */}
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'المهام' : 'Tasks'}</p>
-                    {tasks.length > 0 ? (
-                      <ul className="text-sm space-y-1">
-                        {tasks.map((task, index) => (
-                          <li key={task.id} className="flex items-center gap-2 text-[var(--foreground)]">
-                            <span className="text-[var(--foreground-muted)]">{index + 1}.</span>
-                            {isAr ? task.titleAr : task.titleEn}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد مهام' : 'No tasks'}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Guidance Panel */}
-          <div className="rounded-lg border border-[var(--primary)]/30 bg-[var(--primary-light)] p-2 sm:p-3 md:p-4">
-            <div className="flex gap-2 sm:gap-3">
-              <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-[var(--primary)]" />
-              <div className="min-w-0">
-                <h5 className="text-xs sm:text-sm font-medium text-[var(--foreground)]">
-                  {isAr ? 'نصيحة' : 'Tip'}
-                </h5>
-                <p className="mt-1 text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
-                  {wizardStep === 1 && (isAr
-                    ? 'ابدأ بالمخاطر ذات التصنيف الحرج (Critical) أو الرئيسي (Major) لأنها تتطلب معالجة عاجلة'
-                    : 'Start with Critical or Major rated risks as they require urgent treatment')}
-                  {wizardStep === 2 && (isAr
-                    ? 'استراتيجية التخفيف (Reduce) هي الأكثر شيوعاً وتناسب معظم المخاطر التشغيلية'
-                    : 'The Reduce strategy is most common and suits most operational risks')}
-                  {wizardStep === 3 && (isAr
-                    ? 'حدد مسؤولاً واضحاً لكل خطة معالجة لضمان المتابعة والمساءلة'
-                    : 'Assign a clear owner for each treatment plan to ensure accountability')}
-                  {wizardStep === 4 && (isAr
-                    ? 'قسم الخطة إلى مهام صغيرة يمكن إنجازها في أسبوع أو أقل'
-                    : 'Break down the plan into small tasks that can be completed in a week or less')}
-                  {wizardStep === 5 && (isAr
-                    ? 'تأكد من مراجعة جميع التفاصيل قبل الحفظ'
-                    : 'Make sure to review all details before saving')}
-                </p>
-              </div>
+              )}
             </div>
           </div>
-        </div>
-        <ModalFooter>
-          <Button variant="outline" size="sm" onClick={() => {
-            setShowAddModal(false);
-            resetWizardForm();
-          }}>
-            <span className="text-xs sm:text-sm">{t('common.cancel')}</span>
-          </Button>
-          <div className="flex gap-2">
-            {wizardStep > 1 && (
-              <Button variant="outline" size="sm" onClick={() => setWizardStep(wizardStep - 1)}>
-                <ArrowLeft className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                <span className="text-xs sm:text-sm">{isAr ? 'السابق' : 'Previous'}</span>
-              </Button>
-            )}
-            {wizardStep < 5 ? (
-              <Button
-                size="sm"
-                onClick={() => setWizardStep(wizardStep + 1)}
-                disabled={
-                  (wizardStep === 1 && !selectedRiskId) ||
-                  (wizardStep === 2 && !selectedStrategy)
-                }
-              >
-                <span className="text-xs sm:text-sm">{isAr ? 'التالي' : 'Next'}</span>
-                <ArrowRight className="ms-1 sm:ms-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={async () => {
-                  if (!selectedRiskId || !selectedStrategy || !responsibleId) return;
 
-                  setIsSaving(true);
-                  try {
-                    // Create treatment plan
-                    const treatmentResponse = await fetch(`/api/risks/${selectedRiskId}/treatments`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        titleAr: planTitle || (isAr ? 'خطة معالجة' : 'Treatment Plan'),
-                        titleEn: planTitle || 'Treatment Plan',
-                        descriptionAr: '',
-                        descriptionEn: '',
-                        strategy: selectedStrategy,
-                        status: 'notStarted',
-                        priority: priority,
-                        responsibleId: responsibleId,
-                        riskOwnerId: riskOwnerId || null,
-                        monitorId: monitorId || null,
-                        startDate: startDate || new Date().toISOString(),
-                        dueDate: dueDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-                        progress: 0,
-                        expectedResidualLikelihood: expectedResidualLikelihood,
-                        expectedResidualImpact: expectedResidualImpact,
-                        expectedResidualRating: expectedResidualLikelihood && expectedResidualImpact
-                          ? (expectedResidualLikelihood * expectedResidualImpact) >= 15 ? 'Critical'
-                            : (expectedResidualLikelihood * expectedResidualImpact) >= 10 ? 'Major'
-                            : (expectedResidualLikelihood * expectedResidualImpact) >= 5 ? 'Moderate'
-                            : 'Minor'
-                          : null,
-                      }),
-                    });
-
-                    const treatmentResult = await treatmentResponse.json();
-
-                    if (treatmentResult.success && treatmentResult.data) {
-                      const treatmentPlanId = treatmentResult.data.id;
-
-                      // Create tasks if any
-                      for (let i = 0; i < tasks.length; i++) {
-                        const task = tasks[i];
-                        await fetch(`/api/risks/${selectedRiskId}/treatments/${treatmentPlanId}/tasks`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            titleAr: task.titleAr,
-                            titleEn: task.titleEn,
-                            status: 'notStarted',
-                            priority: task.priority || 'medium',
-                            actionOwnerId: task.actionOwnerId || null,
-                            monitorId: task.monitorId || null,
-                            successIndicatorAr: task.successIndicatorAr || '',
-                            successIndicatorEn: task.successIndicatorEn || '',
-                            dueDate: task.dueDate || null,
-                            order: i,
-                          }),
-                        });
-                      }
-
-                      // Refresh the page to show new data
-                      window.location.reload();
-                    } else {
-                      console.error('Failed to create treatment plan:', treatmentResult.error);
-                      alert(isAr ? 'فشل في إنشاء خطة المعالجة' : 'Failed to create treatment plan');
-                    }
-                  } catch (error) {
-                    console.error('Error creating treatment plan:', error);
-                    alert(isAr ? 'حدث خطأ أثناء الحفظ' : 'An error occurred while saving');
-                  } finally {
-                    setIsSaving(false);
-                    setShowAddModal(false);
-                    resetWizardForm();
-                  }
-                }}
-                disabled={!selectedRiskId || !selectedStrategy || !responsibleId || isSaving}
-              >
-                {isSaving ? (
-                  <Loader2 className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0 animate-spin" />
-                ) : (
-                  <Check className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                )}
-                <span className="text-xs sm:text-sm">{isSaving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t('common.save')}</span>
-              </Button>
-            )}
-          </div>
-        </ModalFooter>
-      </Modal>
-
-      {/* Edit Treatment Modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          resetEditForm();
-        }}
-        title={isAr ? 'تعديل خطة المعالجة' : 'Edit Treatment Plan'}
-        size="lg"
-      >
-        <div className="space-y-3 sm:space-y-4 md:space-y-6">
-          {/* Edit Wizard Steps */}
-          <div className="flex items-center justify-between overflow-x-auto">
-            {[
-              { id: 1, labelAr: 'الاستراتيجية', labelEn: 'Strategy' },
-              { id: 2, labelAr: 'تفاصيل الخطة', labelEn: 'Plan Details' },
-              { id: 3, labelAr: 'المهام', labelEn: 'Tasks' },
-              { id: 4, labelAr: 'المراجعة', labelEn: 'Review' },
-            ].map((step, index) => (
-              <React.Fragment key={step.id}>
-                <div className="flex flex-col items-center shrink-0">
-                  <div
-                    className={`flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-medium ${
-                      editWizardStep === step.id
-                        ? 'bg-[var(--primary)] text-white'
-                        : editWizardStep > step.id
-                        ? 'bg-[var(--status-success)] text-white'
-                        : 'bg-[var(--background-tertiary)] text-[var(--foreground-muted)]'
-                    }`}
-                  >
-                    {editWizardStep > step.id ? <Check className="h-3 w-3 sm:h-4 sm:w-4" /> : step.id}
-                  </div>
-                  <span className="mt-1 text-[10px] sm:text-xs text-[var(--foreground-secondary)] text-center max-w-[60px] sm:max-w-none truncate">
-                    {isAr ? step.labelAr : step.labelEn}
-                  </span>
-                </div>
-                {index < 3 && (
-                  <div
-                    className={`h-0.5 flex-1 mx-1 sm:mx-2 min-w-[20px] ${
-                      editWizardStep > step.id ? 'bg-[var(--status-success)]' : 'bg-[var(--background-tertiary)]'
-                    }`}
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-
-          {/* Edit Step Content */}
-          <div className="min-h-[150px] sm:min-h-[200px] rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4">
-            {/* Show selected risk info */}
-            {editingTreatmentId && (
-              <div className="mb-3 p-2 rounded-lg bg-[var(--background)] border border-[var(--border)]">
-                <p className="text-xs text-[var(--foreground-muted)]">
-                  {isAr ? 'الخطر:' : 'Risk:'}
-                </p>
-                <p className="text-sm font-medium text-[var(--foreground)]">
-                  {(() => {
-                    const treatment = treatments.find(t => t.id === editingTreatmentId);
-                    return treatment ? `${treatment.riskNumber} - ${isAr ? treatment.riskTitleAr : treatment.riskTitleEn}` : '-';
-                  })()}
-                </p>
-              </div>
-            )}
-
-            {editWizardStep === 1 && (
-              <div>
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'تعديل استراتيجية المعالجة' : 'Edit treatment strategy'}
-                </h4>
-                <div className="grid gap-2 sm:gap-3 sm:grid-cols-2">
-                  {(['avoid', 'reduce', 'transfer', 'accept'] as TreatmentStrategy[]).map((strategy) => (
-                    <button
-                      key={strategy}
-                      onClick={() => setSelectedStrategy(strategy)}
-                      className={`rounded-lg border p-2 sm:p-3 md:p-4 text-start transition-colors ${
-                        selectedStrategy === strategy
-                          ? 'border-[var(--primary)] bg-[var(--primary-light)]'
-                          : 'border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {getStrategyIcon(strategy)}
-                          <span className="text-xs sm:text-sm font-medium text-[var(--foreground)]">
-                            {t(`treatment.strategies.${strategy}`)}
-                          </span>
-                        </div>
-                        {selectedStrategy === strategy && (
-                          <Check className="h-4 w-4 text-[var(--primary)] shrink-0" />
-                        )}
-                      </div>
-                      <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? strategyDescriptions[strategy].ar : strategyDescriptions[strategy].en}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {editWizardStep === 2 && (
-              <div>
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'تعديل تفاصيل الخطة' : 'Edit plan details'}
-                </h4>
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
-                    <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                      {isAr ? 'عنوان الخطة' : 'Plan Title'}
-                    </label>
-                    <Input
-                      placeholder={isAr ? 'أدخل عنوان الخطة' : 'Enter plan title'}
-                      value={planTitle}
-                      onChange={(e) => setPlanTitle(e.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2 sm:gap-3 md:gap-4 sm:grid-cols-2">
-                    <div className="relative responsible-dropdown-container">
-                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'المسؤول' : 'Responsible'}
-                      </label>
-                      <div className="relative">
-                        <Input
-                          placeholder={isAr ? 'ابحث عن المسؤول...' : 'Search for responsible...'}
-                          value={responsibleSearchQuery}
-                          onChange={(e) => {
-                            setResponsibleSearchQuery(e.target.value);
-                            setShowResponsibleDropdown(true);
-                            if (responsibleId) {
-                              const selected = responsibleOptions.find(o => o.id === responsibleId);
-                              const displayName = selected ? (isAr ? selected.name : selected.nameEn) : '';
-                              if (e.target.value !== displayName) {
-                                setResponsibleId(null);
-                              }
-                            }
-                          }}
-                          onFocus={() => setShowResponsibleDropdown(true)}
-                          leftIcon={<User className="h-4 w-4" />}
-                        />
-                        {showResponsibleDropdown && (
-                          <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg">
-                            {responsibleOptions
-                              .filter(option => {
-                                if (!responsibleSearchQuery) return true;
-                                const query = responsibleSearchQuery.toLowerCase();
-                                return (
-                                  option.name.toLowerCase().includes(query) ||
-                                  option.nameEn.toLowerCase().includes(query) ||
-                                  option.role.toLowerCase().includes(query)
-                                );
-                              })
-                              .slice(0, 10)
-                              .map((option) => (
-                                <button
-                                  key={option.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setResponsibleId(option.id);
-                                    setResponsibleSearchQuery(isAr ? option.name : option.nameEn);
-                                    setShowResponsibleDropdown(false);
-                                  }}
-                                  className={`w-full px-3 py-2 text-start text-sm hover:bg-[var(--background-secondary)] ${
-                                    responsibleId === option.id ? 'bg-[var(--primary-light)]' : ''
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium text-[var(--foreground)]">
-                                      {isAr ? option.name : option.nameEn}
-                                    </span>
-                                    {responsibleId === option.id && (
-                                      <Check className="h-4 w-4 text-[var(--primary)]" />
-                                    )}
-                                  </div>
-                                  <span className="text-xs text-[var(--foreground-muted)]">
-                                    {option.role}
-                                  </span>
-                                </button>
-                              ))}
-                            {responsibleOptions.filter(option => {
-                              if (!responsibleSearchQuery) return true;
-                              const query = responsibleSearchQuery.toLowerCase();
-                              return (
-                                option.name.toLowerCase().includes(query) ||
-                                option.nameEn.toLowerCase().includes(query) ||
-                                option.role.toLowerCase().includes(query)
-                              );
-                            }).length === 0 && (
-                              <div className="px-3 py-2 text-sm text-[var(--foreground-muted)]">
-                                {isAr ? 'لا توجد نتائج' : 'No results found'}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {responsibleId && (
-                        <p className="mt-1 text-xs text-[var(--status-success)]">
-                          {isAr ? '✓ تم اختيار المسؤول' : '✓ Responsible selected'}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? 'تاريخ الانتهاء' : 'Due Date'}
-                      </label>
-                      <Input
-                        type="date"
-                        value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {editWizardStep === 3 && (
-              <div>
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'تعديل المهام' : 'Edit Tasks'}
-                </h4>
-                <p className="mb-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? 'يمكنك إضافة أو حذف المهام'
-                    : 'You can add or remove tasks'}
-                </p>
-
-                {/* Task input form */}
-                <div className="mb-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'عنوان المهمة (عربي)' : 'Task Title (Arabic)'}
-                      </label>
-                      <Input
-                        placeholder={isAr ? 'أدخل عنوان المهمة بالعربية' : 'Enter task title in Arabic'}
-                        value={newTaskTitleAr}
-                        onChange={(e) => setNewTaskTitleAr(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-[var(--foreground-secondary)]">
-                        {isAr ? 'عنوان المهمة (إنجليزي)' : 'Task Title (English)'}
-                      </label>
-                      <Input
-                        placeholder={isAr ? 'أدخل عنوان المهمة بالإنجليزية' : 'Enter task title in English'}
-                        value={newTaskTitleEn}
-                        onChange={(e) => setNewTaskTitleEn(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-2 flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      leftIcon={<Plus className="h-4 w-4" />}
-                      onClick={addTask}
-                      disabled={!newTaskTitleAr.trim() && !newTaskTitleEn.trim()}
-                    >
-                      <span className="text-xs sm:text-sm">{isAr ? 'إضافة مهمة' : 'Add Task'}</span>
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Tasks list */}
-                {tasks.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-[var(--foreground-secondary)]">
-                      {isAr ? `المهام (${tasks.length})` : `Tasks (${tasks.length})`}
-                    </p>
-                    {tasks.map((task, index) => (
-                      <div
-                        key={task.id}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] p-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--background-tertiary)] text-xs font-medium">
-                            {index + 1}
-                          </span>
-                          <span className="text-sm text-[var(--foreground)] truncate">
-                            {isAr ? task.titleAr : task.titleEn}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => removeTask(task.id)}
-                          className="shrink-0 p-1 text-[var(--foreground-muted)] hover:text-[var(--status-error)] transition-colors"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-[var(--border)] p-4 text-center">
-                    <ListChecks className="mx-auto h-8 w-8 text-[var(--foreground-muted)]" />
-                    <p className="mt-2 text-sm text-[var(--foreground-muted)]">
-                      {isAr ? 'لم يتم إضافة أي مهام بعد' : 'No tasks added yet'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {editWizardStep === 4 && (
-              <div>
-                <h4 className="mb-2 sm:mb-3 text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                  {isAr ? 'مراجعة التعديلات' : 'Review Changes'}
-                </h4>
-                <p className="mb-3 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? 'راجع التعديلات قبل الحفظ'
-                    : 'Review changes before saving'}
-                </p>
-
-                {/* Summary */}
-                <div className="space-y-3">
-                  {/* Strategy */}
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'الاستراتيجية' : 'Strategy'}</p>
-                    {selectedStrategy ? (
-                      <div className="flex items-center gap-2">
-                        {getStrategyIcon(selectedStrategy)}
-                        <span className="text-sm font-medium text-[var(--foreground)]">
-                          {t(`treatment.strategies.${selectedStrategy}`)}
-                        </span>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-[var(--status-error)]">{isAr ? 'لم يتم اختيار استراتيجية' : 'No strategy selected'}</p>
-                    )}
-                  </div>
-
-                  {/* Plan Details */}
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                      <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'عنوان الخطة' : 'Plan Title'}</p>
-                      <p className="text-sm font-medium text-[var(--foreground)]">
-                        {planTitle || (isAr ? 'غير محدد' : 'Not specified')}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                      <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'تاريخ الانتهاء' : 'Due Date'}</p>
-                      <p className="text-sm font-medium text-[var(--foreground)]">
-                        {dueDate ? new Date(dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : (isAr ? 'غير محدد' : 'Not specified')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Responsible */}
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'المسؤول' : 'Responsible'}</p>
-                    {responsibleId ? (
-                      <p className="text-sm font-medium text-[var(--foreground)]">
-                        {(() => {
-                          const responsible = responsibleOptions.find(o => o.id === responsibleId);
-                          return responsible ? (isAr ? `${responsible.name} (${responsible.role})` : `${responsible.nameEn} (${responsible.role})`) : '-';
-                        })()}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-[var(--foreground-muted)]">{isAr ? 'غير محدد' : 'Not specified'}</p>
-                    )}
-                  </div>
-
-                  {/* Tasks */}
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
-                    <p className="text-xs text-[var(--foreground-muted)] mb-1">{isAr ? 'المهام' : 'Tasks'}</p>
-                    {tasks.length > 0 ? (
-                      <ul className="text-sm space-y-1">
-                        {tasks.map((task, index) => (
-                          <li key={task.id} className="flex items-center gap-2 text-[var(--foreground)]">
-                            <span className="text-[var(--foreground-muted)]">{index + 1}.</span>
-                            {isAr ? task.titleAr : task.titleEn}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-[var(--foreground-muted)]">{isAr ? 'لا توجد مهام' : 'No tasks'}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        <ModalFooter>
-          <Button variant="outline" size="sm" onClick={() => {
-            setShowEditModal(false);
-            resetEditForm();
-          }}>
-            <span className="text-xs sm:text-sm">{t('common.cancel')}</span>
-          </Button>
-          <div className="flex gap-2">
-            {editWizardStep > 1 && (
-              <Button variant="outline" size="sm" onClick={() => setEditWizardStep(editWizardStep - 1)}>
-                <ArrowLeft className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                <span className="text-xs sm:text-sm">{isAr ? 'السابق' : 'Previous'}</span>
-              </Button>
-            )}
-            {editWizardStep < 4 ? (
-              <Button
-                size="sm"
-                onClick={() => setEditWizardStep(editWizardStep + 1)}
-                disabled={editWizardStep === 1 && !selectedStrategy}
-              >
-                <span className="text-xs sm:text-sm">{isAr ? 'التالي' : 'Next'}</span>
-                <ArrowRight className="ms-1 sm:ms-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => {
-                  // TODO: Implement save edit functionality
-                  setShowEditModal(false);
-                  resetEditForm();
-                }}
-              >
-                <Check className="me-1 sm:me-2 h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                <span className="text-xs sm:text-sm">{isAr ? 'حفظ التعديلات' : 'Save Changes'}</span>
-              </Button>
-            )}
-          </div>
-        </ModalFooter>
-      </Modal>
-
-      {/* Strategy Guide Modal */}
-      <Modal
-        isOpen={showStrategyGuide}
-        onClose={() => setShowStrategyGuide(false)}
-        title={isAr ? 'دليل استراتيجيات المعالجة' : 'Treatment Strategies Guide'}
-        size="lg"
-      >
-        <div className="space-y-2 sm:space-y-3 md:space-y-4">
-          <p className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
-            {isAr
-              ? 'استراتيجيات المعالجة الأربعة الرئيسية لإدارة المخاطر:'
-              : 'The four main treatment strategies for risk management:'}
-          </p>
-          {(['avoid', 'reduce', 'transfer', 'accept'] as TreatmentStrategy[]).map((strategy) => (
-            <div
-              key={strategy}
-              className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4"
-            >
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div
-                  className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg shrink-0 ${
-                    strategy === 'avoid'
-                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                      : strategy === 'reduce'
-                      ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                      : strategy === 'transfer'
-                      ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
-                      : 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400'
-                  }`}
+          <ModalFooter>
+            <Button variant="outline" onClick={closeAddModal}>
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <div className="flex gap-2">
+              {wizardStep > 1 && (
+                <Button variant="outline" onClick={() => startTransition(() => setWizardStep(wizardStep - 1))}>
+                  <ArrowLeft className="h-4 w-4 me-1" />
+                  {isAr ? 'السابق' : 'Previous'}
+                </Button>
+              )}
+              {wizardStep < 3 ? (
+                <Button
+                  onClick={() => startTransition(() => setWizardStep(wizardStep + 1))}
+                  disabled={wizardStep === 1 && !formData.riskId}
                 >
-                  {getStrategyIcon(strategy)}
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-sm sm:text-base font-semibold text-[var(--foreground)]">
-                    {t(`treatment.strategies.${strategy}`)}
-                  </h4>
-                  <p className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                    {isAr ? strategyDescriptions[strategy].ar : strategyDescriptions[strategy].en}
-                  </p>
-                </div>
+                  {isAr ? 'التالي' : 'Next'}
+                  <ArrowRight className="h-4 w-4 ms-1" />
+                </Button>
+              ) : (
+                <Button onClick={handleSave} disabled={isSaving || !formData.strategy || !formData.responsibleId}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 me-1 animate-spin" />
+                      {isAr ? 'جاري الحفظ...' : 'Saving...'}
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 me-1" />
+                      {isAr ? 'حفظ الخطة' : 'Save Plan'}
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </ModalFooter>
+        </Modal>
+      )}
+
+      {/* View Treatment Modal */}
+      {showViewModal && selectedTreatment && (
+        <Modal
+          isOpen={showViewModal}
+          onClose={() => setShowViewModal(false)}
+          title={isAr ? 'تفاصيل خطة المعالجة' : 'Treatment Plan Details'}
+          size="lg"
+        >
+          <div className="space-y-6">
+            {/* Risk Info */}
+            <div className="p-4 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)]">
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`w-3 h-3 rounded-full ${ratingColors[selectedTreatment.inherentRating]}`} />
+                <span className="font-mono text-sm">{selectedTreatment.riskNumber}</span>
+                <Badge variant={selectedTreatment.inherentRating === 'Critical' ? 'danger' : selectedTreatment.inherentRating === 'Major' ? 'warning' : 'default'}>
+                  {selectedTreatment.inherentRating}
+                </Badge>
               </div>
-              <div className="mt-2 sm:mt-3 rounded bg-[var(--background)] p-2 sm:p-3">
-                <p className="text-[10px] sm:text-xs text-[var(--foreground-muted)]">
-                  <span className="font-medium">{isAr ? 'أمثلة:' : 'Examples:'}</span>{' '}
-                  {isAr ? strategyDescriptions[strategy].examples.ar : strategyDescriptions[strategy].examples.en}
+              <h3 className="font-semibold text-lg">
+                {isAr ? selectedTreatment.riskTitleAr : selectedTreatment.riskTitleEn}
+              </h3>
+              <p className="text-sm text-[var(--foreground-secondary)] mt-1">
+                {isAr ? selectedTreatment.departmentAr : selectedTreatment.departmentEn}
+              </p>
+            </div>
+
+            {/* Strategy & Status */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className={`p-4 rounded-lg ${strategyConfig[selectedTreatment.strategy].bgClass} border ${strategyConfig[selectedTreatment.strategy].borderClass}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {React.createElement(strategyConfig[selectedTreatment.strategy].icon, {
+                    className: `h-5 w-5 ${strategyConfig[selectedTreatment.strategy].colorClass}`,
+                  })}
+                  <span className="font-medium">{isAr ? 'الاستراتيجية' : 'Strategy'}</span>
+                </div>
+                <p className={`text-lg font-semibold ${strategyConfig[selectedTreatment.strategy].colorClass}`}>
+                  {isAr ? strategyConfig[selectedTreatment.strategy].labelAr : strategyConfig[selectedTreatment.strategy].labelEn}
+                </p>
+              </div>
+              <div className={`p-4 rounded-lg ${statusConfig[selectedTreatment.status].bgClass}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {React.createElement(statusConfig[selectedTreatment.status].icon, {
+                    className: `h-5 w-5 ${statusConfig[selectedTreatment.status].colorClass}`,
+                  })}
+                  <span className="font-medium">{isAr ? 'الحالة' : 'Status'}</span>
+                </div>
+                <p className={`text-lg font-semibold ${statusConfig[selectedTreatment.status].colorClass}`}>
+                  {isAr ? statusConfig[selectedTreatment.status].labelAr : statusConfig[selectedTreatment.status].labelEn}
                 </p>
               </div>
             </div>
-          ))}
-        </div>
-        <ModalFooter>
-          <Button size="sm" onClick={() => setShowStrategyGuide(false)}>
-            <span className="text-xs sm:text-sm">{isAr ? 'فهمت' : 'Got it'}</span>
-          </Button>
-        </ModalFooter>
-      </Modal>
+
+            {/* Progress */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium">{isAr ? 'التقدم' : 'Progress'}</span>
+                <span className="text-xl font-bold text-[var(--primary)]">{selectedTreatment.progress}%</span>
+              </div>
+              <div className="h-4 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--primary-dark)] transition-all duration-500"
+                  style={{ width: `${selectedTreatment.progress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Details Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-3 rounded-lg bg-[var(--background-secondary)]">
+                <p className="text-xs text-[var(--foreground-secondary)]">{isAr ? 'المسؤول' : 'Responsible'}</p>
+                <p className="font-medium mt-1">{isAr ? selectedTreatment.responsibleAr : selectedTreatment.responsibleEn}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--background-secondary)]">
+                <p className="text-xs text-[var(--foreground-secondary)]">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
+                <p className="font-medium mt-1">
+                  {new Date(selectedTreatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                </p>
+              </div>
+            </div>
+
+            {/* Tasks */}
+            {selectedTreatment.tasks.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <ListChecks className="h-4 w-4" />
+                  {isAr ? 'المهام' : 'Tasks'} ({selectedTreatment.tasks.length})
+                </h4>
+                <div className="space-y-2">
+                  {selectedTreatment.tasks.map((task, i) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-[var(--background-secondary)]"
+                    >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+                        task.status === 'completed' ? 'bg-green-500 text-white' : 'bg-[var(--background)] border'
+                      }`}>
+                        {task.status === 'completed' ? <Check className="h-3 w-3" /> : i + 1}
+                      </div>
+                      <span className={task.status === 'completed' ? 'line-through text-[var(--foreground-muted)]' : ''}>
+                        {isAr ? task.titleAr : task.titleEn}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <ModalFooter>
+            <Button variant="outline" onClick={() => setShowViewModal(false)}>
+              {isAr ? 'إغلاق' : 'Close'}
+            </Button>
+          </ModalFooter>
+        </Modal>
+      )}
     </div>
   );
 }

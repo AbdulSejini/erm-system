@@ -1248,12 +1248,29 @@ export default function RisksPage() {
     setShowDeleteModal(true);
   };
 
-  // Confirm Delete
-  const confirmDeleteRisk = () => {
-    if (selectedRisk) {
-      setRisks(prev => prev.filter(r => r.id !== selectedRisk.id));
-      setShowDeleteModal(false);
-      setSelectedRisk(null);
+  // Confirm Delete - حذف ناعم (يبقى الخطر في النظام مع تغيير حالته لمحذوف)
+  const confirmDeleteRisk = async () => {
+    if (!selectedRisk) return;
+
+    try {
+      const response = await fetch(`/api/risks/${selectedRisk.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // تحديث الخطر في الـ state ليظهر كمحذوف
+        setRisks(prev => prev.map(r =>
+          r.id === selectedRisk.id
+            ? { ...r, isDeleted: true, deletedAt: new Date().toISOString() }
+            : r
+        ));
+        setShowDeleteModal(false);
+        setSelectedRisk(null);
+      } else {
+        console.error('Failed to delete risk');
+      }
+    } catch (error) {
+      console.error('Error deleting risk:', error);
     }
   };
 
