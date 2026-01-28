@@ -142,9 +142,11 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        // المخاطر المحذوفة تأتي في النهاية دائماً
+        { isDeleted: 'asc' },
+        { createdAt: 'desc' },
+      ],
     });
 
     return NextResponse.json({

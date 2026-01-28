@@ -4,6 +4,7 @@ export type AuditAction =
   | 'create'
   | 'update'
   | 'delete'
+  | 'soft_delete'
   | 'login'
   | 'logout'
   | 'export'

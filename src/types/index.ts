@@ -281,7 +281,7 @@ export interface Notification {
 }
 
 // Audit Log Types
-export type AuditAction = 'create' | 'update' | 'delete' | 'login' | 'logout' | 'export' | 'import';
+export type AuditAction = 'create' | 'update' | 'delete' | 'soft_delete' | 'login' | 'logout' | 'export' | 'import';
 
 export interface AuditLog {
   id: string;

@@ -177,6 +177,10 @@ model Risk {
   approvalStatus       String    @default("Draft") // Approved, Draft, Future, N/A, Sent, Under Discussing
   followUpDate         DateTime?
 
+  // الحذف الناعم - الخطر يُعتبر محذوفاً ولكن يبقى في قاعدة البيانات
+  isDeleted            Boolean   @default(false)
+  deletedAt            DateTime?
+
   // المسؤولين
   ownerId              String    // مالك الخطر (User - للتوافق القديم)
   riskOwnerId          String?   // مالك الخطر (RiskOwner - الجديد)
@@ -216,6 +220,7 @@ model Risk {
   @@index([inherentRating])
   @@index([sourceId])
   @@index([riskOwnerId])
+  @@index([isDeleted])
 }
 
 // تقييمات المخاطر (سجل التاريخ)

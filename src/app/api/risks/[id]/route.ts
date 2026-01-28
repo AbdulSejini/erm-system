@@ -407,7 +407,7 @@ export async function PATCH(
   }
 }
 
-// DELETE - حذف خطر
+// DELETE - حذف ناعم للخطر (يُعلّم كمحذوف ولا يُحذف فعلياً)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -427,30 +427,54 @@ export async function DELETE(
       );
     }
 
-    await prisma.risk.delete({
+    // الحذف الناعم - تعليم الخطر كمحذوف بدلاً من حذفه فعلياً
+    await prisma.risk.update({
       where: { id },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(),
+      },
     });
 
-    // Log the deletion
+    // Log the soft deletion
     const session = await auth();
     if (session?.user?.id) {
       const clientInfo = getClientInfo(request);
       await createAuditLog({
         userId: session.user.id,
-        action: 'delete',
+        action: 'soft_delete',
         entity: 'risk',
         entityId: existingRisk.riskNumber,
-        oldValues: { riskNumber: existingRisk.riskNumber, title: existingRisk.titleEn },
+        oldValues: { riskNumber: existingRisk.riskNumber, title: existingRisk.titleEn, isDeleted: false },
+        newValues: { isDeleted: true },
         ...clientInfo,
+      });
+
+      // تسجيل في سجل التغييرات
+      await prisma.riskChangeLog.create({
+        data: {
+          riskId: id,
+          userId: session.user.id,
+          changeType: 'soft_delete',
+          changeCategory: 'status',
+          fieldName: 'isDeleted',
+          fieldNameAr: 'حالة الحذف',
+          oldValue: 'false',
+          newValue: 'true',
+          description: 'Risk marked as deleted',
+          descriptionAr: 'تم تعليم الخطر كمحذوف',
+          ipAddress: clientInfo.ipAddress || null,
+          userAgent: clientInfo.userAgent || null,
+        },
       });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'تم حذف الخطر بنجاح',
+      message: 'تم تعليم الخطر كمحذوف بنجاح',
     });
   } catch (error) {
-    console.error('Error deleting risk:', error);
+    console.error('Error soft deleting risk:', error);
     return NextResponse.json(
       { success: false, error: 'فشل في حذف الخطر' },
       { status: 500 }

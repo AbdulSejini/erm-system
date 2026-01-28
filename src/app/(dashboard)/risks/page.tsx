@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { cn } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -220,6 +221,8 @@ const convertedHRRisks = hrRisks.map((hr) => ({
   subProcessText: '',
   followUpDate: '',
   nextReviewDate: '',
+  isDeleted: false,
+  deletedAt: null as string | null,
 }));
 
 // Mock data matching actual risk register structure
@@ -269,6 +272,8 @@ const mockRisks = [
     krisEn: '',
     mitigationActionsAr: '',
     mitigationActionsEn: '',
+    isDeleted: false,
+    deletedAt: null as string | null,
   },
   {
     id: '2',
@@ -315,6 +320,8 @@ const mockRisks = [
     subProcessText: '',
     followUpDate: '',
     nextReviewDate: '',
+    isDeleted: false,
+    deletedAt: null as string | null,
   },
   {
     id: '3',
@@ -359,6 +366,8 @@ const mockRisks = [
     subProcessText: '',
     followUpDate: '',
     nextReviewDate: '',
+    isDeleted: false,
+    deletedAt: null as string | null,
   },
   {
     id: '4',
@@ -403,6 +412,8 @@ const mockRisks = [
     subProcessText: '',
     followUpDate: '',
     nextReviewDate: '',
+    isDeleted: false,
+    deletedAt: null as string | null,
   },
   {
     id: '5',
@@ -447,6 +458,8 @@ const mockRisks = [
     subProcessText: '',
     followUpDate: '',
     nextReviewDate: '',
+    isDeleted: false,
+    deletedAt: null as string | null,
   },
   {
     id: '6',
@@ -491,6 +504,8 @@ const mockRisks = [
     subProcessText: '',
     followUpDate: '',
     nextReviewDate: '',
+    isDeleted: false,
+    deletedAt: null as string | null,
   },
   // Include converted HR risks
   ...convertedHRRisks,
@@ -541,6 +556,8 @@ interface APIRisk {
   owner?: { id: string; fullName: string; fullNameEn: string | null };
   champion?: { id: string; fullName: string; fullNameEn: string | null };
   riskOwner?: { id: string; fullName: string; fullNameEn: string | null };
+  isDeleted?: boolean;
+  deletedAt?: string | null;
 }
 
 export default function RisksPage() {
@@ -731,6 +748,8 @@ export default function RisksPage() {
                 krisEn: risk.krisEn || '',
                 mitigationActionsAr: risk.mitigationActionsAr || '',
                 mitigationActionsEn: risk.mitigationActionsEn || '',
+                isDeleted: risk.isDeleted || false,
+                deletedAt: risk.deletedAt || null,
               }));
               setRisks(transformedRisks);
               setIsUsingFallbackData(false);
@@ -1778,12 +1797,27 @@ export default function RisksPage() {
                   {paginatedRisks.map((risk) => (
                     <tr
                       key={risk.id}
-                      className="border-b border-[var(--border)] transition-colors hover:bg-[var(--background-secondary)]"
+                      className={cn(
+                        "border-b border-[var(--border)] transition-colors hover:bg-[var(--background-secondary)]",
+                        risk.isDeleted && "opacity-50 bg-red-50/30 dark:bg-red-900/10"
+                      )}
                     >
                       <td className="p-2 sm:p-3 md:p-4">
-                        <code className="rounded bg-[var(--background-tertiary)] px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-mono">
-                          {risk.riskNumber}
-                        </code>
+                        <div className="flex items-center gap-1.5">
+                          <code className={cn(
+                            "rounded px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-mono",
+                            risk.isDeleted
+                              ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through"
+                              : "bg-[var(--background-tertiary)]"
+                          )}>
+                            {risk.riskNumber}
+                          </code>
+                          {risk.isDeleted && (
+                            <span className="text-[9px] sm:text-[10px] text-red-500 font-medium px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/30">
+                              {isAr ? 'محذوف' : 'Deleted'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
                         <div className="max-w-[200px] sm:max-w-[250px] md:max-w-[300px]">
@@ -1950,11 +1984,25 @@ export default function RisksPage() {
         /* Card View */
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {paginatedRisks.map((risk) => (
-            <Card key={risk.id} hover className="overflow-hidden">
+            <Card key={risk.id} hover className={cn(
+              "overflow-hidden",
+              risk.isDeleted && "opacity-60 border-red-200 dark:border-red-800/50"
+            )}>
               <div className="p-4">
+                {/* Deleted Banner */}
+                {risk.isDeleted && (
+                  <div className="mb-2 -mx-4 -mt-4 px-4 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium text-center">
+                    {isAr ? 'خطر محذوف' : 'Deleted Risk'}
+                  </div>
+                )}
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between">
-                  <code className="rounded bg-[var(--background-tertiary)] px-2 py-1 text-xs font-mono">
+                  <code className={cn(
+                    "rounded px-2 py-1 text-xs font-mono",
+                    risk.isDeleted
+                      ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through"
+                      : "bg-[var(--background-tertiary)]"
+                  )}>
                     {risk.riskNumber}
                   </code>
                   <Badge variant={getStatusBadgeVariant(risk.status)}>
@@ -1963,7 +2011,10 @@ export default function RisksPage() {
                 </div>
 
                 {/* Title */}
-                <h3 className="mb-2 font-semibold text-[var(--foreground)]">
+                <h3 className={cn(
+                  "mb-2 font-semibold text-[var(--foreground)]",
+                  risk.isDeleted && "line-through opacity-70"
+                )}>
                   {isAr ? risk.titleAr : risk.titleEn}
                 </h3>
                 <p className="mb-4 text-sm text-[var(--foreground-secondary)] line-clamp-2">
