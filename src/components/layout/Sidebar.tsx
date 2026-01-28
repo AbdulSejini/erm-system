@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/contexts/LanguageContext';
 import {
@@ -20,7 +21,21 @@ import {
   X,
   MessageSquare,
   Target,
+  Circle,
 } from 'lucide-react';
+
+interface OnlineUser {
+  id: string;
+  fullName: string;
+  fullNameEn: string | null;
+  email: string;
+  role: string;
+  lastLogin: string;
+  department: {
+    nameAr: string;
+    nameEn: string;
+  } | null;
+}
 
 interface NavItem {
   href: string;
@@ -92,6 +107,71 @@ interface SidebarProps {
 export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { t, isRTL } = useTranslation();
+  const { data: session } = useSession();
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [showOnlineUsers, setShowOnlineUsers] = useState(true);
+
+  // Check if user has permission to see online users
+  const canSeeOnlineUsers = session?.user?.role && ['admin', 'riskManager'].includes(session.user.role);
+
+  // Fetch online users
+  useEffect(() => {
+    if (!canSeeOnlineUsers) return;
+
+    const fetchOnlineUsers = async () => {
+      try {
+        const response = await fetch('/api/users/online');
+        if (response.ok) {
+          const data = await response.json();
+          setOnlineUsers(data.users || []);
+        }
+      } catch (error) {
+        console.error('Error fetching online users:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchOnlineUsers();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchOnlineUsers, 30000);
+
+    return () => clearInterval(interval);
+  }, [canSeeOnlineUsers]);
+
+  // Send heartbeat to mark user as active
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch('/api/users/online', { method: 'POST' });
+      } catch (error) {
+        console.error('Error sending heartbeat:', error);
+      }
+    };
+
+    // Send heartbeat every 5 minutes
+    const interval = setInterval(sendHeartbeat, 5 * 60 * 1000);
+
+    // Initial heartbeat
+    sendHeartbeat();
+
+    return () => clearInterval(interval);
+  }, [session?.user?.id]);
+
+  // Get role label
+  const getRoleLabel = (role: string) => {
+    const roles: Record<string, { ar: string; en: string }> = {
+      admin: { ar: 'مدير النظام', en: 'Admin' },
+      riskManager: { ar: 'مدير المخاطر', en: 'Risk Manager' },
+      riskAnalyst: { ar: 'محلل المخاطر', en: 'Risk Analyst' },
+      riskChampion: { ar: 'رائد المخاطر', en: 'Risk Champion' },
+      riskOwner: { ar: 'مالك الخطر', en: 'Risk Owner' },
+      viewer: { ar: 'مشاهد', en: 'Viewer' },
+    };
+    return roles[role] ? (isRTL ? roles[role].ar : roles[role].en) : role;
+  };
 
   return (
     <>
@@ -201,6 +281,85 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
             })}
           </ul>
         </nav>
+
+        {/* Online Users Section - Only for admin and riskManager */}
+        {canSeeOnlineUsers && onlineUsers.length > 0 && (
+          <div className={cn(
+            'border-t border-[var(--border)] transition-all duration-300',
+            isCollapsed ? 'p-2' : 'p-3'
+          )}>
+            {/* Section Header */}
+            <button
+              onClick={() => setShowOnlineUsers(!showOnlineUsers)}
+              className={cn(
+                'w-full flex items-center gap-2 text-xs font-semibold text-[var(--foreground-secondary)] mb-2 hover:text-[var(--foreground)] transition-colors',
+                isCollapsed && 'justify-center'
+              )}
+            >
+              <div className="relative">
+                <Circle className="h-2.5 w-2.5 fill-green-500 text-green-500" />
+                <span className="absolute inset-0 animate-ping">
+                  <Circle className="h-2.5 w-2.5 fill-green-500/50 text-green-500/50" />
+                </span>
+              </div>
+              {!isCollapsed && (
+                <>
+                  <span>{isRTL ? 'المتصلون الآن' : 'Online Now'}</span>
+                  <span className="ms-auto bg-green-500/20 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                    {onlineUsers.length}
+                  </span>
+                </>
+              )}
+            </button>
+
+            {/* Online Users List */}
+            {showOnlineUsers && !isCollapsed && (
+              <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-thin">
+                {onlineUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--background-tertiary)] transition-colors group"
+                    title={`${user.fullName} - ${user.email}`}
+                  >
+                    {/* Avatar */}
+                    <div className="relative shrink-0">
+                      <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] flex items-center justify-center text-white text-xs font-bold">
+                        {(user.fullName || user.email).charAt(0).toUpperCase()}
+                      </div>
+                      {/* Online Indicator */}
+                      <div className="absolute -bottom-0.5 -end-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-[var(--sidebar-bg)]" />
+                    </div>
+
+                    {/* User Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-[var(--foreground)] truncate">
+                        {isRTL ? user.fullName : (user.fullNameEn || user.fullName)}
+                      </p>
+                      <p className="text-[10px] text-[var(--foreground-secondary)] truncate">
+                        {getRoleLabel(user.role)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Collapsed State - Just show count */}
+            {isCollapsed && (
+              <div
+                className="flex flex-col items-center gap-1 cursor-pointer"
+                title={isRTL ? `${onlineUsers.length} متصل الآن` : `${onlineUsers.length} online`}
+              >
+                <div className="relative">
+                  <Users className="h-5 w-5 text-[var(--foreground-secondary)]" />
+                  <div className="absolute -top-1 -end-1 h-4 w-4 rounded-full bg-green-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {onlineUsers.length}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Collapse Toggle */}
         <div className="p-3 border-t border-[var(--border)]">
