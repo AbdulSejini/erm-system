@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Configure dark mode to use class strategy */
+@variant dark (&:where(.dark, .dark *));
+
 /* Saudi Cable Brand Colors - Clean Light Theme */
 :root {
   /* Primary Colors - Softer Orange */
