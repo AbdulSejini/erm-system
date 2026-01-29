@@ -53,6 +53,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             id: user.id,
             email: user.email,
             name: user.fullName,
+            nameEn: user.fullNameEn,
             role: user.role,
           };
         } catch (error) {
@@ -67,6 +68,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.nameEn = user.nameEn;
       }
       return token;
     },
@@ -75,6 +77,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.nameEn = token.nameEn as string | null;
       }
       return session;
     },

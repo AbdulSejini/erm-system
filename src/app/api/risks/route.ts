@@ -58,31 +58,33 @@ export async function GET(request: NextRequest) {
             ...user.accessibleDepartments.map(a => a.departmentId), // الإدارات الإضافية
           ].filter(Boolean) as string[];
 
-          // إذا كان المستخدم مالك خطر (employee) - يرى فقط المخاطر التي هو مالكها
+          // إذا كان المستخدم موظف (employee) - يرى المخاطر حسب الإدارات المحددة له
           if (user.role === 'employee') {
-            where = {
-              ...baseWhere,
-              OR: [
-                { ownerId: user.id }, // مالك الخطر (User)
-                { championId: user.id }, // رائد الخطر
-              ],
-            };
-
             // التحقق من وجود RiskOwner مرتبط بهذا المستخدم عبر البريد
             const riskOwner = await prisma.riskOwner.findFirst({
               where: { email: user.email },
             });
 
+            // بناء شروط الوصول
+            const accessConditions: Record<string, unknown>[] = [
+              { ownerId: user.id }, // مالك الخطر (User)
+              { championId: user.id }, // رائد الخطر
+            ];
+
+            // إضافة المخاطر حسب RiskOwner إن وجد
             if (riskOwner) {
-              where = {
-                ...baseWhere,
-                OR: [
-                  { ownerId: user.id },
-                  { championId: user.id },
-                  { riskOwnerId: riskOwner.id },
-                ],
-              };
+              accessConditions.push({ riskOwnerId: riskOwner.id });
             }
+
+            // إضافة المخاطر حسب الإدارات المسموح بها
+            if (allowedDepartmentIds.length > 0) {
+              accessConditions.push({ departmentId: { in: allowedDepartmentIds } });
+            }
+
+            where = {
+              ...baseWhere,
+              OR: accessConditions,
+            };
           }
           // إذا كان رائد مخاطر - يرى مخاطر إداراته فقط
           else if (user.role === 'riskChampion') {

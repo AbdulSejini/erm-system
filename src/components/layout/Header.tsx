@@ -140,12 +140,31 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     router.push('/login');
   };
 
-  // User data from session
+  // User data from session - استخدام الاسم حسب اللغة
+  const getUserName = () => {
+    if (language === 'en' && session?.user?.nameEn) {
+      return session.user.nameEn;
+    }
+    return session?.user?.name || (language === 'ar' ? 'مستخدم' : 'User');
+  };
+
+  const getRoleName = () => {
+    const role = session?.user?.role;
+    const roleNames: Record<string, { ar: string; en: string }> = {
+      admin: { ar: 'مدير النظام', en: 'System Admin' },
+      riskManager: { ar: 'مدير المخاطر', en: 'Risk Manager' },
+      riskAnalyst: { ar: 'محلل المخاطر', en: 'Risk Analyst' },
+      riskChampion: { ar: 'رائد المخاطر', en: 'Risk Champion' },
+      executive: { ar: 'تنفيذي', en: 'Executive' },
+      employee: { ar: 'موظف', en: 'Employee' },
+    };
+    const roleInfo = roleNames[role || ''] || { ar: 'مستخدم', en: 'User' };
+    return language === 'ar' ? roleInfo.ar : roleInfo.en;
+  };
+
   const user = {
-    name: session?.user?.name || (language === 'ar' ? 'مستخدم' : 'User'),
-    role: session?.user?.role === 'admin'
-      ? (language === 'ar' ? 'مدير النظام' : 'Administrator')
-      : (language === 'ar' ? 'مستخدم' : 'User'),
+    name: getUserName(),
+    role: getRoleName(),
     email: session?.user?.email || '',
     avatar: null,
   };
