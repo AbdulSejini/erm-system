@@ -206,52 +206,86 @@ export default function TreatmentDetailPage() {
       try {
         setLoading(true);
 
-        // Fetch treatment details
+        // Fetch treatment details - treatmentId is actually the risk.id
         const res = await fetch(`/api/risks?includeTreatments=true`);
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.data) {
-            // Find the treatment
-            for (const risk of data.data) {
-              const foundTreatment = risk.treatmentPlans?.find((t: { id: string }) => t.id === treatmentId);
-              if (foundTreatment) {
-                setTreatment({
-                  ...foundTreatment,
-                  risk: {
-                    id: risk.id,
-                    riskNumber: risk.riskNumber,
-                    titleAr: risk.titleAr,
-                    titleEn: risk.titleEn,
-                    descriptionAr: risk.descriptionAr,
-                    descriptionEn: risk.descriptionEn,
-                    causesAr: risk.causesAr,
-                    causesEn: risk.causesEn,
-                    consequencesAr: risk.consequencesAr,
-                    consequencesEn: risk.consequencesEn,
-                    inherentLikelihood: risk.inherentLikelihood,
-                    inherentImpact: risk.inherentImpact,
-                    inherentScore: risk.inherentScore,
-                    inherentRating: risk.inherentRating,
-                    residualLikelihood: risk.residualLikelihood,
-                    residualImpact: risk.residualImpact,
-                    residualScore: risk.residualScore,
-                    residualRating: risk.residualRating,
-                    department: risk.department,
-                    owner: risk.owner,
-                  },
-                });
-                setFormData({
-                  titleAr: foundTreatment.titleAr || '',
-                  titleEn: foundTreatment.titleEn || '',
-                  strategy: foundTreatment.strategy,
-                  status: foundTreatment.status,
-                  priority: foundTreatment.priority || 'medium',
-                  startDate: foundTreatment.startDate?.split('T')[0] || '',
-                  dueDate: foundTreatment.dueDate?.split('T')[0] || '',
-                  tasks: foundTreatment.tasks || [],
-                });
-                break;
-              }
+            // Find the risk by ID (the URL param is risk.id, not treatmentPlan.id)
+            const risk = data.data.find((r: { id: string }) => r.id === treatmentId);
+            if (risk) {
+              // Get the first treatment plan if exists, or create a virtual one
+              const foundTreatment = risk.treatmentPlans?.[0];
+
+              // Determine strategy and status from risk data
+              const determineStrategy = (status: string, inherentScore: number) => {
+                if (status === 'accepted') return 'accept';
+                if (inherentScore >= 20) return 'avoid';
+                if (inherentScore >= 12) return 'reduce';
+                if (inherentScore >= 6) return 'transfer';
+                return 'accept';
+              };
+
+              const determineStatus = (status: string, followUpDate: string | null): TreatmentStatus => {
+                if (status === 'closed' || status === 'mitigated') return 'completed';
+                if (status === 'accepted') return 'completed';
+                if (followUpDate && new Date(followUpDate) < new Date()) return 'overdue';
+                if (status === 'inProgress') return 'inProgress';
+                return 'notStarted';
+              };
+
+              const calculateProgress = (inherentScore: number, residualScore: number | null): number => {
+                if (!residualScore) return 0;
+                const reduction = ((inherentScore - residualScore) / inherentScore) * 100;
+                return Math.max(0, Math.min(100, Math.round(reduction)));
+              };
+
+              const treatmentData = {
+                id: foundTreatment?.id || risk.id,
+                titleAr: foundTreatment?.titleAr || risk.mitigationActionsAr || `خطة معالجة ${risk.riskNumber}`,
+                titleEn: foundTreatment?.titleEn || risk.mitigationActionsEn || `Treatment Plan for ${risk.riskNumber}`,
+                strategy: foundTreatment?.strategy || determineStrategy(risk.status, risk.inherentScore),
+                status: foundTreatment?.status || determineStatus(risk.status, risk.followUpDate),
+                priority: foundTreatment?.priority || (risk.inherentScore >= 15 ? 'high' : risk.inherentScore >= 8 ? 'medium' : 'low'),
+                startDate: foundTreatment?.startDate || risk.createdAt,
+                dueDate: foundTreatment?.dueDate || risk.followUpDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                progress: foundTreatment?.progress || calculateProgress(risk.inherentScore, risk.residualScore),
+                tasks: foundTreatment?.tasks || [],
+                risk: {
+                  id: risk.id,
+                  riskNumber: risk.riskNumber,
+                  titleAr: risk.titleAr,
+                  titleEn: risk.titleEn,
+                  descriptionAr: risk.descriptionAr,
+                  descriptionEn: risk.descriptionEn,
+                  causesAr: risk.causesAr,
+                  causesEn: risk.causesEn,
+                  consequencesAr: risk.consequencesAr,
+                  consequencesEn: risk.consequencesEn,
+                  inherentLikelihood: risk.inherentLikelihood,
+                  inherentImpact: risk.inherentImpact,
+                  inherentScore: risk.inherentScore,
+                  inherentRating: risk.inherentRating,
+                  residualLikelihood: risk.residualLikelihood,
+                  residualImpact: risk.residualImpact,
+                  residualScore: risk.residualScore,
+                  residualRating: risk.residualRating,
+                  department: risk.department,
+                  owner: risk.owner,
+                },
+              };
+
+              setTreatment(treatmentData as TreatmentPlan);
+              setFormData({
+                titleAr: treatmentData.titleAr,
+                titleEn: treatmentData.titleEn,
+                strategy: treatmentData.strategy as TreatmentStrategy,
+                status: treatmentData.status as TreatmentStatus,
+                priority: treatmentData.priority,
+                startDate: treatmentData.startDate?.split('T')[0] || '',
+                dueDate: treatmentData.dueDate?.split('T')[0] || '',
+                tasks: treatmentData.tasks || [],
+              });
             }
           }
         }
