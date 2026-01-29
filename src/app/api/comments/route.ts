@@ -73,7 +73,21 @@ export async function POST(request: NextRequest) {
     // إرسال الإشعارات للمستهدفين
     const notificationRecipients = new Set<string>();
 
-    if (targetType === 'user' && targetUserId) {
+    if (targetType === 'all') {
+      // إرسال لجميع المستخدمين النشطين (ما عدا المرسل والـ admin)
+      const allActiveUsers = await prisma.user.findMany({
+        where: {
+          status: 'active',
+          id: { not: user.id },
+          role: { not: 'admin' },
+        },
+        select: { id: true },
+      });
+
+      for (const activeUser of allActiveUsers) {
+        notificationRecipients.add(activeUser.id);
+      }
+    } else if (targetType === 'user' && targetUserId) {
       // إرسال للمستخدم المحدد فقط
       if (targetUserId !== user.id) {
         const targetUser = await prisma.user.findUnique({
@@ -150,15 +164,32 @@ export async function POST(request: NextRequest) {
       targetName = targetUserInfo?.fullName || '';
     }
 
+    const getNotificationTitle = () => {
+      if (targetType === 'all') {
+        return {
+          ar: `رسالة عامة من ${user.fullName}`,
+          en: `General message from ${user.fullNameEn || user.fullName}`,
+        };
+      } else if (targetType === 'department') {
+        return {
+          ar: `رسالة جديدة لإدارة ${targetName}`,
+          en: `New message for department`,
+        };
+      } else {
+        return {
+          ar: `رسالة جديدة من ${user.fullName}`,
+          en: `New message from ${user.fullNameEn || user.fullName}`,
+        };
+      }
+    };
+
+    const notificationTitle = getNotificationTitle();
+
     const notifications = Array.from(notificationRecipients).map((userId) => ({
       userId,
       type: 'directMessage',
-      titleAr: targetType === 'department'
-        ? `رسالة جديدة لإدارة ${targetName}`
-        : `رسالة جديدة من ${user.fullName}`,
-      titleEn: targetType === 'department'
-        ? `New message for department`
-        : `New message from ${user.fullNameEn || user.fullName}`,
+      titleAr: notificationTitle.ar,
+      titleEn: notificationTitle.en,
       messageAr: `${user.fullName}: "${shortContent}"`,
       messageEn: `${user.fullNameEn || user.fullName}: "${shortContent}"`,
       link: '/discussions',

@@ -208,9 +208,7 @@ export default function DiscussionsPage() {
     e.preventDefault();
 
     // التحقق من البيانات المطلوبة
-    // إذا كان الاستهداف للجميع، يجب اختيار خطر
-    // إذا كان لإدارة أو مستخدم، الخطر اختياري
-    if (targetType === 'all' && !selectedRiskId) return;
+    // الخطر اختياري لجميع أنواع الاستهداف
     if (targetType === 'department' && !targetDepartmentId) return;
     if (targetType === 'user' && !targetUserId) return;
     if (!newCommentContent.trim()) return;
@@ -599,6 +597,12 @@ export default function DiscussionsPage() {
                           {language === 'ar' ? 'رسالة مباشرة' : 'Direct Message'}
                         </span>
                         <span className="text-gray-500">-</span>
+                        {comment.targetType === 'all' && (
+                          <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
+                            <MessageSquare className="h-4 w-4" />
+                            {language === 'ar' ? 'رسالة عامة للجميع' : 'General message to all'}
+                          </span>
+                        )}
                         {comment.targetType === 'department' && comment.targetDepartment && (
                           <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
                             <Building2 className="h-4 w-4" />
@@ -801,7 +805,7 @@ export default function DiscussionsPage() {
               {/* Risk Selection - اختياري عند اختيار إدارة أو مستخدم */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {language === 'ar' ? 'اختر الخطر' : 'Select Risk'} {targetType === 'all' ? '*' : `(${language === 'ar' ? 'اختياري' : 'Optional'})`}
+                  {language === 'ar' ? 'اختر الخطر' : 'Select Risk'} ({language === 'ar' ? 'اختياري' : 'Optional'})
                 </label>
                 <Input
                   placeholder={language === 'ar' ? 'ابحث عن خطر...' : 'Search for a risk...'}
@@ -902,8 +906,8 @@ export default function DiscussionsPage() {
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
                 <p>
                   {targetType === 'all' && (language === 'ar'
-                    ? 'سيتم إرسال إشعار لجميع المستخدمين المعنيين بهذا الخطر (صاحب الخطر، رائد المخاطر، وموظفي الإدارة).'
-                    : 'A notification will be sent to all users related to this risk (risk owner, risk champion, and department staff).')}
+                    ? 'سيتم إرسال إشعار لجميع المستخدمين في النظام.'
+                    : 'A notification will be sent to all users in the system.')}
                   {targetType === 'department' && (language === 'ar'
                     ? 'سيتم إرسال إشعار لجميع منسوبي الإدارة المحددة.'
                     : 'A notification will be sent to all members of the selected department.')}
@@ -936,7 +940,6 @@ export default function DiscussionsPage() {
                 disabled={
                   !newCommentContent.trim() ||
                   submitting ||
-                  (targetType === 'all' && !selectedRiskId) ||
                   (targetType === 'department' && !targetDepartmentId) ||
                   (targetType === 'user' && !targetUserId)
                 }
