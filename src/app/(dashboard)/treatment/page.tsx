@@ -683,7 +683,7 @@ export default function TreatmentPage() {
           { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20', iconBg: 'bg-rose-500', border: 'border-rose-200 dark:border-rose-700/50' },
           { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-800/50', iconBg: 'bg-gray-500 dark:bg-gray-600', border: 'border-gray-200 dark:border-gray-600' },
         ].map((stat, i) => (
-          <Card key={i} className={`overflow-hidden hover:shadow-md transition-all duration-300 border rounded-xl bg-white dark:bg-slate-800 ${stat.border}`}>
+          <Card key={i} className={`overflow-hidden hover:shadow-md transition-all duration-300 border rounded-xl bg-[#FFFFFF] dark:bg-[#1E293B] ${stat.border}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -700,7 +700,7 @@ export default function TreatmentPage() {
       </div>
 
       {/* Progress Overview - تصميم مثل صفحة التقارير */}
-      <Card className="overflow-hidden border border-[#F39200]/20 dark:border-[#F39200]/30 rounded-xl bg-white dark:bg-slate-800">
+      <Card className="overflow-hidden border border-[#F39200]/20 dark:border-[#F39200]/30 rounded-xl bg-[#FFFFFF] dark:bg-[#1E293B]">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -794,7 +794,7 @@ export default function TreatmentPage() {
             return (
               <Card
                 key={treatment.id}
-                className="overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group border border-gray-100 dark:border-gray-700 rounded-xl bg-white dark:bg-slate-800"
+                className="overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group border border-gray-100 dark:border-gray-700 rounded-xl bg-[#FFFFFF] dark:bg-[#1E293B]"
                 onClick={() => router.push(`/treatment/${treatment.id}`)}
               >
                 {/* Card Header with Strategy Color */}
