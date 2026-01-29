@@ -654,44 +654,44 @@ export default function TreatmentPage() {
   // ============================================
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      {/* Header Section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6 p-4 md:p-6 bg-gray-50 dark:bg-transparent min-h-screen">
+      {/* Header Section - خلفية بيضاء مع حدود برتقالية للوضع النهاري */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-transparent p-4 rounded-xl border-t-4 border-t-[#F39200] dark:border-t-0 shadow-sm dark:shadow-none">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)] flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] text-white">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-[var(--foreground)] flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-[#F39200] to-amber-500 text-white shadow-md">
               <Shield className="h-6 w-6" />
             </div>
             {isAr ? 'خطط المعالجة' : 'Treatment Plans'}
           </h1>
-          <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+          <p className="mt-1 text-sm text-gray-600 dark:text-[var(--foreground-secondary)]">
             {isAr ? 'إدارة ومتابعة خطط معالجة المخاطر' : 'Manage and track risk treatment plans'}
           </p>
         </div>
-        <Button onClick={openAddModal} className="gap-2 shadow-lg hover:shadow-xl transition-shadow">
+        <Button onClick={openAddModal} className="gap-2 shadow-lg hover:shadow-xl transition-shadow bg-[#F39200] hover:bg-[#e08600]">
           <Plus className="h-4 w-4" />
           {isAr ? 'إضافة خطة جديدة' : 'Add New Plan'}
         </Button>
       </div>
 
-      {/* Stats Cards - خلفيات فاتحة جداً مع خطوط داكنة واضحة */}
+      {/* Stats Cards - تصميم مثل صفحة التقارير */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-orange-600 dark:text-[#F39200]', labelColor: 'text-gray-700 dark:text-gray-400', bg: 'bg-gradient-to-r from-orange-400 to-amber-400', iconColor: 'text-white', cardBg: 'bg-white dark:bg-[#2E2D2C]', border: 'border-orange-100 dark:border-[#F39200]/30' },
-          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', labelColor: 'text-gray-700 dark:text-gray-400', bg: 'bg-gradient-to-r from-emerald-400 to-teal-400', iconColor: 'text-white', cardBg: 'bg-white dark:bg-[#2E2D2C]', border: 'border-emerald-100 dark:border-emerald-700' },
-          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-sky-600 dark:text-sky-400', labelColor: 'text-gray-700 dark:text-gray-400', bg: 'bg-gradient-to-r from-sky-400 to-blue-400', iconColor: 'text-white', cardBg: 'bg-white dark:bg-[#2E2D2C]', border: 'border-sky-100 dark:border-sky-700' },
-          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-rose-600 dark:text-rose-400', labelColor: 'text-gray-700 dark:text-gray-400', bg: 'bg-gradient-to-r from-red-400 to-rose-400', iconColor: 'text-white', cardBg: 'bg-white dark:bg-[#2E2D2C]', border: 'border-rose-100 dark:border-rose-700' },
-          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-gray-600 dark:text-gray-400', labelColor: 'text-gray-700 dark:text-gray-400', bg: 'bg-gradient-to-r from-gray-400 to-slate-400 dark:from-gray-500 dark:to-slate-500', iconColor: 'text-white', cardBg: 'bg-white dark:bg-[#2E2D2C]', border: 'border-gray-100 dark:border-gray-600' },
+          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-[#F39200]', bg: 'bg-orange-50 dark:bg-[#F39200]/10', iconBg: 'bg-[#F39200]', border: 'border-[#F39200]/20' },
+          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', iconBg: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-700/50' },
+          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20', iconBg: 'bg-sky-500', border: 'border-sky-200 dark:border-sky-700/50' },
+          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20', iconBg: 'bg-rose-500', border: 'border-rose-200 dark:border-rose-700/50' },
+          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-800/50', iconBg: 'bg-gray-500 dark:bg-gray-600', border: 'border-gray-200 dark:border-gray-600' },
         ].map((stat, i) => (
-          <Card key={i} className={`overflow-hidden hover:shadow-lg transition-all duration-300 border shadow-sm rounded-2xl ${stat.border} ${stat.cardBg}`}>
+          <Card key={i} className={`overflow-hidden hover:shadow-md transition-all duration-300 border rounded-xl bg-white dark:bg-[#2E2D2C] ${stat.border}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-xs font-semibold uppercase tracking-wide ${stat.labelColor}`}>{stat.label}</p>
-                  <p className={`text-3xl font-black ${stat.color}`}>{stat.value}</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{stat.label}</p>
+                  <p className={`text-3xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
                 </div>
-                <div className={`p-3 rounded-xl ${stat.bg} shadow-md`}>
-                  <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
+                <div className={`p-2.5 rounded-lg ${stat.iconBg}`}>
+                  <stat.icon className="h-5 w-5 text-white" />
                 </div>
               </div>
             </CardContent>
@@ -699,43 +699,43 @@ export default function TreatmentPage() {
         ))}
       </div>
 
-      {/* Progress Overview - خلفية بيضاء فاتحة */}
-      <Card className="overflow-hidden border border-orange-100 dark:border-[#F39200]/30 shadow-sm rounded-2xl bg-white dark:bg-[#2E2D2C]">
+      {/* Progress Overview - تصميم مثل صفحة التقارير */}
+      <Card className="overflow-hidden border border-[#F39200]/20 dark:border-[#F39200]/30 rounded-xl bg-white dark:bg-[#2E2D2C]">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-r from-orange-400 to-amber-400 shadow-md">
-                <Activity className="h-6 w-6 text-white" />
+              <div className="p-2.5 rounded-lg bg-[#F39200]">
+                <Activity className="h-5 w-5 text-white" />
               </div>
-              <span className="font-bold text-lg text-gray-800 dark:text-gray-200">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
+              <span className="font-semibold text-lg text-gray-800 dark:text-gray-200">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
             </div>
-            <span className="text-3xl font-black text-orange-600 dark:text-[#F39200]">{avgProgress}%</span>
+            <span className="text-3xl font-bold text-[#F39200]">{avgProgress}%</span>
           </div>
-          <div className="h-4 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+          <div className="h-3 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#F39200] to-amber-400 transition-all duration-500"
+              className="h-full rounded-full bg-[#F39200] transition-all duration-500"
               style={{ width: `${avgProgress}%` }}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* Search and Filters - تصميم مثل صفحة التقارير */}
+      <div className="flex flex-col sm:flex-row gap-3 p-4 bg-white dark:bg-transparent rounded-xl border border-gray-100 dark:border-0">
         <div className="relative flex-1">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--foreground-muted)]" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder={isAr ? 'بحث في خطط المعالجة...' : 'Search treatment plans...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="ps-10"
+            className="ps-10 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600"
           />
         </div>
         <div className="flex flex-wrap gap-2">
           <select
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
+            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
           >
             <option value="all">{isAr ? 'كل الأقسام' : 'All Departments'}</option>
             {departments.map((dept) => (
@@ -747,7 +747,7 @@ export default function TreatmentPage() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as TreatmentStatus | 'all')}
-            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
+            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
           >
             <option value="all">{isAr ? 'كل الحالات' : 'All Status'}</option>
             <option value="notStarted">{isAr ? 'لم يبدأ' : 'Not Started'}</option>
@@ -758,7 +758,7 @@ export default function TreatmentPage() {
           <select
             value={filterStrategy}
             onChange={(e) => setFilterStrategy(e.target.value as TreatmentStrategy | 'all')}
-            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
+            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
           >
             <option value="all">{isAr ? 'كل الاستراتيجيات' : 'All Strategies'}</option>
             <option value="avoid">{isAr ? 'تجنب' : 'Avoid'}</option>
@@ -772,7 +772,7 @@ export default function TreatmentPage() {
       {/* Treatment Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {paginatedTreatments.length === 0 ? (
-          <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
+          <div className="col-span-full flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-transparent rounded-xl">
             <div className="p-4 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
               <FileText className="h-8 w-8 text-gray-400" />
             </div>
@@ -794,22 +794,22 @@ export default function TreatmentPage() {
             return (
               <Card
                 key={treatment.id}
-                className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border border-gray-100 dark:border-gray-700 shadow-sm rounded-2xl bg-white dark:bg-[#2E2D2C]"
+                className="overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group border border-gray-100 dark:border-gray-700 rounded-xl bg-white dark:bg-[#2E2D2C]"
                 onClick={() => router.push(`/treatment/${treatment.id}`)}
               >
-                {/* Card Header with Strategy Color - شريط ملون واضح */}
-                <div className={`h-1.5 ${strategyConf.bgClass}`} />
+                {/* Card Header with Strategy Color */}
+                <div className={`h-1 ${strategyConf.bgClass}`} />
 
                 <CardContent className="p-4 space-y-3">
                   {/* Top Row: Risk Number & Status */}
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${ratingColors[treatment.inherentRating]}`} />
-                      <span className="text-sm font-mono font-bold text-gray-800 dark:text-gray-200">
+                      <div className={`w-2.5 h-2.5 rounded-full ${ratingColors[treatment.inherentRating]}`} />
+                      <span className="text-sm font-mono font-semibold text-gray-700 dark:text-gray-200">
                         {treatment.riskNumber}
                       </span>
                     </div>
-                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${statusConf.bgClass} ${statusConf.colorClass} ${statusConf.borderClass}`}>
+                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConf.bgClass} ${statusConf.colorClass}`}>
                       <StatusIcon className="h-3 w-3" />
                       <span>{isAr ? statusConf.labelAr : statusConf.labelEn}</span>
                     </div>
@@ -817,7 +817,7 @@ export default function TreatmentPage() {
 
                   {/* Title */}
                   <div>
-                    <h3 className="font-bold text-gray-800 dark:text-gray-100 line-clamp-2 group-hover:text-[#F39200] transition-colors text-sm">
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-100 line-clamp-2 group-hover:text-[#F39200] transition-colors text-sm">
                       {isAr ? treatment.riskTitleAr : treatment.riskTitleEn}
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -825,23 +825,23 @@ export default function TreatmentPage() {
                     </p>
                   </div>
 
-                  {/* Strategy Badge - شارة الاستراتيجية بألوان واضحة */}
-                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md ${strategyConf.bgClass}`}>
+                  {/* Strategy Badge */}
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md ${strategyConf.bgClass}`}>
                     <StrategyIcon className={`h-3.5 w-3.5 ${strategyConf.colorClass}`} />
-                    <span className={`text-xs font-bold ${strategyConf.colorClass}`}>
+                    <span className={`text-xs font-semibold ${strategyConf.colorClass}`}>
                       {isAr ? strategyConf.labelAr : strategyConf.labelEn}
                     </span>
                   </div>
 
                   {/* Progress Bar */}
                   <div>
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-gray-600 dark:text-gray-400 font-medium">{isAr ? 'التقدم' : 'Progress'}</span>
-                      <span className="font-bold text-orange-600 dark:text-[#F39200]">{treatment.progress}%</span>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-500 dark:text-gray-400">{isAr ? 'التقدم' : 'Progress'}</span>
+                      <span className="font-semibold text-[#F39200]">{treatment.progress}%</span>
                     </div>
-                    <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                    <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#F39200] to-amber-400 transition-all duration-500"
+                        className="h-full rounded-full bg-[#F39200] transition-all duration-500"
                         style={{ width: `${treatment.progress}%` }}
                       />
                     </div>
@@ -849,13 +849,13 @@ export default function TreatmentPage() {
 
                   {/* Footer: Responsible & Due Date */}
                   <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                       <Users className="h-3.5 w-3.5" />
                       <span className="truncate max-w-[90px]">
                         {isAr ? treatment.responsibleAr : treatment.responsibleEn}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                       <Calendar className="h-3.5 w-3.5" />
                       <span>{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
                     </div>
@@ -866,7 +866,7 @@ export default function TreatmentPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 text-xs text-gray-600 dark:text-gray-300"
+                      className="flex-1 text-xs text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
                       onClick={(e) => {
                         e.stopPropagation();
                         openViewModal(treatment);
@@ -878,7 +878,7 @@ export default function TreatmentPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 text-xs border-[#F39200]/50 text-[#F39200] hover:bg-[#F39200]/10"
+                      className="flex-1 text-xs border-[#F39200]/30 text-[#F39200] hover:bg-[#F39200]/5"
                       onClick={(e) => {
                         e.stopPropagation();
                         // فتح مودال التعديل
@@ -919,15 +919,15 @@ export default function TreatmentPage() {
         )}
       </div>
 
-      {/* Pagination - التنقل بين الصفحات */}
+      {/* Pagination - تصميم مثل صفحة التقارير */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-6">
+        <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white dark:bg-transparent rounded-xl border border-gray-100 dark:border-0">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="text-sm"
+            className="text-sm border-gray-200 dark:border-gray-600"
           >
             {isAr ? 'السابق' : 'Previous'}
           </Button>
@@ -948,10 +948,10 @@ export default function TreatmentPage() {
                 <button
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
-                  className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
                     currentPage === pageNum
                       ? 'bg-[#F39200] text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
                   }`}
                 >
                   {pageNum}
@@ -965,7 +965,7 @@ export default function TreatmentPage() {
             size="sm"
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="text-sm"
+            className="text-sm border-gray-200 dark:border-gray-600"
           >
             {isAr ? 'التالي' : 'Next'}
           </Button>
