@@ -9,14 +9,11 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, hover = false, ...props }, ref) => {
-    // Check if className contains a background class
-    const hasBgClass = className?.includes('bg-');
     return (
       <div
         ref={ref}
         className={cn(
-          'rounded-xl border border-[var(--border)] p-6 shadow-sm',
-          !hasBgClass && 'bg-white dark:bg-[#1E293B]',
+          'rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm bg-white dark:bg-slate-800',
           hover && 'card-hover cursor-pointer',
           className
         )}
