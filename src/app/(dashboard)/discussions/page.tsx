@@ -107,6 +107,12 @@ export default function DiscussionsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [riskSearchQuery, setRiskSearchQuery] = useState('');
 
+  // Target selection for discussion
+  const [targetType, setTargetType] = useState<'all' | 'department' | 'user'>('all');
+  const [targetDepartmentId, setTargetDepartmentId] = useState('');
+  const [targetUserId, setTargetUserId] = useState('');
+  const [users, setUsers] = useState<Array<{id: string; fullName: string; fullNameEn: string | null; role: string; department?: {nameAr: string; nameEn: string}}>>([]);
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
@@ -170,6 +176,21 @@ export default function DiscussionsPage() {
     }
   }, []);
 
+  // Fetch users list (excluding admin)
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/users');
+      const data = await response.json();
+      if (data.success) {
+        // Filter out admin users
+        const filteredUsers = data.data.filter((u: { role: string }) => u.role !== 'admin');
+        setUsers(filteredUsers);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  }, []);
+
   const handleSubmitNewDiscussion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRiskId || !newCommentContent.trim()) return;
@@ -182,6 +203,9 @@ export default function DiscussionsPage() {
         body: JSON.stringify({
           content: newCommentContent.trim(),
           type: newCommentType,
+          targetType,
+          targetDepartmentId: targetType === 'department' ? targetDepartmentId : undefined,
+          targetUserId: targetType === 'user' ? targetUserId : undefined,
         }),
       });
 
@@ -192,6 +216,9 @@ export default function DiscussionsPage() {
         setNewCommentContent('');
         setNewCommentType('comment');
         setRiskSearchQuery('');
+        setTargetType('all');
+        setTargetDepartmentId('');
+        setTargetUserId('');
         fetchComments();
       } else {
         alert(data.error || 'Failed to create discussion');
@@ -208,8 +235,9 @@ export default function DiscussionsPage() {
     fetchDepartments();
     if (canStartDiscussion) {
       fetchRisks();
+      fetchUsers();
     }
-  }, [fetchDepartments, fetchRisks, canStartDiscussion]);
+  }, [fetchDepartments, fetchRisks, fetchUsers, canStartDiscussion]);
 
   useEffect(() => {
     fetchComments();
@@ -623,6 +651,9 @@ export default function DiscussionsPage() {
                   setSelectedRiskId('');
                   setNewCommentContent('');
                   setRiskSearchQuery('');
+                  setTargetType('all');
+                  setTargetDepartmentId('');
+                  setTargetUserId('');
                 }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
@@ -702,6 +733,82 @@ export default function DiscussionsPage() {
                 )}
               </div>
 
+              {/* Target Selection - توجيه المناقشة */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {language === 'ar' ? 'توجيه المناقشة إلى' : 'Direct Discussion To'}
+                </label>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => { setTargetType('all'); setTargetDepartmentId(''); setTargetUserId(''); }}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm transition-all ${
+                      targetType === 'all'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-primary-300'
+                    }`}
+                  >
+                    {language === 'ar' ? 'الجميع' : 'Everyone'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setTargetType('department'); setTargetUserId(''); }}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm transition-all ${
+                      targetType === 'department'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-primary-300'
+                    }`}
+                  >
+                    {language === 'ar' ? 'إدارة محددة' : 'Specific Department'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setTargetType('user'); setTargetDepartmentId(''); }}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm transition-all ${
+                      targetType === 'user'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-primary-300'
+                    }`}
+                  >
+                    {language === 'ar' ? 'مستخدم محدد' : 'Specific User'}
+                  </button>
+                </div>
+
+                {/* Department Selection */}
+                {targetType === 'department' && (
+                  <Select
+                    value={targetDepartmentId}
+                    onChange={(value) => setTargetDepartmentId(value)}
+                    options={[
+                      { value: '', label: language === 'ar' ? 'اختر الإدارة...' : 'Select Department...' },
+                      ...departments.map((dept) => ({
+                        value: dept.id,
+                        label: language === 'ar' ? dept.nameAr : dept.nameEn,
+                      })),
+                    ]}
+                  />
+                )}
+
+                {/* User Selection */}
+                {targetType === 'user' && (
+                  <Select
+                    value={targetUserId}
+                    onChange={(value) => setTargetUserId(value)}
+                    options={[
+                      { value: '', label: language === 'ar' ? 'اختر المستخدم...' : 'Select User...' },
+                      ...users.map((user) => ({
+                        value: user.id,
+                        label: `${language === 'ar' ? user.fullName : (user.fullNameEn || user.fullName)} - ${
+                          language === 'ar'
+                            ? (user.department?.nameAr || 'غير محدد')
+                            : (user.department?.nameEn || 'Not Assigned')
+                        }`,
+                      })),
+                    ]}
+                  />
+                )}
+              </div>
+
               {/* Comment Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -735,9 +842,15 @@ export default function DiscussionsPage() {
               {/* Info Note */}
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
                 <p>
-                  {language === 'ar'
+                  {targetType === 'all' && (language === 'ar'
                     ? 'سيتم إرسال إشعار لجميع المستخدمين المعنيين بهذا الخطر (صاحب الخطر، رائد المخاطر، وموظفي الإدارة).'
-                    : 'A notification will be sent to all users related to this risk (risk owner, risk champion, and department staff).'}
+                    : 'A notification will be sent to all users related to this risk (risk owner, risk champion, and department staff).')}
+                  {targetType === 'department' && (language === 'ar'
+                    ? 'سيتم إرسال إشعار لجميع منسوبي الإدارة المحددة.'
+                    : 'A notification will be sent to all members of the selected department.')}
+                  {targetType === 'user' && (language === 'ar'
+                    ? 'سيتم إرسال إشعار للمستخدم المحدد فقط.'
+                    : 'A notification will be sent to the selected user only.')}
                 </p>
               </div>
             </form>
@@ -752,6 +865,9 @@ export default function DiscussionsPage() {
                   setSelectedRiskId('');
                   setNewCommentContent('');
                   setRiskSearchQuery('');
+                  setTargetType('all');
+                  setTargetDepartmentId('');
+                  setTargetUserId('');
                 }}
               >
                 {language === 'ar' ? 'إلغاء' : 'Cancel'}

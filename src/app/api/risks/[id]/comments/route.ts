@@ -221,8 +221,11 @@ export async function POST(
       },
     });
 
-    // إرسال الإشعارات
-    await sendCommentNotifications(risk, comment, user, isInternal);
+    // إرسال الإشعارات مع دعم توجيه المناقشة
+    const targetType = body.targetType || 'all';
+    const targetDepartmentId = body.targetDepartmentId;
+    const targetUserId = body.targetUserId;
+    await sendCommentNotifications(risk, comment, user, isInternal, targetType, targetDepartmentId, targetUserId);
 
     return NextResponse.json({
       success: true,
@@ -306,6 +309,7 @@ async function checkRiskAccess(
 // دالة إرسال الإشعارات عند إضافة تعليق
 // الإشعارات تصل للمستخدمين حسب وظيفتهم والأقسام المتاحة لهم
 // من أضاف التعليق لا يستلم إشعار
+// يدعم توجيه المناقشة لإدارة محددة أو مستخدم محدد
 async function sendCommentNotifications(
   risk: {
     id: string;
@@ -331,121 +335,185 @@ async function sendCommentNotifications(
     id: string;
     fullName: string;
   },
-  isInternal: boolean
+  isInternal: boolean,
+  targetType: 'all' | 'department' | 'user' = 'all',
+  targetDepartmentId?: string,
+  targetUserId?: string
 ) {
   try {
     const notificationRecipients = new Set<string>();
 
-    // 1. صاحب الخطر (ownerId - User)
-    if (risk.ownerId !== currentUser.id) {
-      notificationRecipients.add(risk.ownerId);
-    }
-
-    // 2. صاحب الخطر (riskOwnerId - RiskOwner) - البحث عن المستخدم المرتبط بالبريد
-    if (risk.riskOwnerId) {
-      const riskOwner = await prisma.riskOwner.findUnique({
-        where: { id: risk.riskOwnerId },
-        select: { email: true },
-      });
-
-      if (riskOwner?.email) {
-        const riskOwnerUser = await prisma.user.findUnique({
-          where: { email: riskOwner.email },
+    // إذا كان الاستهداف لمستخدم محدد
+    if (targetType === 'user' && targetUserId) {
+      // إرسال إشعار فقط للمستخدم المحدد
+      if (targetUserId !== currentUser.id) {
+        const targetUser = await prisma.user.findUnique({
+          where: { id: targetUserId },
           select: { id: true, status: true },
         });
-
-        if (riskOwnerUser && riskOwnerUser.status === 'active' && riskOwnerUser.id !== currentUser.id) {
-          notificationRecipients.add(riskOwnerUser.id);
+        if (targetUser && targetUser.status === 'active') {
+          notificationRecipients.add(targetUserId);
         }
       }
     }
+    // إذا كان الاستهداف لإدارة محددة
+    else if (targetType === 'department' && targetDepartmentId) {
+      // إرسال إشعار لجميع منسوبي الإدارة المحددة
+      const departmentUsers = await prisma.user.findMany({
+        where: {
+          departmentId: targetDepartmentId,
+          status: 'active',
+          id: { not: currentUser.id },
+          role: { not: 'admin' }, // استثناء مدير النظام
+        },
+        select: { id: true },
+      });
 
-    // 3. رائد المخاطر للخطر (championId)
-    if (risk.championId && risk.championId !== currentUser.id) {
-      notificationRecipients.add(risk.championId);
+      for (const user of departmentUsers) {
+        notificationRecipients.add(user.id);
+      }
+
+      // إضافة المستخدمين الذين لديهم صلاحية الوصول لهذه الإدارة
+      const usersWithAccess = await prisma.userDepartmentAccess.findMany({
+        where: {
+          departmentId: targetDepartmentId,
+          canView: true,
+          user: {
+            status: 'active',
+            id: { not: currentUser.id },
+            role: { not: 'admin' },
+          },
+        },
+        select: { userId: true },
+      });
+
+      for (const access of usersWithAccess) {
+        notificationRecipients.add(access.userId);
+      }
+
+      // إضافة رائد المخاطر للإدارة المحددة
+      const targetDepartment = await prisma.department.findUnique({
+        where: { id: targetDepartmentId },
+        select: { riskChampionId: true },
+      });
+
+      if (targetDepartment?.riskChampionId && targetDepartment.riskChampionId !== currentUser.id) {
+        notificationRecipients.add(targetDepartment.riskChampionId);
+      }
     }
+    // إذا كان الاستهداف للجميع (السلوك الافتراضي)
+    else {
+      // 1. صاحب الخطر (ownerId - User)
+      if (risk.ownerId !== currentUser.id) {
+        notificationRecipients.add(risk.ownerId);
+      }
 
-    // 4. رائد المخاطر للوظيفة/القسم (department.riskChampionId)
-    const department = await prisma.department.findUnique({
-      where: { id: risk.departmentId },
-      select: {
-        riskChampionId: true,
-        code: true,
-        nameAr: true,
-      },
-    });
+      // 2. صاحب الخطر (riskOwnerId - RiskOwner) - البحث عن المستخدم المرتبط بالبريد
+      if (risk.riskOwnerId) {
+        const riskOwner = await prisma.riskOwner.findUnique({
+          where: { id: risk.riskOwnerId },
+          select: { email: true },
+        });
 
-    if (department?.riskChampionId && department.riskChampionId !== currentUser.id) {
-      notificationRecipients.add(department.riskChampionId);
-    }
+        if (riskOwner?.email) {
+          const riskOwnerUser = await prisma.user.findUnique({
+            where: { email: riskOwner.email },
+            select: { id: true, status: true },
+          });
 
-    // 5. فريق إدارة المخاطر (admin, riskManager, riskAnalyst)
-    // يستلمون إشعارات لجميع التعليقات
-    const riskManagementTeam = await prisma.user.findMany({
-      where: {
-        role: { in: ['admin', 'riskManager', 'riskAnalyst'] },
-        status: 'active',
-        id: { not: currentUser.id },
-      },
-      select: { id: true },
-    });
+          if (riskOwnerUser && riskOwnerUser.status === 'active' && riskOwnerUser.id !== currentUser.id) {
+            notificationRecipients.add(riskOwnerUser.id);
+          }
+        }
+      }
 
-    for (const member of riskManagementTeam) {
-      notificationRecipients.add(member.id);
-    }
+      // 3. رائد المخاطر للخطر (championId)
+      if (risk.championId && risk.championId !== currentUser.id) {
+        notificationRecipients.add(risk.championId);
+      }
 
-    // 6. المستخدمين في نفس الوظيفة/القسم (departmentId)
-    // مثال: جميع مستخدمي الصيانة MAI يستلمون إشعار للخطر MAI-R-643
-    const departmentUsers = await prisma.user.findMany({
-      where: {
-        departmentId: risk.departmentId,
-        status: 'active',
-        id: { not: currentUser.id },
-      },
-      select: { id: true },
-    });
+      // 4. رائد المخاطر للوظيفة/القسم (department.riskChampionId)
+      const department = await prisma.department.findUnique({
+        where: { id: risk.departmentId },
+        select: {
+          riskChampionId: true,
+          code: true,
+          nameAr: true,
+        },
+      });
 
-    for (const user of departmentUsers) {
-      notificationRecipients.add(user.id);
-    }
+      if (department?.riskChampionId && department.riskChampionId !== currentUser.id) {
+        notificationRecipients.add(department.riskChampionId);
+      }
 
-    // 7. المستخدمين الذين لديهم صلاحية الوصول للوظيفة (UserDepartmentAccess)
-    // مثال: مستخدم لديه وصول لـ MAI يستلم إشعار للخطر MAI-R-643
-    const usersWithAccess = await prisma.userDepartmentAccess.findMany({
-      where: {
-        departmentId: risk.departmentId,
-        canView: true,
-        user: {
+      // 5. فريق إدارة المخاطر (admin, riskManager, riskAnalyst)
+      // يستلمون إشعارات لجميع التعليقات
+      const riskManagementTeam = await prisma.user.findMany({
+        where: {
+          role: { in: ['admin', 'riskManager', 'riskAnalyst'] },
           status: 'active',
           id: { not: currentUser.id },
         },
-      },
-      select: { userId: true },
-    });
+        select: { id: true },
+      });
 
-    for (const access of usersWithAccess) {
-      notificationRecipients.add(access.userId);
-    }
+      for (const member of riskManagementTeam) {
+        notificationRecipients.add(member.id);
+      }
 
-    // 8. رواد المخاطر الذين يديرون الوظيفة/القسم (championDepartments)
-    // البحث عن جميع رواد المخاطر المسؤولين عن هذا القسم
-    const championUsers = await prisma.user.findMany({
-      where: {
-        role: 'riskChampion',
-        status: 'active',
-        id: { not: currentUser.id },
-        championDepartments: {
-          some: { id: risk.departmentId },
+      // 6. المستخدمين في نفس الوظيفة/القسم (departmentId)
+      // مثال: جميع مستخدمي الصيانة MAI يستلمون إشعار للخطر MAI-R-643
+      const departmentUsers = await prisma.user.findMany({
+        where: {
+          departmentId: risk.departmentId,
+          status: 'active',
+          id: { not: currentUser.id },
         },
-      },
-      select: { id: true },
-    });
+        select: { id: true },
+      });
 
-    for (const champion of championUsers) {
-      notificationRecipients.add(champion.id);
+      for (const user of departmentUsers) {
+        notificationRecipients.add(user.id);
+      }
+
+      // 7. المستخدمين الذين لديهم صلاحية الوصول للوظيفة (UserDepartmentAccess)
+      // مثال: مستخدم لديه وصول لـ MAI يستلم إشعار للخطر MAI-R-643
+      const usersWithAccess = await prisma.userDepartmentAccess.findMany({
+        where: {
+          departmentId: risk.departmentId,
+          canView: true,
+          user: {
+            status: 'active',
+            id: { not: currentUser.id },
+          },
+        },
+        select: { userId: true },
+      });
+
+      for (const access of usersWithAccess) {
+        notificationRecipients.add(access.userId);
+      }
+
+      // 8. رواد المخاطر الذين يديرون الوظيفة/القسم (championDepartments)
+      // البحث عن جميع رواد المخاطر المسؤولين عن هذا القسم
+      const championUsers = await prisma.user.findMany({
+        where: {
+          role: 'riskChampion',
+          status: 'active',
+          id: { not: currentUser.id },
+          championDepartments: {
+            some: { id: risk.departmentId },
+          },
+        },
+        select: { id: true },
+      });
+
+      for (const champion of championUsers) {
+        notificationRecipients.add(champion.id);
+      }
     }
 
-    // 9. إذا كان التعليق رداً، نرسل إشعار لصاحب التعليق الأصلي
+    // إذا كان التعليق رداً، نرسل إشعار لصاحب التعليق الأصلي (في جميع الحالات)
     if (comment.parentId) {
       const originalComment = await prisma.riskComment.findUnique({
         where: { id: comment.parentId },
@@ -486,7 +554,7 @@ async function sendCommentNotifications(
       });
     }
 
-    console.log(`Sent ${notifications.length} notifications for comment on risk ${risk.riskNumber} (${department?.code || 'N/A'})`);
+    console.log(`Sent ${notifications.length} notifications for comment on risk ${risk.riskNumber} (targetType: ${targetType})`);
   } catch (error) {
     console.error('Error sending comment notifications:', error);
     // لا نريد أن يفشل إنشاء التعليق بسبب فشل الإشعارات
