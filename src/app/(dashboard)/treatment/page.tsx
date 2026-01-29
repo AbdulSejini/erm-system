@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useTransition, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -147,6 +148,7 @@ interface Treatment {
   startDate: string;
   dueDate: string;
   tasks: TaskData[];
+  departmentId: string;
   departmentAr: string;
   departmentEn: string;
 }
@@ -296,6 +298,7 @@ const ratingColors: Record<RiskRating, string> = {
 // ============================================
 
 export default function TreatmentPage() {
+  const router = useRouter();
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
   const [isPending, startTransition] = useTransition();
@@ -305,12 +308,14 @@ export default function TreatmentPage() {
   const [loading, setLoading] = useState(true);
   const [responsibleOptions, setResponsibleOptions] = useState<ResponsibleOption[]>([]);
   const [riskOwnersList, setRiskOwnersList] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
 
   // UI states
   const [searchQuery, setSearchQuery] = useState('');
   const [riskSearchQuery, setRiskSearchQuery] = useState(''); // للبحث في قائمة المخاطر
   const [filterStatus, setFilterStatus] = useState<TreatmentStatus | 'all'>('all');
   const [filterStrategy, setFilterStrategy] = useState<TreatmentStrategy | 'all'>('all');
+  const [filterDepartment, setFilterDepartment] = useState<string>('all'); // فرز حسب القسم
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12; // عدد العناصر في كل صفحة
@@ -396,6 +401,19 @@ export default function TreatmentPage() {
             })));
           }
         }
+
+        // Fetch departments للفرز
+        const deptRes = await fetch('/api/departments');
+        if (deptRes.ok) {
+          const deptData = await deptRes.json();
+          if (deptData.success && deptData.data) {
+            setDepartments(deptData.data.map((d: { id: string; nameAr: string; nameEn: string }) => ({
+              id: d.id,
+              nameAr: d.nameAr,
+              nameEn: d.nameEn,
+            })));
+          }
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -432,6 +450,7 @@ export default function TreatmentPage() {
       startDate: risk.createdAt,
       dueDate: risk.followUpDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       tasks: risk.treatmentPlans?.[0]?.tasks || [],
+      departmentId: risk.department?.id || '',
       departmentAr: risk.department?.nameAr || 'غير محدد',
       departmentEn: risk.department?.nameEn || 'Not Assigned',
     }));
@@ -445,9 +464,10 @@ export default function TreatmentPage() {
         t.titleEn.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
       const matchesStrategy = filterStrategy === 'all' || t.strategy === filterStrategy;
-      return matchesSearch && matchesStatus && matchesStrategy;
+      const matchesDepartment = filterDepartment === 'all' || t.departmentId === filterDepartment;
+      return matchesSearch && matchesStatus && matchesStrategy && matchesDepartment;
     });
-  }, [treatments, searchQuery, filterStatus, filterStrategy]);
+  }, [treatments, searchQuery, filterStatus, filterStrategy, filterDepartment]);
 
   // Pagination - عرض الصفحة الحالية فقط
   const paginatedTreatments = useMemo(() => {
@@ -711,11 +731,23 @@ export default function TreatmentPage() {
             className="ps-10"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={filterDepartment}
+            onChange={(e) => setFilterDepartment(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
+          >
+            <option value="all">{isAr ? 'كل الأقسام' : 'All Departments'}</option>
+            {departments.map((dept) => (
+              <option key={dept.id} value={dept.id}>
+                {isAr ? dept.nameAr : dept.nameEn}
+              </option>
+            ))}
+          </select>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as TreatmentStatus | 'all')}
-            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
           >
             <option value="all">{isAr ? 'كل الحالات' : 'All Status'}</option>
             <option value="notStarted">{isAr ? 'لم يبدأ' : 'Not Started'}</option>
@@ -726,7 +758,7 @@ export default function TreatmentPage() {
           <select
             value={filterStrategy}
             onChange={(e) => setFilterStrategy(e.target.value as TreatmentStrategy | 'all')}
-            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#F39200]"
           >
             <option value="all">{isAr ? 'كل الاستراتيجيات' : 'All Strategies'}</option>
             <option value="avoid">{isAr ? 'تجنب' : 'Avoid'}</option>
@@ -763,7 +795,7 @@ export default function TreatmentPage() {
               <Card
                 key={treatment.id}
                 className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border border-gray-100 dark:border-gray-700 shadow-sm rounded-2xl bg-white dark:bg-[#2E2D2C]"
-                onClick={() => openViewModal(treatment)}
+                onClick={() => router.push(`/treatment/${treatment.id}`)}
               >
                 {/* Card Header with Strategy Color - شريط ملون واضح */}
                 <div className={`h-1.5 ${strategyConf.bgClass}`} />
