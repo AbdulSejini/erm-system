@@ -193,11 +193,24 @@ export default function DiscussionsPage() {
 
   const handleSubmitNewDiscussion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRiskId || !newCommentContent.trim()) return;
+
+    // التحقق من البيانات المطلوبة
+    // إذا كان الاستهداف للجميع، يجب اختيار خطر
+    // إذا كان لإدارة أو مستخدم، الخطر اختياري
+    if (targetType === 'all' && !selectedRiskId) return;
+    if (targetType === 'department' && !targetDepartmentId) return;
+    if (targetType === 'user' && !targetUserId) return;
+    if (!newCommentContent.trim()) return;
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/risks/${selectedRiskId}/comments`, {
+      // إذا كان هناك خطر محدد، نرسل للـ API الخاص بالخطر
+      // وإلا نرسل للـ API العام للتعليقات
+      const apiUrl = selectedRiskId
+        ? `/api/risks/${selectedRiskId}/comments`
+        : '/api/comments';
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -206,6 +219,7 @@ export default function DiscussionsPage() {
           targetType,
           targetDepartmentId: targetType === 'department' ? targetDepartmentId : undefined,
           targetUserId: targetType === 'user' ? targetUserId : undefined,
+          riskId: selectedRiskId || undefined,
         }),
       });
 
@@ -663,80 +677,10 @@ export default function DiscussionsPage() {
 
             {/* Modal Body */}
             <form onSubmit={handleSubmitNewDiscussion} className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)]">
-              {/* Risk Selection */}
+              {/* Target Selection - توجيه المناقشة (نقله للأعلى) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {language === 'ar' ? 'اختر الخطر' : 'Select Risk'} *
-                </label>
-                <Input
-                  placeholder={language === 'ar' ? 'ابحث عن خطر...' : 'Search for a risk...'}
-                  value={riskSearchQuery}
-                  onChange={(e) => setRiskSearchQuery(e.target.value)}
-                  className="mb-2"
-                />
-                <div className="max-h-48 overflow-y-auto border dark:border-gray-700 rounded-lg">
-                  {risks
-                    .filter((risk) => {
-                      if (!riskSearchQuery) return true;
-                      const query = riskSearchQuery.toLowerCase();
-                      return (
-                        risk.riskNumber.toLowerCase().includes(query) ||
-                        risk.titleAr.toLowerCase().includes(query) ||
-                        risk.titleEn.toLowerCase().includes(query) ||
-                        risk.department.nameAr.toLowerCase().includes(query) ||
-                        risk.department.code.toLowerCase().includes(query)
-                      );
-                    })
-                    .slice(0, 20)
-                    .map((risk) => (
-                      <div
-                        key={risk.id}
-                        onClick={() => setSelectedRiskId(risk.id)}
-                        className={`p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 border-b dark:border-gray-700 last:border-b-0 ${
-                          selectedRiskId === risk.id ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-primary-600 dark:text-primary-400">
-                            {risk.riskNumber}
-                          </span>
-                          <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-                            {risk.department.code}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">
-                          {language === 'ar' ? risk.titleAr : risk.titleEn}
-                        </p>
-                      </div>
-                    ))}
-                  {risks.filter((risk) => {
-                    if (!riskSearchQuery) return true;
-                    const query = riskSearchQuery.toLowerCase();
-                    return (
-                      risk.riskNumber.toLowerCase().includes(query) ||
-                      risk.titleAr.toLowerCase().includes(query) ||
-                      risk.titleEn.toLowerCase().includes(query)
-                    );
-                  }).length === 0 && (
-                    <div className="p-4 text-center text-gray-500">
-                      {language === 'ar' ? 'لا توجد مخاطر' : 'No risks found'}
-                    </div>
-                  )}
-                </div>
-                {selectedRiskId && (
-                  <div className="mt-2 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-sm">
-                    <span className="text-primary-700 dark:text-primary-300">
-                      {language === 'ar' ? 'المحدد: ' : 'Selected: '}
-                      {risks.find((r) => r.id === selectedRiskId)?.riskNumber}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Target Selection - توجيه المناقشة */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {language === 'ar' ? 'توجيه المناقشة إلى' : 'Direct Discussion To'}
+                  {language === 'ar' ? 'توجيه المناقشة إلى' : 'Direct Discussion To'} *
                 </label>
                 <div className="flex gap-2 mb-3">
                   <button
@@ -809,6 +753,76 @@ export default function DiscussionsPage() {
                 )}
               </div>
 
+              {/* Risk Selection - اختياري عند اختيار إدارة أو مستخدم */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {language === 'ar' ? 'اختر الخطر' : 'Select Risk'} {targetType === 'all' ? '*' : `(${language === 'ar' ? 'اختياري' : 'Optional'})`}
+                </label>
+                <Input
+                  placeholder={language === 'ar' ? 'ابحث عن خطر...' : 'Search for a risk...'}
+                  value={riskSearchQuery}
+                  onChange={(e) => setRiskSearchQuery(e.target.value)}
+                  className="mb-2"
+                />
+                <div className="max-h-48 overflow-y-auto border dark:border-gray-700 rounded-lg">
+                  {risks
+                    .filter((risk) => {
+                      if (!riskSearchQuery) return true;
+                      const query = riskSearchQuery.toLowerCase();
+                      return (
+                        risk.riskNumber.toLowerCase().includes(query) ||
+                        risk.titleAr.toLowerCase().includes(query) ||
+                        risk.titleEn.toLowerCase().includes(query) ||
+                        risk.department.nameAr.toLowerCase().includes(query) ||
+                        risk.department.code.toLowerCase().includes(query)
+                      );
+                    })
+                    .slice(0, 20)
+                    .map((risk) => (
+                      <div
+                        key={risk.id}
+                        onClick={() => setSelectedRiskId(risk.id)}
+                        className={`p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 border-b dark:border-gray-700 last:border-b-0 ${
+                          selectedRiskId === risk.id ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-primary-600 dark:text-primary-400">
+                            {risk.riskNumber}
+                          </span>
+                          <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                            {risk.department.code}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">
+                          {language === 'ar' ? risk.titleAr : risk.titleEn}
+                        </p>
+                      </div>
+                    ))}
+                  {risks.filter((risk) => {
+                    if (!riskSearchQuery) return true;
+                    const query = riskSearchQuery.toLowerCase();
+                    return (
+                      risk.riskNumber.toLowerCase().includes(query) ||
+                      risk.titleAr.toLowerCase().includes(query) ||
+                      risk.titleEn.toLowerCase().includes(query)
+                    );
+                  }).length === 0 && (
+                    <div className="p-4 text-center text-gray-500">
+                      {language === 'ar' ? 'لا توجد مخاطر' : 'No risks found'}
+                    </div>
+                  )}
+                </div>
+                {selectedRiskId && (
+                  <div className="mt-2 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-sm">
+                    <span className="text-primary-700 dark:text-primary-300">
+                      {language === 'ar' ? 'المحدد: ' : 'Selected: '}
+                      {risks.find((r) => r.id === selectedRiskId)?.riskNumber}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {/* Comment Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -874,7 +888,13 @@ export default function DiscussionsPage() {
               </Button>
               <Button
                 onClick={handleSubmitNewDiscussion}
-                disabled={!selectedRiskId || !newCommentContent.trim() || submitting}
+                disabled={
+                  !newCommentContent.trim() ||
+                  submitting ||
+                  (targetType === 'all' && !selectedRiskId) ||
+                  (targetType === 'department' && !targetDepartmentId) ||
+                  (targetType === 'user' && !targetUserId)
+                }
               >
                 {submitting ? (
                   <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} animate-spin`} />
