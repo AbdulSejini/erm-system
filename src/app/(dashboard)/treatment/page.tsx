@@ -428,32 +428,37 @@ export default function TreatmentPage() {
   // Computed Data
   // ============================================
 
+  // عرض فقط المخاطر التي لديها خطط معالجة حقيقية في قاعدة البيانات
   const treatments = useMemo<Treatment[]>(() => {
-    return risks.map((risk) => ({
-      id: risk.id,
-      riskId: risk.id,
-      riskNumber: risk.riskNumber,
-      riskTitleAr: risk.titleAr,
-      riskTitleEn: risk.titleEn,
-      titleAr: risk.mitigationActionsAr || `خطة معالجة ${risk.riskNumber}`,
-      titleEn: risk.mitigationActionsEn || `Treatment Plan for ${risk.riskNumber}`,
-      strategy: determineStrategy(risk.status, risk.inherentScore),
-      status: determineStatus(risk.status, risk.followUpDate),
-      inherentRating: normalizeRating(risk.inherentRating),
-      inherentScore: risk.inherentScore,
-      residualRating: normalizeRating(risk.residualRating),
-      currentResidualScore: risk.residualScore || risk.inherentScore,
-      progress: calculateProgress(risk.inherentScore, risk.residualScore),
-      priority: risk.inherentScore >= 15 ? 'high' : risk.inherentScore >= 8 ? 'medium' : 'low',
-      responsibleAr: risk.owner?.fullName || risk.champion?.fullName || 'غير محدد',
-      responsibleEn: risk.owner?.fullNameEn || risk.champion?.fullNameEn || 'Not Assigned',
-      startDate: risk.createdAt,
-      dueDate: risk.followUpDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      tasks: risk.treatmentPlans?.[0]?.tasks || [],
-      departmentId: risk.department?.id || '',
-      departmentAr: risk.department?.nameAr || 'غير محدد',
-      departmentEn: risk.department?.nameEn || 'Not Assigned',
-    }));
+    return risks
+      .filter((risk) => risk.treatmentPlans && risk.treatmentPlans.length > 0)
+      .flatMap((risk) =>
+        risk.treatmentPlans!.map((plan) => ({
+          id: plan.id,
+          riskId: risk.id,
+          riskNumber: risk.riskNumber,
+          riskTitleAr: risk.titleAr,
+          riskTitleEn: risk.titleEn,
+          titleAr: plan.titleAr || `خطة معالجة ${risk.riskNumber}`,
+          titleEn: plan.titleEn || `Treatment Plan for ${risk.riskNumber}`,
+          strategy: plan.strategy as TreatmentStrategy,
+          status: plan.status as TreatmentStatus,
+          inherentRating: normalizeRating(risk.inherentRating),
+          inherentScore: risk.inherentScore,
+          residualRating: normalizeRating(risk.residualRating),
+          currentResidualScore: risk.residualScore || risk.inherentScore,
+          progress: plan.progress || 0,
+          priority: (plan.priority || 'medium') as 'high' | 'medium' | 'low',
+          responsibleAr: plan.responsible?.fullName || risk.owner?.fullName || 'غير محدد',
+          responsibleEn: plan.responsible?.fullNameEn || risk.owner?.fullNameEn || 'Not Assigned',
+          startDate: plan.startDate || risk.createdAt,
+          dueDate: plan.dueDate || risk.followUpDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          tasks: plan.tasks || [],
+          departmentId: risk.department?.id || '',
+          departmentAr: risk.department?.nameAr || 'غير محدد',
+          departmentEn: risk.department?.nameEn || 'Not Assigned',
+        }))
+      );
   }, [risks]);
 
   const filteredTreatments = useMemo(() => {
