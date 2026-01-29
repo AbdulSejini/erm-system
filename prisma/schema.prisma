@@ -46,6 +46,8 @@ model User {
   auditLogs             AuditLog[]
   riskComments          RiskComment[]          @relation("CommentAuthor")
   riskChangeLogs        RiskChangeLog[]        @relation("RiskChangeLogUser")
+  sentDirectMessages    DirectMessage[]        @relation("DirectMessageAuthor")
+  receivedDirectMessages DirectMessage[]       @relation("DirectMessageTarget")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -88,6 +90,7 @@ model Department {
   incidents      Incident[]
   processes      Process[]
   riskOwners     RiskOwner[]            @relation("RiskOwnerDepartment")
+  directMessages DirectMessage[]        @relation("DirectMessageDepartment")
 }
 
 // العمليات (Processes)
@@ -531,6 +534,34 @@ model RiskComment {
   @@index([riskId])
   @@index([authorId])
   @@index([parentId])
+}
+
+// الرسائل المباشرة (بدون خطر)
+model DirectMessage {
+  id                  String    @id @default(cuid())
+  authorId            String
+  content             String    // محتوى الرسالة
+  type                String    @default("message") // message, question, announcement
+  targetType          String    @default("department") // department, user
+  targetDepartmentId  String?   // الإدارة المستهدفة
+  targetUserId        String?   // المستخدم المستهدف
+  parentId            String?   // للرد على رسالة أخرى
+  attachments         String?   // روابط المرفقات (JSON)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // العلاقات
+  author            User             @relation("DirectMessageAuthor", fields: [authorId], references: [id])
+  targetDepartment  Department?      @relation("DirectMessageDepartment", fields: [targetDepartmentId], references: [id])
+  targetUser        User?            @relation("DirectMessageTarget", fields: [targetUserId], references: [id])
+  parent            DirectMessage?   @relation("DirectMessageReplies", fields: [parentId], references: [id])
+  replies           DirectMessage[]  @relation("DirectMessageReplies")
+
+  @@index([authorId])
+  @@index([targetDepartmentId])
+  @@index([targetUserId])
+  @@index([parentId])
+  @@index([createdAt])
 }
 
 // سجل تعديلات المخاطر

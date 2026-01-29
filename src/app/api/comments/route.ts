@@ -171,12 +171,50 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // حفظ الرسالة المباشرة في قاعدة البيانات
+    const directMessage = await prisma.directMessage.create({
+      data: {
+        authorId: user.id,
+        content: body.content.trim(),
+        type: body.type || 'message',
+        targetType,
+        targetDepartmentId: targetType === 'department' ? targetDepartmentId : null,
+        targetUserId: targetType === 'user' ? targetUserId : null,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+            role: true,
+            avatar: true,
+          },
+        },
+        targetDepartment: {
+          select: {
+            id: true,
+            nameAr: true,
+            nameEn: true,
+            code: true,
+          },
+        },
+        targetUser: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+          },
+        },
+      },
+    });
+
     console.log(`Sent ${notifications.length} direct notifications (targetType: ${targetType})`);
 
     return NextResponse.json({
       success: true,
       data: {
-        message: 'تم إرسال الرسالة بنجاح',
+        message: directMessage,
         notificationsSent: notifications.length,
       },
     });
@@ -189,7 +227,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET - الحصول على جميع التعليقات مع التصفية
+// GET - الحصول على جميع التعليقات والرسائل المباشرة مع التصفية
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -227,25 +265,23 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
 
-    // بناء شروط التصفية
-    const whereClause: Record<string, unknown> = {
-      parentId: null, // فقط التعليقات الرئيسية
-    };
-
     // التصفية حسب الصلاحيات
     const isRiskManagement = ['admin', 'riskManager', 'riskAnalyst'].includes(user.role);
 
+    // الحصول على قائمة الأقسام المتاحة للمستخدم
+    const accessibleDeptIds = user.accessibleDepartments.map(d => d.departmentId);
+    if (user.departmentId) {
+      accessibleDeptIds.push(user.departmentId);
+    }
+
+    // ========== 1. جلب تعليقات المخاطر ==========
+    const riskCommentWhere: Record<string, unknown> = {
+      parentId: null,
+    };
+
     if (!isRiskManagement) {
-      // إخفاء التعليقات الداخلية
-      whereClause.isInternal = false;
-
-      // تصفية المخاطر حسب صلاحيات المستخدم
-      const accessibleDeptIds = user.accessibleDepartments.map(d => d.departmentId);
-      if (user.departmentId) {
-        accessibleDeptIds.push(user.departmentId);
-      }
-
-      whereClause.risk = {
+      riskCommentWhere.isInternal = false;
+      riskCommentWhere.risk = {
         OR: [
           { departmentId: { in: accessibleDeptIds } },
           { ownerId: user.id },
@@ -254,49 +290,84 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // البحث في محتوى التعليق
     if (search) {
-      whereClause.content = { contains: search, mode: 'insensitive' };
+      riskCommentWhere.content = { contains: search, mode: 'insensitive' };
     }
 
-    // التصفية حسب الإدارة
     if (departmentId) {
-      whereClause.risk = {
-        ...((whereClause.risk as object) || {}),
+      riskCommentWhere.risk = {
+        ...((riskCommentWhere.risk as object) || {}),
         departmentId,
       };
     }
 
-    // التصفية حسب الخطر
     if (riskId) {
-      whereClause.riskId = riskId;
+      riskCommentWhere.riskId = riskId;
     }
 
-    // التصفية حسب الكاتب
     if (authorId) {
-      whereClause.authorId = authorId;
+      riskCommentWhere.authorId = authorId;
     }
 
-    // التصفية حسب نوع التعليق
-    if (type) {
-      whereClause.type = type;
+    if (type && type !== 'directMessage') {
+      riskCommentWhere.type = type;
     }
 
-    // التصفية حسب التاريخ
     if (dateFrom || dateTo) {
-      whereClause.createdAt = {};
+      riskCommentWhere.createdAt = {};
       if (dateFrom) {
-        (whereClause.createdAt as Record<string, Date>).gte = new Date(dateFrom);
+        (riskCommentWhere.createdAt as Record<string, Date>).gte = new Date(dateFrom);
       }
       if (dateTo) {
-        (whereClause.createdAt as Record<string, Date>).lte = new Date(dateTo);
+        (riskCommentWhere.createdAt as Record<string, Date>).lte = new Date(dateTo);
       }
     }
 
-    // جلب التعليقات مع التقسيم
-    const [comments, total] = await Promise.all([
-      prisma.riskComment.findMany({
-        where: whereClause,
+    // ========== 2. جلب الرسائل المباشرة ==========
+    const directMessageWhere: Record<string, unknown> = {
+      parentId: null,
+    };
+
+    // تصفية الرسائل المباشرة حسب الصلاحيات
+    if (!isRiskManagement) {
+      directMessageWhere.OR = [
+        { authorId: user.id },
+        { targetUserId: user.id },
+        { targetDepartmentId: user.departmentId },
+        { targetDepartmentId: { in: accessibleDeptIds } },
+      ];
+    }
+
+    if (search) {
+      directMessageWhere.content = { contains: search, mode: 'insensitive' };
+    }
+
+    if (departmentId) {
+      directMessageWhere.targetDepartmentId = departmentId;
+    }
+
+    if (authorId) {
+      directMessageWhere.authorId = authorId;
+    }
+
+    if (dateFrom || dateTo) {
+      directMessageWhere.createdAt = {};
+      if (dateFrom) {
+        (directMessageWhere.createdAt as Record<string, Date>).gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        (directMessageWhere.createdAt as Record<string, Date>).lte = new Date(dateTo);
+      }
+    }
+
+    // إذا تم تحديد خطر معين، لا نعرض الرسائل المباشرة
+    const shouldFetchDirectMessages = !riskId && (type === 'directMessage' || !type);
+
+    // جلب البيانات
+    const [riskComments, riskCommentsTotal, directMessages, directMessagesTotal] = await Promise.all([
+      // جلب تعليقات المخاطر (إذا لم يكن النوع المحدد هو directMessage فقط)
+      type !== 'directMessage' ? prisma.riskComment.findMany({
+        where: riskCommentWhere,
         include: {
           author: {
             select: {
@@ -340,11 +411,122 @@ export async function GET(request: NextRequest) {
           },
         },
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.riskComment.count({ where: whereClause }),
+      }) : Promise.resolve([]),
+
+      type !== 'directMessage' ? prisma.riskComment.count({ where: riskCommentWhere }) : Promise.resolve(0),
+
+      // جلب الرسائل المباشرة
+      shouldFetchDirectMessages ? prisma.directMessage.findMany({
+        where: directMessageWhere,
+        include: {
+          author: {
+            select: {
+              id: true,
+              fullName: true,
+              fullNameEn: true,
+              role: true,
+              avatar: true,
+            },
+          },
+          targetDepartment: {
+            select: {
+              id: true,
+              nameAr: true,
+              nameEn: true,
+              code: true,
+            },
+          },
+          targetUser: {
+            select: {
+              id: true,
+              fullName: true,
+              fullNameEn: true,
+            },
+          },
+          replies: {
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  fullNameEn: true,
+                  role: true,
+                  avatar: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }) : Promise.resolve([]),
+
+      shouldFetchDirectMessages ? prisma.directMessage.count({ where: directMessageWhere }) : Promise.resolve(0),
     ]);
+
+    // دمج وترتيب النتائج حسب التاريخ
+    interface CommentItem {
+      id: string;
+      content: string;
+      type: string;
+      createdAt: Date;
+      updatedAt: Date;
+      author: {
+        id: string;
+        fullName: string;
+        fullNameEn: string | null;
+        role: string;
+        avatar: string | null;
+      };
+      isDirectMessage: boolean;
+      risk?: {
+        id: string;
+        riskNumber: string;
+        titleAr: string;
+        titleEn: string;
+        department: {
+          id: string;
+          nameAr: string;
+          nameEn: string;
+          code: string;
+        };
+      } | null;
+      targetDepartment?: {
+        id: string;
+        nameAr: string;
+        nameEn: string;
+        code: string;
+      } | null;
+      targetUser?: {
+        id: string;
+        fullName: string;
+        fullNameEn: string | null;
+      } | null;
+      targetType?: string;
+      isInternal?: boolean;
+      replies: unknown[];
+    }
+
+    const allComments: CommentItem[] = [
+      ...riskComments.map((c) => ({
+        ...c,
+        isDirectMessage: false,
+        targetDepartment: null,
+        targetUser: null,
+        targetType: undefined,
+      })),
+      ...directMessages.map((m) => ({
+        ...m,
+        isDirectMessage: true,
+        type: 'directMessage',
+        risk: null,
+        isInternal: false,
+      })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // تطبيق الصفحات
+    const total = riskCommentsTotal + directMessagesTotal;
+    const paginatedComments = allComments.slice((page - 1) * limit, page * limit);
 
     // إحصائيات عامة
     const stats = await prisma.riskComment.groupBy({
@@ -353,10 +535,22 @@ export async function GET(request: NextRequest) {
       where: isRiskManagement ? { parentId: null } : { parentId: null, isInternal: false },
     });
 
+    const directMessageCount = await prisma.directMessage.count({
+      where: isRiskManagement ? { parentId: null } : {
+        parentId: null,
+        OR: [
+          { authorId: user.id },
+          { targetUserId: user.id },
+          { targetDepartmentId: user.departmentId },
+          { targetDepartmentId: { in: accessibleDeptIds } },
+        ],
+      },
+    });
+
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [todayCount, weekCount] = await Promise.all([
+    const [todayCount, weekCount, todayDirectCount, weekDirectCount] = await Promise.all([
       prisma.riskComment.count({
         where: {
           parentId: null,
@@ -371,12 +565,24 @@ export async function GET(request: NextRequest) {
           ...(isRiskManagement ? {} : { isInternal: false }),
         },
       }),
+      prisma.directMessage.count({
+        where: {
+          parentId: null,
+          createdAt: { gte: todayStart },
+        },
+      }),
+      prisma.directMessage.count({
+        where: {
+          parentId: null,
+          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        },
+      }),
     ]);
 
     return NextResponse.json({
       success: true,
       data: {
-        comments,
+        comments: paginatedComments,
         pagination: {
           total,
           page,
@@ -384,9 +590,12 @@ export async function GET(request: NextRequest) {
           totalPages: Math.ceil(total / limit),
         },
         stats: {
-          byType: stats.reduce((acc, s) => ({ ...acc, [s.type]: s._count }), {}),
-          today: todayCount,
-          thisWeek: weekCount,
+          byType: {
+            ...stats.reduce((acc, s) => ({ ...acc, [s.type]: s._count }), {}),
+            directMessage: directMessageCount,
+          },
+          today: todayCount + todayDirectCount,
+          thisWeek: weekCount + weekDirectCount,
           total,
         },
       },

@@ -33,7 +33,8 @@ interface Comment {
   id: string;
   content: string;
   type: string;
-  isInternal: boolean;
+  isInternal?: boolean;
+  isDirectMessage?: boolean;
   createdAt: string;
   updatedAt: string;
   author: {
@@ -43,7 +44,7 @@ interface Comment {
     role: string;
     avatar: string | null;
   };
-  risk: {
+  risk?: {
     id: string;
     riskNumber: string;
     titleAr: string;
@@ -54,7 +55,19 @@ interface Comment {
       nameEn: string;
       code: string;
     };
-  };
+  } | null;
+  targetDepartment?: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+    code: string;
+  } | null;
+  targetUser?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+  } | null;
+  targetType?: string;
   replies: Comment[];
 }
 
@@ -305,6 +318,8 @@ export default function DiscussionsPage() {
       reply: { ar: 'رد', en: 'Reply' },
       statusUpdate: { ar: 'تحديث حالة', en: 'Status Update' },
       approval: { ar: 'موافقة', en: 'Approval' },
+      directMessage: { ar: 'رسالة مباشرة', en: 'Direct Message' },
+      message: { ar: 'رسالة', en: 'Message' },
     };
     return labels[type]?.[language] || type;
   };
@@ -316,6 +331,8 @@ export default function DiscussionsPage() {
       reply: 'info',
       statusUpdate: 'success',
       approval: 'success',
+      directMessage: 'info',
+      message: 'info',
     };
     return variants[type] || 'default';
   };
@@ -535,13 +552,17 @@ export default function DiscussionsPage() {
             <Card
               key={comment.id}
               className="hover:shadow-lg transition-shadow duration-200 cursor-pointer"
-              onClick={() => router.push(`/risks/${comment.risk.id}`)}
+              onClick={() => comment.risk ? router.push(`/risks/${comment.risk.id}`) : undefined}
             >
               <CardContent className="p-4">
                 <div className="flex flex-col lg:flex-row gap-4">
                   {/* Author Avatar */}
                   <div className="flex-shrink-0">
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-bold text-lg">
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                      comment.isDirectMessage
+                        ? 'bg-gradient-to-br from-blue-500 to-blue-600'
+                        : 'bg-gradient-to-br from-primary-500 to-primary-600'
+                    }`}>
                       {comment.author.fullName.charAt(0)}
                     </div>
                   </div>
@@ -570,21 +591,43 @@ export default function DiscussionsPage() {
                       </span>
                     </div>
 
-                    {/* Risk Info */}
-                    <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
-                      <span className="flex items-center gap-1 text-primary-600 dark:text-primary-400 font-medium">
-                        <AlertTriangle className="h-4 w-4" />
-                        {comment.risk.riskNumber}
-                      </span>
-                      <span className="text-gray-500">-</span>
-                      <span className="text-gray-700 dark:text-gray-300 truncate max-w-md">
-                        {language === 'ar' ? comment.risk.titleAr : comment.risk.titleEn}
-                      </span>
-                      <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                        <Building2 className="h-3 w-3" />
-                        {language === 'ar' ? comment.risk.department.nameAr : comment.risk.department.nameEn}
-                      </span>
-                    </div>
+                    {/* Risk Info OR Direct Message Target */}
+                    {comment.isDirectMessage ? (
+                      <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
+                        <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                          <Send className="h-4 w-4" />
+                          {language === 'ar' ? 'رسالة مباشرة' : 'Direct Message'}
+                        </span>
+                        <span className="text-gray-500">-</span>
+                        {comment.targetType === 'department' && comment.targetDepartment && (
+                          <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
+                            <Building2 className="h-4 w-4" />
+                            {language === 'ar' ? `إلى إدارة ${comment.targetDepartment.nameAr}` : `To ${comment.targetDepartment.nameEn}`}
+                          </span>
+                        )}
+                        {comment.targetType === 'user' && comment.targetUser && (
+                          <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
+                            <User className="h-4 w-4" />
+                            {language === 'ar' ? `إلى ${comment.targetUser.fullName}` : `To ${comment.targetUser.fullNameEn || comment.targetUser.fullName}`}
+                          </span>
+                        )}
+                      </div>
+                    ) : comment.risk && (
+                      <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
+                        <span className="flex items-center gap-1 text-primary-600 dark:text-primary-400 font-medium">
+                          <AlertTriangle className="h-4 w-4" />
+                          {comment.risk.riskNumber}
+                        </span>
+                        <span className="text-gray-500">-</span>
+                        <span className="text-gray-700 dark:text-gray-300 truncate max-w-md">
+                          {language === 'ar' ? comment.risk.titleAr : comment.risk.titleEn}
+                        </span>
+                        <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                          <Building2 className="h-3 w-3" />
+                          {language === 'ar' ? comment.risk.department.nameAr : comment.risk.department.nameEn}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Comment Text */}
                     <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap line-clamp-3">
@@ -603,18 +646,20 @@ export default function DiscussionsPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex-shrink-0 flex items-start">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/risks/${comment.risk.id}`);
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {comment.risk && (
+                    <div className="flex-shrink-0 flex items-start">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/risks/${comment.risk!.id}`);
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
