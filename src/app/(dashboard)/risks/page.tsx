@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
@@ -223,6 +223,7 @@ const convertedHRRisks = hrRisks.map((hr) => ({
   nextReviewDate: '',
   isDeleted: false,
   deletedAt: null as string | null,
+  commentsCount: 0,
 }));
 
 // Mock data matching actual risk register structure
@@ -274,6 +275,7 @@ const mockRisks = [
     mitigationActionsEn: '',
     isDeleted: false,
     deletedAt: null as string | null,
+    commentsCount: 0,
   },
   {
     id: '2',
@@ -322,6 +324,7 @@ const mockRisks = [
     nextReviewDate: '',
     isDeleted: false,
     deletedAt: null as string | null,
+    commentsCount: 0,
   },
   {
     id: '3',
@@ -368,6 +371,7 @@ const mockRisks = [
     nextReviewDate: '',
     isDeleted: false,
     deletedAt: null as string | null,
+    commentsCount: 0,
   },
   {
     id: '4',
@@ -414,6 +418,7 @@ const mockRisks = [
     nextReviewDate: '',
     isDeleted: false,
     deletedAt: null as string | null,
+    commentsCount: 0,
   },
   {
     id: '5',
@@ -460,6 +465,7 @@ const mockRisks = [
     nextReviewDate: '',
     isDeleted: false,
     deletedAt: null as string | null,
+    commentsCount: 0,
   },
   {
     id: '6',
@@ -506,9 +512,60 @@ const mockRisks = [
     nextReviewDate: '',
     isDeleted: false,
     deletedAt: null as string | null,
+    commentsCount: 0,
   },
   // Include converted HR risks
   ...convertedHRRisks,
+  // خطر محذوف للاختبار
+  {
+    id: 'deleted-1',
+    riskNumber: 'DEL-R-001',
+    titleAr: 'خطر محذوف - للاختبار',
+    titleEn: 'Deleted Risk - For Testing',
+    descriptionAr: 'هذا خطر تم حذفه للتأكد من عمل ميزة التمييز',
+    descriptionEn: 'This is a deleted risk to verify the highlighting feature',
+    categoryCode: 'OPS',
+    status: 'closed' as RiskStatus,
+    departmentId: '',
+    departmentAr: 'تقنية المعلومات',
+    departmentEn: 'IT',
+    processAr: 'إدارة النظم',
+    processEn: 'Systems Management',
+    processText: 'إدارة النظم',
+    subProcessAr: 'الصيانة',
+    subProcessEn: 'Maintenance',
+    subProcessText: 'الصيانة',
+    ownerAr: 'النظام',
+    ownerEn: 'System',
+    ownerId: undefined as string | undefined,
+    championAr: 'النظام',
+    championEn: 'System',
+    identifiedDate: '2026-01-01',
+    followUpDate: '',
+    nextReviewDate: '',
+    inherentLikelihood: 2,
+    inherentImpact: 2,
+    inherentScore: 4,
+    inherentRating: 'Negligible' as RiskRating,
+    residualLikelihood: 1,
+    residualImpact: 1,
+    residualScore: 1,
+    residualRating: 'Negligible' as RiskRating,
+    issuedBy: 'Internal',
+    potentialCauseAr: '',
+    potentialCauseEn: '',
+    potentialImpactAr: '',
+    potentialImpactEn: '',
+    layersOfProtectionAr: '',
+    layersOfProtectionEn: '',
+    krisAr: '',
+    krisEn: '',
+    mitigationActionsAr: '',
+    mitigationActionsEn: '',
+    isDeleted: true,
+    deletedAt: '2026-01-15T10:00:00.000Z',
+    commentsCount: 0,
+  },
 ];
 
 // Combined all risks (fallback data)
@@ -559,6 +616,9 @@ interface APIRisk {
   riskOwnerId?: string | null;
   isDeleted?: boolean;
   deletedAt?: string | null;
+  _count?: {
+    comments: number;
+  };
 }
 
 export default function RisksPage() {
@@ -571,6 +631,9 @@ export default function RisksPage() {
   // Sort options type
   type SortField = 'riskNumber' | 'title' | 'inherentScore' | 'residualScore' | 'status' | 'identifiedDate';
   type SortDirection = 'asc' | 'desc';
+
+  // Ref to track if this is the initial load (to prevent resetting page on mount)
+  const isInitialMount = useRef(true);
 
   // Initialize state from URL params for persistence
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
@@ -683,6 +746,7 @@ export default function RisksPage() {
           krisEn: risk.krisEn || '',
           mitigationActionsAr: risk.mitigationActionsAr || '',
           mitigationActionsEn: risk.mitigationActionsEn || '',
+          commentsCount: risk._count?.comments || 0,
         }));
 
         setRisks(transformedRisks);
@@ -751,6 +815,7 @@ export default function RisksPage() {
                 mitigationActionsEn: risk.mitigationActionsEn || '',
                 isDeleted: risk.isDeleted || false,
                 deletedAt: risk.deletedAt || null,
+                commentsCount: risk._count?.comments || 0,
               }));
               setRisks(transformedRisks);
               setIsUsingFallbackData(false);
@@ -1017,8 +1082,12 @@ export default function RisksPage() {
     });
   }, [debouncedSearch, filterRating, filterCategory, filterStatus, filterDepartment, sortField, sortDirection, currentPage, itemsPerPage, updateURLParams]);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (but not on initial mount)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     setCurrentPage(1);
   }, [debouncedSearch, filterRating, filterCategory, filterStatus, filterDepartment]);
 
@@ -1118,8 +1187,12 @@ export default function RisksPage() {
       return matchesSearch && matchesRating && matchesCategory && matchesStatus && matchesDepartment;
     });
 
-    // Then sort
+    // Then sort - المخاطر المحذوفة تأتي دائماً في النهاية
     return filtered.sort((a, b) => {
+      // المخاطر المحذوفة تأتي في النهاية دائماً
+      if (a.isDeleted && !b.isDeleted) return 1;
+      if (!a.isDeleted && b.isDeleted) return -1;
+
       let comparison = 0;
 
       switch (sortField) {
@@ -1816,22 +1889,34 @@ export default function RisksPage() {
                     <tr
                       key={risk.id}
                       className={cn(
-                        "border-b border-[var(--border)] transition-colors hover:bg-[var(--background-secondary)]",
-                        risk.isDeleted && "opacity-50 bg-red-50/30 dark:bg-red-900/10"
+                        "border-b border-[var(--border)] transition-all duration-300 hover:bg-[var(--background-secondary)]",
+                        risk.isDeleted && [
+                          "bg-gradient-to-r from-red-50/80 via-red-50/40 to-transparent",
+                          "dark:from-red-950/40 dark:via-red-950/20 dark:to-transparent",
+                          "border-l-4 border-l-red-500",
+                          "opacity-70 hover:opacity-90"
+                        ]
                       )}
                     >
                       <td className="p-2 sm:p-3 md:p-4">
                         <div className="flex items-center gap-1.5">
+                          {/* أيقونة تحذير للمخاطر المحذوفة */}
+                          {risk.isDeleted && (
+                            <span className="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-100 dark:bg-red-900/50 animate-pulse">
+                              <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-red-500" />
+                            </span>
+                          )}
                           <code className={cn(
                             "rounded px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-mono",
                             risk.isDeleted
-                              ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through"
+                              ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through decoration-red-500 decoration-2"
                               : "bg-[var(--background-tertiary)]"
                           )}>
                             {risk.riskNumber}
                           </code>
                           {risk.isDeleted && (
-                            <span className="text-[9px] sm:text-[10px] text-red-500 font-medium px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/30">
+                            <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] text-white font-bold px-1.5 py-0.5 rounded-full bg-red-500 shadow-sm animate-pulse">
+                              <X className="h-2.5 w-2.5" />
                               {isAr ? 'محذوف' : 'Deleted'}
                             </span>
                           )}
@@ -1839,10 +1924,20 @@ export default function RisksPage() {
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
                         <div className="max-w-[200px] sm:max-w-[250px] md:max-w-[300px]">
-                          <p className="font-medium text-xs sm:text-sm text-[var(--foreground)] truncate">
+                          <p className={cn(
+                            "font-medium text-xs sm:text-sm truncate",
+                            risk.isDeleted
+                              ? "text-red-600/70 dark:text-red-400/70 line-through decoration-red-400"
+                              : "text-[var(--foreground)]"
+                          )}>
                             {isAr ? risk.titleAr : risk.titleEn}
                           </p>
-                          <p className="mt-0.5 text-[10px] sm:text-xs text-[var(--foreground-muted)] truncate">
+                          <p className={cn(
+                            "mt-0.5 text-[10px] sm:text-xs truncate",
+                            risk.isDeleted
+                              ? "text-red-400/60 dark:text-red-500/60"
+                              : "text-[var(--foreground-muted)]"
+                          )}>
                             {isAr ? risk.departmentAr : risk.departmentEn} • {isAr ? risk.processAr : risk.processEn}
                           </p>
                         </div>
@@ -1890,9 +1985,14 @@ export default function RisksPage() {
                             size="icon-sm"
                             title={isAr ? 'التفاصيل والنقاش' : 'Details & Discussion'}
                             onClick={() => router.push(`/risks/${risk.id}`)}
-                            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-[var(--primary)]"
+                            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-[var(--primary)] relative"
                           >
                             <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
+                            {(risk.commentsCount || 0) > 0 && (
+                              <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 text-[9px] sm:text-[10px] font-bold bg-[#F39200] text-white rounded-full shadow-sm">
+                                {risk.commentsCount > 99 ? '99+' : risk.commentsCount}
+                              </span>
+                            )}
                           </Button>
                           <Button variant="ghost" size="icon-sm" title={isAr ? 'تعديل' : 'Edit'} onClick={() => handleEditRisk(risk)} className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8">
                             <Edit className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
@@ -2003,26 +2103,45 @@ export default function RisksPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {paginatedRisks.map((risk) => (
             <Card key={risk.id} hover className={cn(
-              "overflow-hidden",
-              risk.isDeleted && "opacity-60 border-red-200 dark:border-red-800/50"
+              "overflow-hidden relative",
+              risk.isDeleted && [
+                "opacity-75 hover:opacity-90",
+                "border-2 border-red-300 dark:border-red-700/70",
+                "bg-gradient-to-br from-red-50/50 to-transparent dark:from-red-950/30 dark:to-transparent"
+              ]
             )}>
-              <div className="p-4">
-                {/* Deleted Banner */}
+              {/* خط مائل للمخاطر المحذوفة */}
+              {risk.isDeleted && (
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-full bg-[repeating-linear-gradient(135deg,transparent,transparent_10px,rgba(239,68,68,0.1)_10px,rgba(239,68,68,0.1)_20px)]" />
+                </div>
+              )}
+              <div className="p-4 relative">
+                {/* Deleted Banner - محسّن */}
                 {risk.isDeleted && (
-                  <div className="mb-2 -mx-4 -mt-4 px-4 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium text-center">
+                  <div className="mb-3 -mx-4 -mt-4 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md">
+                    <Trash2 className="h-3.5 w-3.5 animate-pulse" />
                     {isAr ? 'خطر محذوف' : 'Deleted Risk'}
+                    <Trash2 className="h-3.5 w-3.5 animate-pulse" />
                   </div>
                 )}
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between">
-                  <code className={cn(
-                    "rounded px-2 py-1 text-xs font-mono",
-                    risk.isDeleted
-                      ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through"
-                      : "bg-[var(--background-tertiary)]"
-                  )}>
-                    {risk.riskNumber}
-                  </code>
+                  <div className="flex items-center gap-2">
+                    {risk.isDeleted && (
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/50">
+                        <X className="h-3.5 w-3.5 text-red-500" />
+                      </span>
+                    )}
+                    <code className={cn(
+                      "rounded px-2 py-1 text-xs font-mono",
+                      risk.isDeleted
+                        ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through decoration-2"
+                        : "bg-[var(--background-tertiary)]"
+                    )}>
+                      {risk.riskNumber}
+                    </code>
+                  </div>
                   <Badge variant={getStatusBadgeVariant(risk.status)}>
                     {getStatusDisplayName(risk.status)}
                   </Badge>
@@ -2030,8 +2149,10 @@ export default function RisksPage() {
 
                 {/* Title */}
                 <h3 className={cn(
-                  "mb-2 font-semibold text-[var(--foreground)]",
-                  risk.isDeleted && "line-through opacity-70"
+                  "mb-2 font-semibold",
+                  risk.isDeleted
+                    ? "line-through decoration-red-400 decoration-2 text-red-600/70 dark:text-red-400/70"
+                    : "text-[var(--foreground)]"
                 )}>
                   {isAr ? risk.titleAr : risk.titleEn}
                 </h3>

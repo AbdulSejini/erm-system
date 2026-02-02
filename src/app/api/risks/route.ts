@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const filterByAccess = searchParams.get('filterByAccess') !== 'false'; // افتراضياً يتم الفلترة
+    const includeTreatments = searchParams.get('includeTreatments') === 'true'; // جلب خطط المعالجة
 
     // الحصول على الجلسة للتحقق من صلاحيات المستخدم
     const session = await auth();
@@ -143,6 +144,53 @@ export async function GET(request: NextRequest) {
             fullNameEn: true,
           },
         },
+        // جلب عدد التعليقات على كل خطر
+        _count: {
+          select: {
+            comments: true,
+          },
+        },
+        // جلب خطط المعالجة إذا طُلب ذلك
+        ...(includeTreatments && {
+          treatments: {
+            include: {
+              responsible: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  fullNameEn: true,
+                },
+              },
+              riskOwner: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  fullNameEn: true,
+                },
+              },
+              monitor: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  fullNameEn: true,
+                },
+              },
+              tasks: {
+                orderBy: { order: 'asc' },
+                include: {
+                  assignedTo: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      fullNameEn: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        }),
       },
       orderBy: [
         // المخاطر المحذوفة تأتي في النهاية دائماً
@@ -151,9 +199,21 @@ export async function GET(request: NextRequest) {
       ],
     });
 
+    // تحويل اسم treatments إلى treatmentPlans للتوافق مع الـ frontend
+    const risksWithTreatmentPlans = includeTreatments
+      ? risks.map((risk) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { treatments, ...restRisk } = risk as any;
+          return {
+            ...restRisk,
+            treatmentPlans: treatments || [],
+          };
+        })
+      : risks;
+
     return NextResponse.json({
       success: true,
-      data: risks,
+      data: risksWithTreatmentPlans,
       count: risks.length,
     });
   } catch (error) {

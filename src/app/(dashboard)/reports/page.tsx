@@ -43,7 +43,10 @@ interface Risk {
   riskNumber: string;
   titleAr: string;
   titleEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
   status: string;
+  approvalStatus: string;
   inherentLikelihood: number;
   inherentImpact: number;
   inherentScore: number;
@@ -52,22 +55,65 @@ interface Risk {
   residualImpact: number | null;
   residualScore: number | null;
   residualRating: string | null;
+  potentialCauseAr: string | null;
+  potentialCauseEn: string | null;
+  potentialImpactAr: string | null;
+  potentialImpactEn: string | null;
+  layersOfProtectionAr: string | null;
+  layersOfProtectionEn: string | null;
+  krisAr: string | null;
+  krisEn: string | null;
+  mitigationActionsAr: string | null;
+  mitigationActionsEn: string | null;
+  complianceRequired: boolean;
+  complianceNoteAr: string | null;
+  complianceNoteEn: string | null;
+  iaRef: string | null;
+  processText: string | null;
+  subProcessText: string | null;
+  issuedBy: string | null;
+  identifiedDate: string;
+  lastReviewDate: string | null;
+  nextReviewDate: string | null;
   createdAt: string;
   updatedAt: string;
   followUpDate: string | null;
+  isDeleted: boolean;
   department?: {
     id: string;
     nameAr: string;
     nameEn: string;
     code: string;
   };
+  category?: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+    code: string;
+  };
+  source?: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+  };
   owner?: {
+    id: string;
     fullName: string;
     fullNameEn: string | null;
   };
   riskOwner?: {
     nameAr: string;
     nameEn: string | null;
+    department?: {
+      id: string;
+      nameAr: string;
+      nameEn: string;
+    };
+  };
+  champion?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
   };
 }
 
@@ -323,41 +369,151 @@ export default function ReportsPage() {
     return labels[status]?.[isAr ? 'ar' : 'en'] || status;
   };
 
+  const getApprovalStatusLabel = (status: string) => {
+    const labels: Record<string, { ar: string; en: string }> = {
+      Draft: { ar: 'مسودة', en: 'Draft' },
+      Approved: { ar: 'معتمد', en: 'Approved' },
+      Future: { ar: 'مستقبلي', en: 'Future' },
+      'N/A': { ar: 'غير متاح', en: 'N/A' },
+      Sent: { ar: 'مرسل', en: 'Sent' },
+      'Under Discussing': { ar: 'قيد المناقشة', en: 'Under Discussing' },
+    };
+    return labels[status]?.[isAr ? 'ar' : 'en'] || status;
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleDateString(isAr ? 'ar-SA' : 'en-US');
+    } catch {
+      return '';
+    }
+  };
+
+  const escapeCSVField = (field: string | number | boolean | null | undefined): string => {
+    if (field === null || field === undefined) return '';
+    const str = String(field);
+    // Escape double quotes and wrap in quotes if contains special characters
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return `"${str}"`;
+  };
+
   const handleExportCSV = () => {
+    // جميع الأعمدة من قاعدة البيانات
     const headers = [
       isAr ? 'رقم الخطر' : 'Risk Number',
-      isAr ? 'العنوان' : 'Title',
-      isAr ? 'الإدارة' : 'Department',
-      isAr ? 'الحالة' : 'Status',
-      isAr ? 'التصنيف الكامن' : 'Inherent Rating',
+      isAr ? 'العنوان (عربي)' : 'Title (Arabic)',
+      isAr ? 'العنوان (إنجليزي)' : 'Title (English)',
+      isAr ? 'الوصف (عربي)' : 'Description (Arabic)',
+      isAr ? 'الوصف (إنجليزي)' : 'Description (English)',
+      isAr ? 'نوع الخطر' : 'Risk Category',
+      isAr ? 'رمز نوع الخطر' : 'Category Code',
+      isAr ? 'الوظيفة/الإدارة' : 'Department',
+      isAr ? 'رمز الوظيفة' : 'Department Code',
+      isAr ? 'مصدر الخطر' : 'Risk Source',
+      isAr ? 'الجهة المصدرة' : 'Issued By',
+      isAr ? 'العملية' : 'Process',
+      isAr ? 'العملية الفرعية' : 'Sub Process',
+      isAr ? 'السبب المحتمل (عربي)' : 'Potential Cause (Arabic)',
+      isAr ? 'السبب المحتمل (إنجليزي)' : 'Potential Cause (English)',
+      isAr ? 'التأثير المحتمل (عربي)' : 'Potential Impact (Arabic)',
+      isAr ? 'التأثير المحتمل (إنجليزي)' : 'Potential Impact (English)',
+      isAr ? 'الاحتمالية الكامنة' : 'Inherent Likelihood',
+      isAr ? 'التأثير الكامن' : 'Inherent Impact',
       isAr ? 'الدرجة الكامنة' : 'Inherent Score',
-      isAr ? 'التصنيف المتبقي' : 'Residual Rating',
+      isAr ? 'التصنيف الكامن' : 'Inherent Rating',
+      isAr ? 'الاحتمالية المتبقية' : 'Residual Likelihood',
+      isAr ? 'التأثير المتبقي' : 'Residual Impact',
       isAr ? 'الدرجة المتبقية' : 'Residual Score',
-      isAr ? 'تاريخ الإنشاء' : 'Created Date',
+      isAr ? 'التصنيف المتبقي' : 'Residual Rating',
+      isAr ? 'طبقات الحماية (عربي)' : 'Layers of Protection (Arabic)',
+      isAr ? 'طبقات الحماية (إنجليزي)' : 'Layers of Protection (English)',
+      isAr ? 'مؤشرات المخاطر (عربي)' : 'KRIs (Arabic)',
+      isAr ? 'مؤشرات المخاطر (إنجليزي)' : 'KRIs (English)',
+      isAr ? 'إجراءات التخفيف (عربي)' : 'Mitigation Actions (Arabic)',
+      isAr ? 'إجراءات التخفيف (إنجليزي)' : 'Mitigation Actions (English)',
+      isAr ? 'يتطلب امتثال' : 'Compliance Required',
+      isAr ? 'ملاحظة الامتثال (عربي)' : 'Compliance Note (Arabic)',
+      isAr ? 'ملاحظة الامتثال (إنجليزي)' : 'Compliance Note (English)',
+      isAr ? 'مرجع التدقيق الداخلي' : 'IA Reference',
+      isAr ? 'الحالة' : 'Status',
+      isAr ? 'حالة الموافقة' : 'Approval Status',
+      isAr ? 'مالك الخطر' : 'Risk Owner',
+      isAr ? 'مالك الخطر (المسجل)' : 'Risk Owner (Registered)',
+      isAr ? 'قسم مالك الخطر' : 'Risk Owner Department',
+      isAr ? 'رائد المخاطر' : 'Risk Champion',
+      isAr ? 'تاريخ تحديد الخطر' : 'Identified Date',
+      isAr ? 'تاريخ الإضافة' : 'Created Date',
+      isAr ? 'تاريخ آخر تحديث' : 'Last Updated',
+      isAr ? 'تاريخ المتابعة' : 'Follow-up Date',
+      isAr ? 'تاريخ آخر مراجعة' : 'Last Review Date',
+      isAr ? 'تاريخ المراجعة القادمة' : 'Next Review Date',
+      isAr ? 'محذوف' : 'Is Deleted',
     ];
 
     const rows = filteredRisks.map(risk => [
-      risk.riskNumber,
-      isAr ? risk.titleAr : risk.titleEn,
-      isAr ? (risk.department?.nameAr || '') : (risk.department?.nameEn || ''),
-      getStatusLabel(risk.status),
-      risk.inherentRating || '',
-      risk.inherentScore?.toString() || '',
-      risk.residualRating || '',
-      risk.residualScore?.toString() || '',
-      new Date(risk.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US'),
+      escapeCSVField(risk.riskNumber),
+      escapeCSVField(risk.titleAr),
+      escapeCSVField(risk.titleEn),
+      escapeCSVField(risk.descriptionAr),
+      escapeCSVField(risk.descriptionEn),
+      escapeCSVField(isAr ? risk.category?.nameAr : risk.category?.nameEn),
+      escapeCSVField(risk.category?.code),
+      escapeCSVField(isAr ? risk.department?.nameAr : risk.department?.nameEn),
+      escapeCSVField(risk.department?.code),
+      escapeCSVField(isAr ? risk.source?.nameAr : risk.source?.nameEn),
+      escapeCSVField(risk.issuedBy),
+      escapeCSVField(risk.processText),
+      escapeCSVField(risk.subProcessText),
+      escapeCSVField(risk.potentialCauseAr),
+      escapeCSVField(risk.potentialCauseEn),
+      escapeCSVField(risk.potentialImpactAr),
+      escapeCSVField(risk.potentialImpactEn),
+      escapeCSVField(risk.inherentLikelihood),
+      escapeCSVField(risk.inherentImpact),
+      escapeCSVField(risk.inherentScore),
+      escapeCSVField(risk.inherentRating),
+      escapeCSVField(risk.residualLikelihood),
+      escapeCSVField(risk.residualImpact),
+      escapeCSVField(risk.residualScore),
+      escapeCSVField(risk.residualRating),
+      escapeCSVField(risk.layersOfProtectionAr),
+      escapeCSVField(risk.layersOfProtectionEn),
+      escapeCSVField(risk.krisAr),
+      escapeCSVField(risk.krisEn),
+      escapeCSVField(risk.mitigationActionsAr),
+      escapeCSVField(risk.mitigationActionsEn),
+      escapeCSVField(risk.complianceRequired ? (isAr ? 'نعم' : 'Yes') : (isAr ? 'لا' : 'No')),
+      escapeCSVField(risk.complianceNoteAr),
+      escapeCSVField(risk.complianceNoteEn),
+      escapeCSVField(risk.iaRef),
+      escapeCSVField(getStatusLabel(risk.status)),
+      escapeCSVField(getApprovalStatusLabel(risk.approvalStatus)),
+      escapeCSVField(isAr ? risk.owner?.fullName : (risk.owner?.fullNameEn || risk.owner?.fullName)),
+      escapeCSVField(isAr ? risk.riskOwner?.nameAr : (risk.riskOwner?.nameEn || risk.riskOwner?.nameAr)),
+      escapeCSVField(isAr ? risk.riskOwner?.department?.nameAr : risk.riskOwner?.department?.nameEn),
+      escapeCSVField(isAr ? risk.champion?.fullName : (risk.champion?.fullNameEn || risk.champion?.fullName)),
+      escapeCSVField(formatDate(risk.identifiedDate)),
+      escapeCSVField(formatDate(risk.createdAt)),
+      escapeCSVField(formatDate(risk.updatedAt)),
+      escapeCSVField(formatDate(risk.followUpDate)),
+      escapeCSVField(formatDate(risk.lastReviewDate)),
+      escapeCSVField(formatDate(risk.nextReviewDate)),
+      escapeCSVField(risk.isDeleted ? (isAr ? 'نعم' : 'Yes') : (isAr ? 'لا' : 'No')),
     ]);
 
     const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+      headers.map(h => escapeCSVField(h)).join(','),
+      ...rows.map(row => row.join(',')),
     ].join('\n');
 
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `risk-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `risk-register-report-${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

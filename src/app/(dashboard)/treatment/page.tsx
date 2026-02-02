@@ -335,7 +335,7 @@ export default function TreatmentPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Form states - محسّن مع حقول إضافية للمهام
+  // Form states - محسّن مع حقول إضافية للمهام وإعادة تقييم الخطر المتبقي
   const [formData, setFormData] = useState({
     riskId: '',
     strategy: '' as TreatmentStrategy | '',
@@ -345,6 +345,10 @@ export default function TreatmentPage() {
     priority: 'medium' as 'high' | 'medium' | 'low',
     startDate: new Date().toISOString().split('T')[0],
     dueDate: '',
+    // إعادة تقييم الخطر المتبقي (Residual Risk)
+    residualLikelihood: null as number | null,
+    residualImpact: null as number | null,
+    updateResidualRisk: false, // هل يريد المستخدم تحديث الخطر المتبقي
     tasks: [] as {
       id: string;
       titleAr: string;
@@ -509,6 +513,9 @@ export default function TreatmentPage() {
       priority: 'medium',
       startDate: new Date().toISOString().split('T')[0],
       dueDate: '',
+      residualLikelihood: null,
+      residualImpact: null,
+      updateResidualRisk: false,
       tasks: [],
     });
     setWizardStep(1);
@@ -534,6 +541,17 @@ export default function TreatmentPage() {
 
     setIsSaving(true);
     try {
+      // حساب الدرجة والتصنيف المتبقي إذا تم تحديثهما
+      let expectedResidualScore = null;
+      let expectedResidualRating = null;
+      if (formData.updateResidualRisk && formData.residualLikelihood && formData.residualImpact) {
+        expectedResidualScore = formData.residualLikelihood * formData.residualImpact;
+        expectedResidualRating = expectedResidualScore >= 20 ? 'Critical' :
+                                  expectedResidualScore >= 15 ? 'Major' :
+                                  expectedResidualScore >= 10 ? 'Moderate' :
+                                  expectedResidualScore >= 5 ? 'Minor' : 'Negligible';
+      }
+
       const response = await fetch(`/api/risks/${formData.riskId}/treatments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -549,6 +567,13 @@ export default function TreatmentPage() {
           startDate: formData.startDate,
           dueDate: formData.dueDate,
           progress: 0,
+          // إعادة تقييم الخطر المتبقي
+          expectedResidualLikelihood: formData.updateResidualRisk ? formData.residualLikelihood : null,
+          expectedResidualImpact: formData.updateResidualRisk ? formData.residualImpact : null,
+          expectedResidualScore,
+          expectedResidualRating,
+          // تحديث الخطر المتبقي الفعلي
+          updateRiskResidual: formData.updateResidualRisk,
         }),
       });
 
@@ -897,6 +922,9 @@ export default function TreatmentPage() {
                           priority: treatment.priority as 'high' | 'medium' | 'low',
                           startDate: treatment.startDate.split('T')[0],
                           dueDate: treatment.dueDate.split('T')[0],
+                          residualLikelihood: null,
+                          residualImpact: null,
+                          updateResidualRisk: false,
                           tasks: treatment.tasks.map(t => ({
                             id: t.id,
                             titleAr: t.titleAr,
@@ -1176,6 +1204,162 @@ export default function TreatmentPage() {
                         onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
                       />
                     </div>
+                  </div>
+
+                  {/* إعادة تقييم الخطر المتبقي - Residual Risk Re-assessment */}
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3 mb-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.updateResidualRisk}
+                          onChange={(e) => setFormData((prev) => ({
+                            ...prev,
+                            updateResidualRisk: e.target.checked,
+                            residualLikelihood: e.target.checked ? (selectedRisk?.residualLikelihood || selectedRisk?.inherentLikelihood || 3) : null,
+                            residualImpact: e.target.checked ? (selectedRisk?.residualImpact || selectedRisk?.inherentImpact || 3) : null,
+                          }))}
+                          className="w-4 h-4 rounded border-gray-300 text-[#F39200] focus:ring-[#F39200]"
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {isAr ? 'إعادة تقييم الخطر المتبقي' : 'Re-assess Residual Risk'}
+                        </span>
+                      </label>
+                      <span className="text-xs text-gray-500">
+                        {isAr ? '(اختياري)' : '(Optional)'}
+                      </span>
+                    </div>
+
+                    {formData.updateResidualRisk && selectedRisk && (
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-700/50">
+                        {/* عرض التقييم الكامن الحالي للمرجعية */}
+                        <div className="mb-4 p-3 rounded-lg bg-white/80 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-600">
+                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                            {isAr ? 'التقييم الكامن الحالي (للمرجعية)' : 'Current Inherent Assessment (Reference)'}
+                          </p>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600 dark:text-gray-400">{isAr ? 'الاحتمالية:' : 'Likelihood:'}</span>
+                              <span className="font-bold text-gray-800 dark:text-gray-200">{selectedRisk.inherentLikelihood}</span>
+                            </div>
+                            <span className="text-gray-400">×</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600 dark:text-gray-400">{isAr ? 'التأثير:' : 'Impact:'}</span>
+                              <span className="font-bold text-gray-800 dark:text-gray-200">{selectedRisk.inherentImpact}</span>
+                            </div>
+                            <span className="text-gray-400">=</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600 dark:text-gray-400">{isAr ? 'الدرجة:' : 'Score:'}</span>
+                              <span className={`font-bold px-2 py-0.5 rounded text-sm ${
+                                selectedRisk.inherentScore >= 20 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                selectedRisk.inherentScore >= 12 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                                selectedRisk.inherentScore >= 6 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              }`}>
+                                {selectedRisk.inherentScore}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-2">
+                          <TrendingDown className="h-4 w-4" />
+                          {isAr ? 'التقييم المتبقي بعد المعالجة' : 'Residual Assessment After Treatment'}
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* الاحتمالية المتبقية */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                              {isAr ? 'الاحتمالية المتبقية' : 'Residual Likelihood'}
+                            </label>
+                            <div className="flex gap-1">
+                              {[1, 2, 3, 4, 5].map((val) => (
+                                <button
+                                  key={val}
+                                  onClick={() => setFormData((prev) => ({ ...prev, residualLikelihood: val }))}
+                                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                                    formData.residualLikelihood === val
+                                      ? val >= 4 ? 'bg-red-500 text-white' :
+                                        val === 3 ? 'bg-amber-500 text-white' :
+                                        'bg-green-500 text-white'
+                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                  }`}
+                                >
+                                  {val}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 text-center">
+                              {formData.residualLikelihood === 1 ? (isAr ? 'نادر' : 'Rare') :
+                               formData.residualLikelihood === 2 ? (isAr ? 'غير محتمل' : 'Unlikely') :
+                               formData.residualLikelihood === 3 ? (isAr ? 'ممكن' : 'Possible') :
+                               formData.residualLikelihood === 4 ? (isAr ? 'محتمل' : 'Likely') :
+                               formData.residualLikelihood === 5 ? (isAr ? 'شبه مؤكد' : 'Almost Certain') : ''}
+                            </p>
+                          </div>
+
+                          {/* التأثير المتبقي */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                              {isAr ? 'التأثير المتبقي' : 'Residual Impact'}
+                            </label>
+                            <div className="flex gap-1">
+                              {[1, 2, 3, 4, 5].map((val) => (
+                                <button
+                                  key={val}
+                                  onClick={() => setFormData((prev) => ({ ...prev, residualImpact: val }))}
+                                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                                    formData.residualImpact === val
+                                      ? val >= 4 ? 'bg-red-500 text-white' :
+                                        val === 3 ? 'bg-amber-500 text-white' :
+                                        'bg-green-500 text-white'
+                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                  }`}
+                                >
+                                  {val}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 text-center">
+                              {formData.residualImpact === 1 ? (isAr ? 'ضئيل' : 'Negligible') :
+                               formData.residualImpact === 2 ? (isAr ? 'طفيف' : 'Minor') :
+                               formData.residualImpact === 3 ? (isAr ? 'متوسط' : 'Moderate') :
+                               formData.residualImpact === 4 ? (isAr ? 'كبير' : 'Major') :
+                               formData.residualImpact === 5 ? (isAr ? 'كارثي' : 'Catastrophic') : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* عرض الدرجة المتبقية المحسوبة */}
+                        {formData.residualLikelihood && formData.residualImpact && (
+                          <div className="mt-4 p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                {isAr ? 'درجة الخطر المتبقي:' : 'Residual Risk Score:'}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <span className={`text-2xl font-bold px-3 py-1 rounded-lg ${
+                                  (formData.residualLikelihood * formData.residualImpact) >= 20 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                  (formData.residualLikelihood * formData.residualImpact) >= 12 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                                  (formData.residualLikelihood * formData.residualImpact) >= 6 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                }`}>
+                                  {formData.residualLikelihood * formData.residualImpact}
+                                </span>
+                                {selectedRisk.inherentScore > (formData.residualLikelihood * formData.residualImpact) && (
+                                  <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                    <TrendingDown className="h-3 w-3" />
+                                    {isAr ? `تخفيض ${Math.round((1 - (formData.residualLikelihood * formData.residualImpact) / selectedRisk.inherentScore) * 100)}%` :
+                                     `${Math.round((1 - (formData.residualLikelihood * formData.residualImpact) / selectedRisk.inherentScore) * 100)}% Reduction`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

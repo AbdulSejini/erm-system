@@ -19,10 +19,19 @@ export async function POST(
       );
     }
 
-    // التحقق من وجود الخطر
+    // التحقق من وجود الخطر وجلب بياناته الحالية
     const risk = await prisma.risk.findUnique({
       where: { id: riskId },
-      select: { id: true, riskNumber: true, titleAr: true }
+      select: {
+        id: true,
+        riskNumber: true,
+        titleAr: true,
+        titleEn: true,
+        residualLikelihood: true,
+        residualImpact: true,
+        residualScore: true,
+        residualRating: true,
+      }
     });
 
     if (!risk) {
@@ -110,6 +119,110 @@ export async function POST(
         userAgent: clientInfo.userAgent || null,
       },
     });
+
+    // تحديث الخطر المتبقي (Residual Risk) إذا طُلب ذلك
+    if (body.updateRiskResidual && body.expectedResidualLikelihood && body.expectedResidualImpact) {
+      const newResidualScore = body.expectedResidualLikelihood * body.expectedResidualImpact;
+      const newResidualRating = newResidualScore >= 20 ? 'Critical' :
+                                newResidualScore >= 15 ? 'Major' :
+                                newResidualScore >= 10 ? 'Moderate' :
+                                newResidualScore >= 5 ? 'Minor' : 'Negligible';
+
+      // تحديث الخطر
+      await prisma.risk.update({
+        where: { id: riskId },
+        data: {
+          residualLikelihood: body.expectedResidualLikelihood,
+          residualImpact: body.expectedResidualImpact,
+          residualScore: newResidualScore,
+          residualRating: newResidualRating,
+        },
+      });
+
+      // تسجيل تغيير الاحتمالية المتبقية
+      if (risk.residualLikelihood !== body.expectedResidualLikelihood) {
+        await prisma.riskChangeLog.create({
+          data: {
+            riskId,
+            userId: session.user.id,
+            changeType: 'field_update',
+            changeCategory: 'assessment',
+            fieldName: 'residualLikelihood',
+            fieldNameAr: 'الاحتمالية المتبقية',
+            oldValue: risk.residualLikelihood?.toString() || null,
+            newValue: body.expectedResidualLikelihood.toString(),
+            description: `Updated residual likelihood from ${risk.residualLikelihood || 'N/A'} to ${body.expectedResidualLikelihood} (via treatment plan)`,
+            descriptionAr: `تم تحديث الاحتمالية المتبقية من ${risk.residualLikelihood || 'غير محدد'} إلى ${body.expectedResidualLikelihood} (عبر خطة المعالجة)`,
+            relatedEntityId: treatmentPlan.id,
+            ipAddress: clientInfo.ipAddress || null,
+            userAgent: clientInfo.userAgent || null,
+          },
+        });
+      }
+
+      // تسجيل تغيير التأثير المتبقي
+      if (risk.residualImpact !== body.expectedResidualImpact) {
+        await prisma.riskChangeLog.create({
+          data: {
+            riskId,
+            userId: session.user.id,
+            changeType: 'field_update',
+            changeCategory: 'assessment',
+            fieldName: 'residualImpact',
+            fieldNameAr: 'التأثير المتبقي',
+            oldValue: risk.residualImpact?.toString() || null,
+            newValue: body.expectedResidualImpact.toString(),
+            description: `Updated residual impact from ${risk.residualImpact || 'N/A'} to ${body.expectedResidualImpact} (via treatment plan)`,
+            descriptionAr: `تم تحديث التأثير المتبقي من ${risk.residualImpact || 'غير محدد'} إلى ${body.expectedResidualImpact} (عبر خطة المعالجة)`,
+            relatedEntityId: treatmentPlan.id,
+            ipAddress: clientInfo.ipAddress || null,
+            userAgent: clientInfo.userAgent || null,
+          },
+        });
+      }
+
+      // تسجيل تغيير درجة الخطر المتبقي
+      if (risk.residualScore !== newResidualScore) {
+        await prisma.riskChangeLog.create({
+          data: {
+            riskId,
+            userId: session.user.id,
+            changeType: 'field_update',
+            changeCategory: 'assessment',
+            fieldName: 'residualScore',
+            fieldNameAr: 'درجة الخطر المتبقي',
+            oldValue: risk.residualScore?.toString() || null,
+            newValue: newResidualScore.toString(),
+            description: `Updated residual score from ${risk.residualScore || 'N/A'} to ${newResidualScore} (via treatment plan: ${treatmentPlan.titleEn})`,
+            descriptionAr: `تم تحديث درجة الخطر المتبقي من ${risk.residualScore || 'غير محدد'} إلى ${newResidualScore} (عبر خطة المعالجة: ${treatmentPlan.titleAr})`,
+            relatedEntityId: treatmentPlan.id,
+            ipAddress: clientInfo.ipAddress || null,
+            userAgent: clientInfo.userAgent || null,
+          },
+        });
+      }
+
+      // تسجيل تغيير تصنيف الخطر المتبقي
+      if (risk.residualRating !== newResidualRating) {
+        await prisma.riskChangeLog.create({
+          data: {
+            riskId,
+            userId: session.user.id,
+            changeType: 'field_update',
+            changeCategory: 'assessment',
+            fieldName: 'residualRating',
+            fieldNameAr: 'تصنيف الخطر المتبقي',
+            oldValue: risk.residualRating || null,
+            newValue: newResidualRating,
+            description: `Updated residual rating from ${risk.residualRating || 'N/A'} to ${newResidualRating} (via treatment plan)`,
+            descriptionAr: `تم تحديث تصنيف الخطر المتبقي من ${risk.residualRating || 'غير محدد'} إلى ${newResidualRating} (عبر خطة المعالجة)`,
+            relatedEntityId: treatmentPlan.id,
+            ipAddress: clientInfo.ipAddress || null,
+            userAgent: clientInfo.userAgent || null,
+          },
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
