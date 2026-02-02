@@ -237,16 +237,28 @@ export default function TreatmentDetailPage() {
           }
         }
 
-        // Fetch treatment details - treatmentId is actually the risk.id
+        // Fetch treatment details - treatmentId is the treatmentPlan.id
         const res = await fetch(`/api/risks?includeTreatments=true`);
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.data) {
-            // Find the risk by ID (the URL param is risk.id, not treatmentPlan.id)
-            const risk = data.data.find((r: { id: string }) => r.id === treatmentId);
+            // Find the risk that contains this treatment plan
+            let foundRisk = null;
+            let foundTreatment = null;
+
+            for (const risk of data.data) {
+              if (risk.treatmentPlans && risk.treatmentPlans.length > 0) {
+                const treatment = risk.treatmentPlans.find((t: { id: string }) => t.id === treatmentId);
+                if (treatment) {
+                  foundRisk = risk;
+                  foundTreatment = treatment;
+                  break;
+                }
+              }
+            }
+
+            const risk = foundRisk;
             if (risk) {
-              // Get the first treatment plan if exists, or create a virtual one
-              const foundTreatment = risk.treatmentPlans?.[0];
 
               // Determine strategy and status from risk data
               const determineStrategy = (status: string, inherentScore: number) => {
