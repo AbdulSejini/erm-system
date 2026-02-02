@@ -639,8 +639,8 @@ export default function DashboardPage() {
               {/* Alerts Dropdown */}
               {showAlerts && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowAlerts(false)} />
-                  <div className={`absolute top-full z-50 mt-2 w-80 sm:w-96 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl ${isAr ? 'left-0' : 'right-0'} animate-slideDown`}>
+                  <div className="fixed inset-0 z-[100]" onClick={() => setShowAlerts(false)} />
+                  <div className={`absolute top-full z-[110] mt-2 w-80 sm:w-96 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl ${isAr ? 'left-0' : 'right-0'} animate-slideDown`}>
                     <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 p-4">
                       <h3 className="font-semibold text-gray-900 dark:text-white">
                         {isAr ? 'التنبيهات' : 'Alerts'}
