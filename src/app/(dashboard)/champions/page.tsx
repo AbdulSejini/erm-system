@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +18,7 @@ import {
   Award,
   Calendar,
   TrendingUp,
+  TrendingDown,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -36,10 +37,22 @@ import {
   GraduationCap,
   Briefcase,
   RefreshCw,
+  Trophy,
+  Flame,
+  Zap,
+  Crown,
+  Medal,
+  Sparkles,
+  ArrowUp,
+  ArrowDown,
+  Gift,
+  Rocket,
+  ThumbsUp,
+  Heart,
 } from 'lucide-react';
 
 // Champion performance levels
-type PerformanceLevel = 'excellent' | 'good' | 'needsImprovement' | 'new';
+type PerformanceLevel = 'legendary' | 'excellent' | 'good' | 'rising' | 'new';
 
 // API Types
 interface APIChampion {
@@ -77,6 +90,19 @@ interface APIChampion {
   treatmentPlansCompleted?: number;
 }
 
+// Extended champion with competition stats
+interface CompetitiveChampion extends APIChampion {
+  points: number;
+  rank: number;
+  streak: number;
+  badges: string[];
+  weeklyProgress: number;
+  monthlyProgress: number;
+  level: number;
+  xpToNextLevel: number;
+  currentXP: number;
+}
+
 // Training modules for champions
 const trainingModules = [
   {
@@ -108,6 +134,90 @@ const trainingModules = [
   },
 ];
 
+// Badge definitions
+const badgeDefinitions = {
+  firstRisk: {
+    nameAr: 'البداية',
+    nameEn: 'First Steps',
+    icon: '🌟',
+    descAr: 'أول خطر تم حله',
+    descEn: 'First risk resolved'
+  },
+  fiveRisks: {
+    nameAr: 'المحترف',
+    nameEn: 'Professional',
+    icon: '⭐',
+    descAr: '5 مخاطر تم حلها',
+    descEn: '5 risks resolved'
+  },
+  tenRisks: {
+    nameAr: 'الخبير',
+    nameEn: 'Expert',
+    icon: '🏆',
+    descAr: '10 مخاطر تم حلها',
+    descEn: '10 risks resolved'
+  },
+  speedster: {
+    nameAr: 'السريع',
+    nameEn: 'Speedster',
+    icon: '⚡',
+    descAr: 'حل 3 مخاطر في أسبوع',
+    descEn: '3 risks solved in a week'
+  },
+  perfectRate: {
+    nameAr: 'الكمال',
+    nameEn: 'Perfectionist',
+    icon: '💎',
+    descAr: 'معدل حل 100%',
+    descEn: '100% resolution rate'
+  },
+  teamPlayer: {
+    nameAr: 'روح الفريق',
+    nameEn: 'Team Player',
+    icon: '🤝',
+    descAr: 'مسؤول عن أكثر من 3 أقسام',
+    descEn: 'Responsible for 3+ departments'
+  },
+  streak7: {
+    nameAr: 'المثابر',
+    nameEn: 'Consistent',
+    icon: '🔥',
+    descAr: '7 أيام متتالية من النشاط',
+    descEn: '7 days activity streak'
+  },
+  topPerformer: {
+    nameAr: 'الأفضل',
+    nameEn: 'Top Performer',
+    icon: '👑',
+    descAr: 'أفضل أداء هذا الشهر',
+    descEn: 'Best performer this month'
+  },
+};
+
+// Animated counter hook
+const useAnimatedCounter = (end: number, duration: number = 1000) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let startTime: number;
+    let animationFrame: number;
+
+    const animate = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / duration, 1);
+      setCount(Math.floor(progress * end));
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [end, duration]);
+
+  return count;
+};
+
 export default function ChampionsPage() {
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
@@ -115,9 +225,11 @@ export default function ChampionsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [filterPerformance, setFilterPerformance] = useState<PerformanceLevel | 'all'>('all');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [selectedChampion, setSelectedChampion] = useState<CompetitiveChampion | null>(null);
 
   // Data states
   const [champions, setChampions] = useState<APIChampion[]>([]);
@@ -188,9 +300,74 @@ export default function ChampionsPage() {
     fetchDepartments();
   }, [fetchChampions, fetchDepartments]);
 
-  const getPerformanceLevel = (champion: APIChampion): PerformanceLevel => {
-    const daysActive = Math.floor((Date.now() - new Date(champion.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+  // Calculate competitive stats for champions
+  const competitiveChampions: CompetitiveChampion[] = useMemo(() => {
+    return champions.map((champion, index) => {
+      const risksAssigned = champion.risksAssigned || 0;
+      const risksResolved = champion.risksResolved || 0;
+      const resolutionRate = risksAssigned > 0 ? risksResolved / risksAssigned : 0;
+      const daysActive = Math.floor((Date.now() - new Date(champion.createdAt).getTime()) / (1000 * 60 * 60 * 24));
 
+      // Calculate points (gamification)
+      const basePoints = risksResolved * 100;
+      const bonusPoints = Math.round(resolutionRate * 50);
+      const streakBonus = Math.min(daysActive, 30) * 2;
+      const departmentBonus = (champion.accessibleDepartments?.length || 0) * 25;
+      const totalPoints = basePoints + bonusPoints + streakBonus + departmentBonus;
+
+      // Calculate level (every 500 points = 1 level)
+      const level = Math.floor(totalPoints / 500) + 1;
+      const currentXP = totalPoints % 500;
+      const xpToNextLevel = 500 - currentXP;
+
+      // Calculate badges
+      const badges: string[] = [];
+      if (risksResolved >= 1) badges.push('firstRisk');
+      if (risksResolved >= 5) badges.push('fiveRisks');
+      if (risksResolved >= 10) badges.push('tenRisks');
+      if (resolutionRate === 1 && risksAssigned > 0) badges.push('perfectRate');
+      if ((champion.accessibleDepartments?.length || 0) >= 3) badges.push('teamPlayer');
+      if (daysActive >= 7) badges.push('streak7');
+
+      // Simulate weekly/monthly progress (in real app, would calculate from actual data)
+      const weeklyProgress = Math.min(Math.round(Math.random() * 30 + risksResolved * 10), 100);
+      const monthlyProgress = Math.min(Math.round(Math.random() * 20 + risksResolved * 5), 100);
+
+      return {
+        ...champion,
+        points: totalPoints,
+        rank: 0, // Will be set after sorting
+        streak: Math.min(daysActive, 30),
+        badges,
+        weeklyProgress,
+        monthlyProgress,
+        level,
+        xpToNextLevel,
+        currentXP,
+      };
+    })
+    .sort((a, b) => b.points - a.points)
+    .map((champion, index) => ({
+      ...champion,
+      rank: index + 1,
+    }));
+  }, [champions]);
+
+  // Add top performer badge to #1
+  const championsWithTopBadge = useMemo(() => {
+    return competitiveChampions.map(champion => {
+      if (champion.rank === 1 && !champion.badges.includes('topPerformer')) {
+        return { ...champion, badges: [...champion.badges, 'topPerformer'] };
+      }
+      return champion;
+    });
+  }, [competitiveChampions]);
+
+  const getPerformanceLevel = (champion: CompetitiveChampion): PerformanceLevel => {
+    if (champion.rank === 1) return 'legendary';
+    if (champion.rank <= 3) return 'excellent';
+
+    const daysActive = Math.floor((Date.now() - new Date(champion.createdAt).getTime()) / (1000 * 60 * 60 * 24));
     if (daysActive < 30) return 'new';
 
     const resolutionRate = champion.risksAssigned && champion.risksAssigned > 0
@@ -199,19 +376,21 @@ export default function ChampionsPage() {
 
     if (resolutionRate >= 0.7) return 'excellent';
     if (resolutionRate >= 0.4) return 'good';
-    return 'needsImprovement';
+    return 'rising';
   };
 
   const getPerformanceColor = (level: PerformanceLevel) => {
     switch (level) {
+      case 'legendary':
+        return 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white';
       case 'excellent':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+        return 'bg-gradient-to-r from-emerald-400 to-green-500 text-white';
       case 'good':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'needsImprovement':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+        return 'bg-gradient-to-r from-blue-400 to-indigo-500 text-white';
+      case 'rising':
+        return 'bg-gradient-to-r from-orange-400 to-red-500 text-white';
       case 'new':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
+        return 'bg-gradient-to-r from-purple-400 to-violet-500 text-white';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -219,12 +398,14 @@ export default function ChampionsPage() {
 
   const getPerformanceLabel = (level: PerformanceLevel) => {
     switch (level) {
+      case 'legendary':
+        return isAr ? 'أسطوري' : 'Legendary';
       case 'excellent':
         return isAr ? 'ممتاز' : 'Excellent';
       case 'good':
         return isAr ? 'جيد' : 'Good';
-      case 'needsImprovement':
-        return isAr ? 'يحتاج تحسين' : 'Needs Improvement';
+      case 'rising':
+        return isAr ? 'صاعد' : 'Rising';
       case 'new':
         return isAr ? 'جديد' : 'New';
       default:
@@ -234,16 +415,31 @@ export default function ChampionsPage() {
 
   const getPerformanceIcon = (level: PerformanceLevel) => {
     switch (level) {
+      case 'legendary':
+        return <Crown className="h-3 w-3 sm:h-4 sm:w-4" />;
       case 'excellent':
         return <Star className="h-3 w-3 sm:h-4 sm:w-4" />;
       case 'good':
         return <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />;
-      case 'needsImprovement':
-        return <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />;
+      case 'rising':
+        return <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />;
       case 'new':
-        return <Clock className="h-3 w-3 sm:h-4 sm:w-4" />;
+        return <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />;
       default:
         return null;
+    }
+  };
+
+  const getRankIcon = (rank: number) => {
+    switch (rank) {
+      case 1:
+        return <span className="text-2xl">🥇</span>;
+      case 2:
+        return <span className="text-2xl">🥈</span>;
+      case 3:
+        return <span className="text-2xl">🥉</span>;
+      default:
+        return <span className="text-lg font-bold text-gray-500">#{rank}</span>;
     }
   };
 
@@ -262,7 +458,7 @@ export default function ChampionsPage() {
     c.department ? (isAr ? c.department.nameAr : c.department.nameEn) : ''
   ).filter(Boolean))];
 
-  const filteredChampions = champions.filter((champion) => {
+  const filteredChampions = championsWithTopBadge.filter((champion) => {
     const name = isAr ? champion.fullName : (champion.fullNameEn || champion.fullName);
     const matchesSearch =
       champion.fullName.includes(searchQuery) ||
@@ -283,9 +479,10 @@ export default function ChampionsPage() {
   // Stats
   const stats = {
     total: champions.length,
-    excellent: champions.filter((c) => getPerformanceLevel(c) === 'excellent').length,
-    needsTraining: champions.filter((c) => getPerformanceLevel(c) === 'new' || getPerformanceLevel(c) === 'needsImprovement').length,
-    totalRisksManaged: champions.reduce((sum, c) => sum + (c.risksAssigned || 0), 0),
+    legendary: championsWithTopBadge.filter((c) => getPerformanceLevel(c) === 'legendary').length,
+    excellent: championsWithTopBadge.filter((c) => getPerformanceLevel(c) === 'excellent').length,
+    totalPoints: championsWithTopBadge.reduce((sum, c) => sum + c.points, 0),
+    totalBadges: championsWithTopBadge.reduce((sum, c) => sum + c.badges.length, 0),
     avgResolutionRate: champions.length > 0
       ? Math.round(
           (champions.reduce((sum, c) => sum + (c.risksResolved || 0), 0) /
@@ -295,13 +492,21 @@ export default function ChampionsPage() {
       : 0,
   };
 
+  // Animated stats
+  const animatedTotal = useAnimatedCounter(stats.total, 1000);
+  const animatedPoints = useAnimatedCounter(stats.totalPoints, 1500);
+  const animatedBadges = useAnimatedCounter(stats.totalBadges, 1200);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-[var(--primary)] mx-auto mb-4" />
+          <div className="relative">
+            <Trophy className="h-16 w-16 text-amber-500 mx-auto mb-4 animate-bounce" />
+            <Sparkles className="h-6 w-6 text-yellow-400 absolute -top-2 -right-2 animate-pulse" />
+          </div>
           <p className="text-sm text-[var(--foreground-secondary)]">
-            {isAr ? 'جاري تحميل رواد المخاطر...' : 'Loading risk champions...'}
+            {isAr ? 'جاري تحميل أبطال المخاطر...' : 'Loading Risk Champions...'}
           </p>
         </div>
       </div>
@@ -310,146 +515,223 @@ export default function ChampionsPage() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)] truncate">
-            {isAr ? 'رواد المخاطر' : 'Risk Champions'}
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-            {isAr
-              ? 'إدارة ومتابعة أداء رواد المخاطر في الإدارات المختلفة'
-              : 'Manage and track risk champions performance across departments'}
-          </p>
+      {/* Hero Header with Animation */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 p-6 md:p-8 text-white">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-20 -right-20 w-60 h-60 bg-white/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-white/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<RefreshCw className={`h-4 w-4 sm:h-5 sm:w-5 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />}
-            onClick={() => fetchChampions(true)}
-            disabled={isRefreshing}
-          >
-            <span className="text-xs sm:text-sm">{isAr ? 'تحديث' : 'Refresh'}</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
-            onClick={() => setShowGuideModal(true)}
-          >
-            <span className="text-xs sm:text-sm">{isAr ? 'دليل الرواد' : 'Champion Guide'}</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
-            onClick={() => setShowTrainingModal(true)}
-          >
-            <span className="text-xs sm:text-sm">{isAr ? 'برنامج التدريب' : 'Training Program'}</span>
-          </Button>
+
+        <div className="relative z-10">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Trophy className="h-12 w-12 md:h-16 md:w-16 text-yellow-300 drop-shadow-lg" />
+                <Sparkles className="h-5 w-5 text-yellow-200 absolute -top-1 -right-1 animate-pulse" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                  {isAr ? '🏆 أبطال المخاطر' : '🏆 Risk Champions'}
+                </h1>
+                <p className="mt-1 text-white/80 text-sm md:text-base">
+                  {isAr
+                    ? 'تنافس، تألق، وكن الأفضل في إدارة المخاطر!'
+                    : 'Compete, shine, and be the best in risk management!'}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />}
+                onClick={() => fetchChampions(true)}
+                disabled={isRefreshing}
+                className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+              >
+                {isAr ? 'تحديث' : 'Refresh'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<HelpCircle className="h-4 w-4" />}
+                onClick={() => setShowGuideModal(true)}
+                className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+              >
+                {isAr ? 'الدليل' : 'Guide'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<GraduationCap className="h-4 w-4" />}
+                onClick={() => setShowTrainingModal(true)}
+                className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+              >
+                {isAr ? 'التدريب' : 'Training'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Quick Stats in Header */}
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 border border-white/20 text-center transform hover:scale-105 transition-transform">
+              <Users className="h-6 w-6 mx-auto mb-1 text-white/80" />
+              <p className="text-2xl md:text-3xl font-bold">{animatedTotal}</p>
+              <p className="text-xs text-white/70">{isAr ? 'إجمالي الأبطال' : 'Total Champions'}</p>
+            </div>
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 border border-white/20 text-center transform hover:scale-105 transition-transform">
+              <Zap className="h-6 w-6 mx-auto mb-1 text-yellow-300" />
+              <p className="text-2xl md:text-3xl font-bold">{animatedPoints.toLocaleString()}</p>
+              <p className="text-xs text-white/70">{isAr ? 'إجمالي النقاط' : 'Total Points'}</p>
+            </div>
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 border border-white/20 text-center transform hover:scale-105 transition-transform">
+              <Award className="h-6 w-6 mx-auto mb-1 text-yellow-300" />
+              <p className="text-2xl md:text-3xl font-bold">{animatedBadges}</p>
+              <p className="text-xs text-white/70">{isAr ? 'الشارات المكتسبة' : 'Badges Earned'}</p>
+            </div>
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 border border-white/20 text-center transform hover:scale-105 transition-transform">
+              <Target className="h-6 w-6 mx-auto mb-1 text-white/80" />
+              <p className="text-2xl md:text-3xl font-bold">{stats.avgResolutionRate}%</p>
+              <p className="text-xs text-white/70">{isAr ? 'معدل الإنجاز' : 'Resolution Rate'}</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[var(--primary-light)] shrink-0">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.total}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'إجمالي الرواد' : 'Total Champions'}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30 shrink-0">
-              <Star className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.excellent}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'أداء ممتاز' : 'Excellent Performance'}
-              </p>
+      {/* Top 3 Leaderboard Podium */}
+      {championsWithTopBadge.length >= 3 && (
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-4 border-b border-amber-200 dark:border-amber-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-6 w-6 text-amber-500" />
+                <h2 className="text-lg font-bold text-[var(--foreground)]">
+                  {isAr ? '🏅 لوحة الشرف' : '🏅 Hall of Fame'}
+                </h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowLeaderboard(!showLeaderboard)}
+                rightIcon={showLeaderboard ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              >
+                {showLeaderboard ? (isAr ? 'إخفاء' : 'Hide') : (isAr ? 'عرض' : 'Show')}
+              </Button>
             </div>
           </div>
+
+          {showLeaderboard && (
+            <div className="p-6">
+              <div className="flex items-end justify-center gap-4 md:gap-8">
+                {/* 2nd Place */}
+                <div className="text-center transform hover:scale-105 transition-all duration-300">
+                  <div className="relative mb-3">
+                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-3xl md:text-4xl font-bold text-white shadow-lg mx-auto border-4 border-gray-200">
+                      {(isAr ? championsWithTopBadge[1]?.fullName : (championsWithTopBadge[1]?.fullNameEn || championsWithTopBadge[1]?.fullName))?.charAt(0)}
+                    </div>
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+                      <span className="text-3xl">🥈</span>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-t from-gray-200 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-t-lg p-3 h-24 flex flex-col justify-end">
+                    <p className="font-bold text-sm md:text-base text-[var(--foreground)] truncate max-w-[100px]">
+                      {isAr ? championsWithTopBadge[1]?.fullName : (championsWithTopBadge[1]?.fullNameEn || championsWithTopBadge[1]?.fullName)}
+                    </p>
+                    <p className="text-xs text-[var(--foreground-secondary)]">
+                      {championsWithTopBadge[1]?.points.toLocaleString()} {isAr ? 'نقطة' : 'pts'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 1st Place */}
+                <div className="text-center transform hover:scale-105 transition-all duration-300">
+                  <div className="relative mb-3">
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2">
+                      <Crown className="h-8 w-8 text-yellow-500 animate-bounce" />
+                    </div>
+                    <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-4xl md:text-5xl font-bold text-white shadow-xl mx-auto border-4 border-yellow-300 ring-4 ring-yellow-200/50">
+                      {(isAr ? championsWithTopBadge[0]?.fullName : (championsWithTopBadge[0]?.fullNameEn || championsWithTopBadge[0]?.fullName))?.charAt(0)}
+                    </div>
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+                      <span className="text-4xl">🥇</span>
+                    </div>
+                    <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-yellow-400 animate-pulse" />
+                  </div>
+                  <div className="bg-gradient-to-t from-yellow-300 to-yellow-200 dark:from-yellow-700 dark:to-yellow-600 rounded-t-lg p-3 h-32 flex flex-col justify-end">
+                    <p className="font-bold text-base md:text-lg text-[var(--foreground)] truncate max-w-[120px]">
+                      {isAr ? championsWithTopBadge[0]?.fullName : (championsWithTopBadge[0]?.fullNameEn || championsWithTopBadge[0]?.fullName)}
+                    </p>
+                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-200">
+                      {championsWithTopBadge[0]?.points.toLocaleString()} {isAr ? 'نقطة' : 'pts'}
+                    </p>
+                    <div className="flex justify-center gap-1 mt-1">
+                      {championsWithTopBadge[0]?.badges.slice(0, 3).map((badge, i) => (
+                        <span key={i} className="text-sm" title={isAr ? badgeDefinitions[badge as keyof typeof badgeDefinitions]?.nameAr : badgeDefinitions[badge as keyof typeof badgeDefinitions]?.nameEn}>
+                          {badgeDefinitions[badge as keyof typeof badgeDefinitions]?.icon}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3rd Place */}
+                <div className="text-center transform hover:scale-105 transition-all duration-300">
+                  <div className="relative mb-3">
+                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center text-3xl md:text-4xl font-bold text-white shadow-lg mx-auto border-4 border-amber-500">
+                      {(isAr ? championsWithTopBadge[2]?.fullName : (championsWithTopBadge[2]?.fullNameEn || championsWithTopBadge[2]?.fullName))?.charAt(0)}
+                    </div>
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+                      <span className="text-3xl">🥉</span>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-t from-amber-200 to-amber-100 dark:from-amber-800 dark:to-amber-700 rounded-t-lg p-3 h-20 flex flex-col justify-end">
+                    <p className="font-bold text-sm md:text-base text-[var(--foreground)] truncate max-w-[100px]">
+                      {isAr ? championsWithTopBadge[2]?.fullName : (championsWithTopBadge[2]?.fullNameEn || championsWithTopBadge[2]?.fullName)}
+                    </p>
+                    <p className="text-xs text-[var(--foreground-secondary)]">
+                      {championsWithTopBadge[2]?.points.toLocaleString()} {isAr ? 'نقطة' : 'pts'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/30 shrink-0">
-              <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.needsTraining}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'بحاجة لتدريب' : 'Need Training'}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30 shrink-0">
-              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.totalRisksManaged}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'المخاطر المُدارة' : 'Managed Risks'}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30 shrink-0">
-              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.avgResolutionRate}%</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'معدل الحل' : 'Resolution Rate'}
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
+      )}
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-2 sm:p-3 md:p-4">
-          <div className="flex flex-col gap-2 sm:gap-3 md:gap-4 sm:flex-row sm:items-center">
-            <div className="flex-1 min-w-0">
+        <CardContent className="p-3 md:p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex-1">
               <Input
-                placeholder={isAr ? 'بحث بالاسم أو البريد الإلكتروني...' : 'Search by name or email...'}
+                placeholder={isAr ? 'ابحث عن بطل...' : 'Search for a champion...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                leftIcon={<Search className="h-4 w-4 sm:h-5 sm:w-5" />}
+                leftIcon={<Search className="h-4 w-4" />}
               />
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2">
               <select
-                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
+                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
                 value={filterPerformance}
                 onChange={(e) => setFilterPerformance(e.target.value as PerformanceLevel | 'all')}
               >
                 <option value="all">{isAr ? 'جميع المستويات' : 'All Levels'}</option>
+                <option value="legendary">{isAr ? 'أسطوري' : 'Legendary'}</option>
                 <option value="excellent">{isAr ? 'ممتاز' : 'Excellent'}</option>
                 <option value="good">{isAr ? 'جيد' : 'Good'}</option>
-                <option value="needsImprovement">{isAr ? 'يحتاج تحسين' : 'Needs Improvement'}</option>
+                <option value="rising">{isAr ? 'صاعد' : 'Rising'}</option>
                 <option value="new">{isAr ? 'جديد' : 'New'}</option>
               </select>
               <select
-                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
+                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
                 value={filterDepartment}
                 onChange={(e) => setFilterDepartment(e.target.value)}
               >
-                <option value="all">{isAr ? 'جميع الإدارات' : 'All Departments'}</option>
+                <option value="all">{isAr ? 'جميع الأقسام' : 'All Departments'}</option>
                 {uniqueDepartments.map((dept) => (
                   <option key={dept} value={dept}>
                     {dept}
@@ -462,7 +744,7 @@ export default function ChampionsPage() {
       </Card>
 
       {/* Champions Grid */}
-      <div className="grid gap-2 sm:gap-3 md:gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredChampions.map((champion) => {
           const isExpanded = expandedCards.has(champion.id);
           const performanceLevel = getPerformanceLevel(champion);
@@ -471,139 +753,204 @@ export default function ChampionsPage() {
             : 0;
 
           return (
-            <Card key={champion.id} className="overflow-hidden">
-              <div className="p-2 sm:p-3 md:p-4">
-                {/* Header */}
-                <div className="mb-3 sm:mb-4 flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[var(--primary-light)] text-base sm:text-lg font-bold text-[var(--primary)] shrink-0">
+            <Card
+              key={champion.id}
+              className={`overflow-hidden transform transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
+                champion.rank <= 3 ? 'ring-2 ring-amber-400/50' : ''
+              }`}
+            >
+              <div className="p-4">
+                {/* Header with Rank */}
+                <div className="flex items-start justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-3">
+                    {/* Rank Badge */}
+                    <div className="flex-shrink-0">
+                      {getRankIcon(champion.rank)}
+                    </div>
+                    {/* Avatar */}
+                    <div className={`relative w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg ${
+                      champion.rank === 1 ? 'bg-gradient-to-br from-yellow-400 to-amber-500' :
+                      champion.rank === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-400' :
+                      champion.rank === 3 ? 'bg-gradient-to-br from-amber-500 to-amber-600' :
+                      'bg-gradient-to-br from-blue-400 to-indigo-500'
+                    }`}>
                       {(isAr ? champion.fullName : (champion.fullNameEn || champion.fullName)).charAt(0)}
+                      {/* Level badge */}
+                      <div className="absolute -bottom-1 -right-1 bg-[var(--primary)] text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">
+                        {champion.level}
+                      </div>
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-[var(--foreground)] text-sm sm:text-base truncate">
+                      <h3 className="font-bold text-[var(--foreground)] truncate">
                         {isAr ? champion.fullName : (champion.fullNameEn || champion.fullName)}
                       </h3>
-                      <p className="text-xs sm:text-sm text-[var(--foreground-secondary)] truncate">
-                        {isAr ? 'رائد مخاطر' : 'Risk Champion'}
-                      </p>
+                      <div className="flex items-center gap-1 text-xs text-[var(--foreground-secondary)]">
+                        <Zap className="h-3 w-3 text-amber-500" />
+                        <span className="font-semibold text-amber-600">{champion.points.toLocaleString()}</span>
+                        <span>{isAr ? 'نقطة' : 'pts'}</span>
+                      </div>
                     </div>
                   </div>
-                  <span
-                    className={`flex items-center gap-1 rounded-full px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium shrink-0 ${getPerformanceColor(
-                      performanceLevel
-                    )}`}
-                  >
-                    <span className="shrink-0">{getPerformanceIcon(performanceLevel)}</span>
-                    <span className="truncate">{getPerformanceLabel(performanceLevel)}</span>
+                  <span className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${getPerformanceColor(performanceLevel)}`}>
+                    {getPerformanceIcon(performanceLevel)}
+                    <span>{getPerformanceLabel(performanceLevel)}</span>
                   </span>
                 </div>
 
-                {/* Department & Accessible Departments */}
-                <div className="mb-3 sm:mb-4 flex flex-wrap items-center gap-1 sm:gap-2">
-                  {champion.department && (
-                    <Badge variant="default">
-                      <Building2 className="me-1 h-3 w-3 shrink-0" />
-                      <span className="truncate">{isAr ? champion.department.nameAr : champion.department.nameEn}</span>
-                    </Badge>
-                  )}
-                  {champion.accessibleDepartments && champion.accessibleDepartments.length > 0 && (
-                    <Badge variant="success">
-                      <span className="truncate">+{champion.accessibleDepartments.length} {isAr ? 'وظائف' : 'depts'}</span>
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Stats Row */}
-                <div className="mb-3 sm:mb-4 grid grid-cols-2 gap-2 sm:gap-3">
-                  <div className="rounded-lg bg-[var(--background-secondary)] p-2 sm:p-3 text-center">
-                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{champion.risksAssigned || 0}</p>
-                    <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                      {isAr ? 'المخاطر المسندة' : 'Assigned Risks'}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-[var(--background-secondary)] p-2 sm:p-3 text-center">
-                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--status-success)]">{resolutionRate}%</p>
-                    <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
-                      {isAr ? 'معدل الحل' : 'Resolution Rate'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Treatment Progress */}
-                <div className="mb-3 sm:mb-4">
-                  <div className="mb-1 flex items-center justify-between text-xs sm:text-sm">
-                    <span className="text-[var(--foreground-secondary)] truncate min-w-0">
-                      {isAr ? 'المخاطر المحلولة' : 'Resolved Risks'}
+                {/* XP Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-[var(--foreground-secondary)]">
+                      {isAr ? `المستوى ${champion.level}` : `Level ${champion.level}`}
                     </span>
-                    <span className="font-medium text-[var(--foreground)] shrink-0">
-                      {champion.risksResolved || 0}/{champion.risksAssigned || 0}
+                    <span className="text-[var(--foreground-secondary)]">
+                      {champion.currentXP} / 500 XP
                     </span>
                   </div>
-                  <div className="h-1.5 sm:h-2 overflow-hidden rounded-full bg-[var(--background-tertiary)]">
+                  <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-[var(--status-success)]"
-                      style={{
-                        width: `${resolutionRate}%`,
-                      }}
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
+                      style={{ width: `${(champion.currentXP / 500) * 100}%` }}
                     />
                   </div>
                 </div>
 
-                {/* Join Date */}
-                <div className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                  <span className="truncate">{isAr ? 'تاريخ الانضمام:' : 'Joined:'}</span>
-                  <span className="font-medium shrink-0">
-                    {new Date(champion.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
-                  </span>
+                {/* Badges */}
+                {champion.badges.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-1">
+                    {champion.badges.map((badge) => (
+                      <span
+                        key={badge}
+                        className="inline-flex items-center gap-1 bg-[var(--background-secondary)] rounded-full px-2 py-1 text-xs"
+                        title={isAr ? badgeDefinitions[badge as keyof typeof badgeDefinitions]?.descAr : badgeDefinitions[badge as keyof typeof badgeDefinitions]?.descEn}
+                      >
+                        <span>{badgeDefinitions[badge as keyof typeof badgeDefinitions]?.icon}</span>
+                        <span className="text-[var(--foreground-secondary)]">
+                          {isAr ? badgeDefinitions[badge as keyof typeof badgeDefinitions]?.nameAr : badgeDefinitions[badge as keyof typeof badgeDefinitions]?.nameEn}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Department */}
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {champion.department && (
+                    <Badge variant="default">
+                      <Building2 className="me-1 h-3 w-3" />
+                      {isAr ? champion.department.nameAr : champion.department.nameEn}
+                    </Badge>
+                  )}
+                  {champion.accessibleDepartments && champion.accessibleDepartments.length > 0 && (
+                    <Badge variant="success">
+                      +{champion.accessibleDepartments.length} {isAr ? 'أقسام' : 'depts'}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="bg-[var(--background-secondary)] rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-[var(--foreground)]">{champion.risksAssigned || 0}</p>
+                    <p className="text-xs text-[var(--foreground-secondary)]">
+                      {isAr ? 'مخاطر مُسندة' : 'Assigned'}
+                    </p>
+                  </div>
+                  <div className="bg-[var(--background-secondary)] rounded-lg p-3 text-center">
+                    <p className={`text-2xl font-bold ${resolutionRate >= 70 ? 'text-emerald-500' : resolutionRate >= 40 ? 'text-blue-500' : 'text-orange-500'}`}>
+                      {resolutionRate}%
+                    </p>
+                    <p className="text-xs text-[var(--foreground-secondary)]">
+                      {isAr ? 'معدل الإنجاز' : 'Resolution'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-[var(--foreground-secondary)]">
+                      {isAr ? 'المخاطر المحلولة' : 'Risks Resolved'}
+                    </span>
+                    <span className="font-medium">
+                      {champion.risksResolved || 0}/{champion.risksAssigned || 0}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        resolutionRate >= 70 ? 'bg-gradient-to-r from-emerald-400 to-green-500' :
+                        resolutionRate >= 40 ? 'bg-gradient-to-r from-blue-400 to-indigo-500' :
+                        'bg-gradient-to-r from-orange-400 to-amber-500'
+                      }`}
+                      style={{ width: `${resolutionRate}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Streak & Join Date */}
+                <div className="flex items-center justify-between text-xs text-[var(--foreground-secondary)] mb-4">
+                  <div className="flex items-center gap-1">
+                    <Flame className="h-4 w-4 text-orange-500" />
+                    <span>{champion.streak} {isAr ? 'يوم نشاط' : 'day streak'}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    <span>{new Date(champion.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+                  </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 sm:pt-4">
-                  <div className="flex gap-1 sm:gap-2">
-                    <Button variant="ghost" size="sm" title={isAr ? 'عرض' : 'View'}>
-                      <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
+                <div className="flex items-center justify-between border-t border-[var(--border)] pt-3">
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" title={isAr ? 'عرض الملف' : 'View Profile'}>
+                      <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" title={isAr ? 'مراسلة' : 'Message'}>
-                      <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <Button variant="ghost" size="sm" title={isAr ? 'إرسال رسالة' : 'Send Message'}>
+                      <Mail className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" title={isAr ? 'تشجيع' : 'Cheer'}>
+                      <ThumbsUp className="h-4 w-4" />
                     </Button>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleCardExpand(champion.id)}
-                    rightIcon={isExpanded ? <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5" /> : <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5" />}
+                    rightIcon={isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   >
-                    <span className="text-xs sm:text-sm">{isExpanded ? (isAr ? 'أقل' : 'Less') : (isAr ? 'المزيد' : 'More')}</span>
+                    {isExpanded ? (isAr ? 'أقل' : 'Less') : (isAr ? 'المزيد' : 'More')}
                   </Button>
                 </div>
               </div>
 
               {/* Expanded Details */}
               {isExpanded && (
-                <div className="border-t border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4">
+                <div className="border-t border-[var(--border)] bg-[var(--background-secondary)] p-4 space-y-4">
                   {/* Contact Info */}
-                  <div className="mb-3 sm:mb-4 space-y-1.5 sm:space-y-2">
-                    <h4 className="text-xs sm:text-sm font-semibold text-[var(--foreground)]">
+                  <div>
+                    <h4 className="text-sm font-semibold text-[var(--foreground)] mb-2">
                       {isAr ? 'معلومات الاتصال' : 'Contact Information'}
                     </h4>
-                    <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                      <Mail className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                      <span className="truncate min-w-0">{champion.email}</span>
-                    </div>
-                    {champion.phone && (
-                      <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        <Phone className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                        <span dir="ltr" className="truncate min-w-0">{champion.phone}</span>
+                    <div className="space-y-1 text-sm text-[var(--foreground-secondary)]">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        <span>{champion.email}</span>
                       </div>
-                    )}
+                      {champion.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4" />
+                          <span dir="ltr">{champion.phone}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Accessible Departments */}
                   {champion.accessibleDepartments && champion.accessibleDepartments.length > 0 && (
                     <div>
-                      <h4 className="mb-1.5 sm:mb-2 text-xs sm:text-sm font-semibold text-[var(--foreground)]">
-                        {isAr ? 'الوظائف التي يمكنه الاطلاع عليها' : 'Accessible Departments'}
+                      <h4 className="text-sm font-semibold text-[var(--foreground)] mb-2">
+                        {isAr ? 'الأقسام المسؤول عنها' : 'Responsible Departments'}
                       </h4>
                       <div className="flex flex-wrap gap-1">
                         {champion.accessibleDepartments.map((access) => (
@@ -614,6 +961,30 @@ export default function ChampionsPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Weekly Challenge */}
+                  <div className="bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Rocket className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                        {isAr ? 'تحدي الأسبوع' : 'Weekly Challenge'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-purple-600 dark:text-purple-400">
+                        {isAr ? 'حل 5 مخاطر هذا الأسبوع' : 'Resolve 5 risks this week'}
+                      </span>
+                      <span className="font-medium text-purple-700 dark:text-purple-300">
+                        {Math.min(champion.risksResolved || 0, 5)}/5
+                      </span>
+                    </div>
+                    <div className="h-2 bg-purple-200 dark:bg-purple-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
+                        style={{ width: `${Math.min(((champion.risksResolved || 0) / 5) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </Card>
@@ -623,14 +994,14 @@ export default function ChampionsPage() {
 
       {/* Empty State */}
       {filteredChampions.length === 0 && (
-        <Card className="p-4 sm:p-6 md:p-8 text-center">
-          <Users className="mx-auto h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-[var(--foreground-muted)]" />
-          <h3 className="mt-3 sm:mt-4 font-semibold text-sm sm:text-base text-[var(--foreground)]">
-            {isAr ? 'لا يوجد رواد' : 'No Champions Found'}
+        <Card className="p-8 text-center">
+          <Trophy className="mx-auto h-16 w-16 text-amber-300" />
+          <h3 className="mt-4 font-bold text-lg text-[var(--foreground)]">
+            {isAr ? 'لا يوجد أبطال' : 'No Champions Found'}
           </h3>
-          <p className="mt-1 text-xs sm:text-sm text-[var(--foreground-secondary)]">
+          <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
             {isAr
-              ? 'لم يتم العثور على رواد مخاطر. يمكنك إضافة رواد من صفحة الإعدادات > المستخدمين'
+              ? 'لم يتم العثور على أبطال مخاطر. يمكنك إضافة أبطال من صفحة الإعدادات > المستخدمين'
               : 'No risk champions found. You can add champions from Settings > Users'}
           </p>
         </Card>
@@ -640,29 +1011,29 @@ export default function ChampionsPage() {
       <Modal
         isOpen={showTrainingModal}
         onClose={() => setShowTrainingModal(false)}
-        title={isAr ? 'برنامج تدريب الرواد' : 'Champion Training Program'}
+        title={isAr ? '🎓 برنامج تدريب الأبطال' : '🎓 Champion Training Program'}
         size="lg"
       >
-        <div className="space-y-3 sm:space-y-4">
-          <p className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--foreground-secondary)]">
             {isAr
-              ? 'برنامج تدريب شامل لتأهيل رواد المخاطر على إدارة المخاطر بفعالية'
-              : 'Comprehensive training program to qualify risk champions for effective risk management'}
+              ? 'أكمل التدريب لكسب شارات إضافية ونقاط مكافأة!'
+              : 'Complete training to earn bonus badges and points!'}
           </p>
 
           {trainingModules.map((module) => (
             <div
               key={module.id}
-              className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4"
+              className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-4"
             >
-              <div className="flex items-start justify-between gap-2 sm:gap-3">
-                <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                  <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[var(--primary-light)] shrink-0">
-                    <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)]" />
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 text-white">
+                    <GraduationCap className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                      <h4 className="font-semibold text-xs sm:text-sm md:text-base text-[var(--foreground)] truncate">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-[var(--foreground)]">
                         {isAr ? module.titleAr : module.titleEn}
                       </h4>
                       {module.required && (
@@ -671,13 +1042,17 @@ export default function ChampionsPage() {
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-1 text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                    <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
                       {isAr ? module.descriptionAr : module.descriptionEn}
                     </p>
-                    <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-2 sm:gap-4 text-[10px] sm:text-xs text-[var(--foreground-muted)]">
+                    <div className="mt-2 flex items-center gap-4 text-xs text-[var(--foreground-muted)]">
                       <span className="flex items-center gap-1">
-                        <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
+                        <Clock className="h-3 w-3" />
                         {module.duration}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Zap className="h-3 w-3 text-amber-500" />
+                        +100 {isAr ? 'نقطة' : 'pts'}
                       </span>
                     </div>
                   </div>
@@ -687,8 +1062,8 @@ export default function ChampionsPage() {
           ))}
         </div>
         <ModalFooter>
-          <Button size="sm" onClick={() => setShowTrainingModal(false)}>
-            <span className="text-xs sm:text-sm">{isAr ? 'إغلاق' : 'Close'}</span>
+          <Button onClick={() => setShowTrainingModal(false)}>
+            {isAr ? 'إغلاق' : 'Close'}
           </Button>
         </ModalFooter>
       </Modal>
@@ -697,101 +1072,88 @@ export default function ChampionsPage() {
       <Modal
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}
-        title={isAr ? 'دليل رائد المخاطر' : 'Risk Champion Guide'}
+        title={isAr ? '📖 دليل بطل المخاطر' : '📖 Risk Champion Guide'}
         size="lg"
       >
-        <div className="space-y-4 sm:space-y-6">
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4">
-            <h4 className="mb-1.5 sm:mb-2 flex items-center gap-1.5 sm:gap-2 font-semibold text-xs sm:text-sm md:text-base text-[var(--foreground)]">
-              <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)] shrink-0" />
-              {isAr ? 'مسؤوليات رائد المخاطر' : 'Risk Champion Responsibilities'}
+        <div className="space-y-6">
+          {/* How to Earn Points */}
+          <div className="rounded-lg border border-[var(--border)] bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-4">
+            <h4 className="mb-3 flex items-center gap-2 font-bold text-[var(--foreground)]">
+              <Zap className="h-5 w-5 text-amber-500" />
+              {isAr ? 'كيف تكسب النقاط؟' : 'How to Earn Points?'}
             </h4>
-            <ul className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-              <li className="flex items-start gap-1.5 sm:gap-2">
-                <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-[var(--status-success)]" />
-                <span className="min-w-0">{isAr
-                  ? 'تحديد وتسجيل المخاطر في إدارته'
-                  : 'Identify and register risks in their department'}</span>
+            <ul className="space-y-2 text-sm text-[var(--foreground-secondary)]">
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span>{isAr ? 'حل مخطر = 100 نقطة' : 'Resolve a risk = 100 pts'}</span>
               </li>
-              <li className="flex items-start gap-1.5 sm:gap-2">
-                <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-[var(--status-success)]" />
-                <span className="min-w-0">{isAr
-                  ? 'تقييم المخاطر وتحديد مستوى الخطورة'
-                  : 'Assess risks and determine severity levels'}</span>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span>{isAr ? 'معدل إنجاز عالي = حتى 50 نقطة مكافأة' : 'High resolution rate = up to 50 bonus pts'}</span>
               </li>
-              <li className="flex items-start gap-1.5 sm:gap-2">
-                <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-[var(--status-success)]" />
-                <span className="min-w-0">{isAr
-                  ? 'إعداد ومتابعة خطط المعالجة'
-                  : 'Develop and monitor treatment plans'}</span>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span>{isAr ? 'نشاط يومي = 2 نقطة لكل يوم' : 'Daily activity = 2 pts per day'}</span>
               </li>
-              <li className="flex items-start gap-1.5 sm:gap-2">
-                <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-[var(--status-success)]" />
-                <span className="min-w-0">{isAr
-                  ? 'رفع التقارير الدورية لإدارة المخاطر'
-                  : 'Submit periodic reports to risk management'}</span>
-              </li>
-              <li className="flex items-start gap-1.5 sm:gap-2">
-                <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-[var(--status-success)]" />
-                <span className="min-w-0">{isAr
-                  ? 'نشر ثقافة إدارة المخاطر في الإدارة'
-                  : 'Promote risk management culture in the department'}</span>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span>{isAr ? 'كل قسم إضافي = 25 نقطة' : 'Each additional dept = 25 pts'}</span>
               </li>
             </ul>
           </div>
 
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-2 sm:p-3 md:p-4">
-            <h4 className="mb-1.5 sm:mb-2 flex items-center gap-1.5 sm:gap-2 font-semibold text-xs sm:text-sm md:text-base text-[var(--foreground)]">
-              <Target className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)] shrink-0" />
-              {isAr ? 'مؤشرات الأداء' : 'Performance Indicators'}
+          {/* Badges */}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-4">
+            <h4 className="mb-3 flex items-center gap-2 font-bold text-[var(--foreground)]">
+              <Award className="h-5 w-5 text-purple-500" />
+              {isAr ? 'الشارات المتاحة' : 'Available Badges'}
             </h4>
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-              <div className="rounded bg-[var(--background)] p-2 sm:p-3">
-                <div className="text-base sm:text-lg md:text-xl font-bold text-[var(--foreground)]">≥ 80%</div>
-                <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
-                  {isAr ? 'معدل حل المخاطر المستهدف' : 'Target risk resolution rate'}
-                </p>
-              </div>
-              <div className="rounded bg-[var(--background)] p-2 sm:p-3">
-                <div className="text-base sm:text-lg md:text-xl font-bold text-[var(--foreground)]">≤ 30</div>
-                <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
-                  {isAr ? 'أيام لتحديث سجل المخاطر' : 'Days to update risk register'}
-                </p>
-              </div>
-              <div className="rounded bg-[var(--background)] p-2 sm:p-3">
-                <div className="text-base sm:text-lg md:text-xl font-bold text-[var(--foreground)]">100%</div>
-                <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
-                  {isAr ? 'إكمال التدريب الإلزامي' : 'Mandatory training completion'}
-                </p>
-              </div>
-              <div className="rounded bg-[var(--background)] p-2 sm:p-3">
-                <div className="text-base sm:text-lg md:text-xl font-bold text-[var(--foreground)]">≥ 90%</div>
-                <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
-                  {isAr ? 'إكمال خطط المعالجة في الوقت' : 'On-time treatment plan completion'}
-                </p>
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(badgeDefinitions).map(([key, badge]) => (
+                <div key={key} className="flex items-center gap-2 rounded-lg bg-[var(--background)] p-2">
+                  <span className="text-xl">{badge.icon}</span>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--foreground)]">
+                      {isAr ? badge.nameAr : badge.nameEn}
+                    </p>
+                    <p className="text-xs text-[var(--foreground-secondary)]">
+                      {isAr ? badge.descAr : badge.descEn}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="rounded-lg border border-[var(--primary)]/30 bg-[var(--primary-light)] p-2 sm:p-3 md:p-4">
-            <div className="flex gap-2 sm:gap-3">
-              <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-[var(--primary)]" />
-              <div className="min-w-0">
-                <h5 className="font-medium text-xs sm:text-sm text-[var(--foreground)]">
-                  {isAr ? 'للدعم والمساعدة' : 'For Support'}
-                </h5>
-                <p className="mt-1 text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? 'تواصل مع إدارة المخاطر المؤسسية للحصول على الدعم والتوجيه اللازم'
-                    : 'Contact the Enterprise Risk Management department for support and guidance'}
-                </p>
-              </div>
-            </div>
+          {/* Responsibilities */}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-4">
+            <h4 className="mb-3 flex items-center gap-2 font-bold text-[var(--foreground)]">
+              <Shield className="h-5 w-5 text-blue-500" />
+              {isAr ? 'مسؤوليات البطل' : 'Champion Responsibilities'}
+            </h4>
+            <ul className="space-y-2 text-sm text-[var(--foreground-secondary)]">
+              <li className="flex items-start gap-2">
+                <CheckCircle className="mt-0.5 h-4 w-4 text-green-500" />
+                <span>{isAr ? 'تحديد وتسجيل المخاطر في إدارته' : 'Identify and register risks in their department'}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="mt-0.5 h-4 w-4 text-green-500" />
+                <span>{isAr ? 'تقييم المخاطر وتحديد مستوى الخطورة' : 'Assess risks and determine severity levels'}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="mt-0.5 h-4 w-4 text-green-500" />
+                <span>{isAr ? 'إعداد ومتابعة خطط المعالجة' : 'Develop and monitor treatment plans'}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="mt-0.5 h-4 w-4 text-green-500" />
+                <span>{isAr ? 'رفع التقارير الدورية لإدارة المخاطر' : 'Submit periodic reports to risk management'}</span>
+              </li>
+            </ul>
           </div>
         </div>
         <ModalFooter>
-          <Button size="sm" onClick={() => setShowGuideModal(false)}>
-            <span className="text-xs sm:text-sm">{isAr ? 'فهمت' : 'Got it'}</span>
+          <Button onClick={() => setShowGuideModal(false)}>
+            {isAr ? 'فهمت!' : 'Got it!'}
           </Button>
         </ModalFooter>
       </Modal>
