@@ -396,24 +396,24 @@ export default function ChampionsPage() {
 
       const daysActive = Math.floor((Date.now() - new Date(champion.createdAt).getTime()) / (1000 * 60 * 60 * 24));
 
-      // Calculate points based on REAL performance ONLY
-      // Points system (performance-based only):
-      // - 100 points per resolved risk (mitigated or closed)
-      // - 50 points per completed treatment plan
-      // - Bonus for high resolution rate (up to 50 points if rate >= 50%)
+      // Calculate points based on COMPLETED TREATMENT PLANS ONLY
+      // Points system (treatment plan performance only):
+      // - 100 points per completed treatment plan
+      // - Bonus 50 points if completion rate >= 50%
       // - Penalty for overdue treatments (-10 points each)
-      // NO points for: active treatments, departments, days active
+      //
+      // NOTE: Risk status (mitigated/closed) does NOT give points
+      // Only actual completed treatment plans count as real work
 
-      const riskPoints = risksResolved * 100;
-      const treatmentCompletedPoints = treatmentsCompleted * 50;
-      // Only give rate bonus if actually resolved something
-      const riskRateBonus = risksResolved > 0 && riskResolutionRate >= 0.5 ? Math.round(riskResolutionRate * 50) : 0;
+      const treatmentCompletedPoints = treatmentsCompleted * 100;
+      const completionRateBonus = treatmentsCompleted > 0 && treatmentCompletionRate >= 0.5
+        ? Math.round(treatmentCompletionRate * 50)
+        : 0;
       const overduePenalty = treatmentsOverdue * 10;
 
       const totalPoints = Math.max(0,
-        riskPoints +
         treatmentCompletedPoints +
-        riskRateBonus -
+        completionRateBonus -
         overduePenalty
       );
 
@@ -1220,15 +1220,11 @@ export default function ChampionsPage() {
             <ul className="space-y-2 text-sm text-[var(--foreground-secondary)]">
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'حل خطر (تخفيف/إغلاق) = 100 نقطة' : 'Resolve a risk = 100 pts'}</span>
+                <span>{isAr ? 'إكمال خطة معالجة = 100 نقطة' : 'Complete treatment plan = 100 pts'}</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'إكمال خطة معالجة = 50 نقطة' : 'Complete treatment plan = 50 pts'}</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'معدل إنجاز ≥50% = حتى 50 نقطة مكافأة' : 'Resolution rate ≥50% = up to 50 bonus pts'}</span>
+                <span>{isAr ? 'معدل إكمال ≥50% = حتى 50 نقطة مكافأة' : 'Completion rate ≥50% = up to 50 bonus pts'}</span>
               </li>
               <li className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-red-500" />
