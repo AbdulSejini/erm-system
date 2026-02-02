@@ -207,7 +207,7 @@ export async function PATCH(
   }
 }
 
-// DELETE - حذف خطة معالجة
+// DELETE - حذف خطة معالجة (مدير المخاطر أو مدير النظام فقط)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; treatmentId: string }> }
@@ -220,6 +220,19 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, error: 'غير مصرح' },
         { status: 401 }
+      );
+    }
+
+    // التحقق من صلاحيات المستخدم - فقط مدير المخاطر أو مدير النظام يمكنهم الحذف
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (!user || !['admin', 'riskManager'].includes(user.role)) {
+      return NextResponse.json(
+        { success: false, error: 'ليس لديك صلاحية حذف خطط المعالجة. هذا الإجراء متاح فقط لمدير المخاطر أو مدير النظام.' },
+        { status: 403 }
       );
     }
 

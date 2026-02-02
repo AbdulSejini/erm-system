@@ -205,6 +205,7 @@ export default function TreatmentDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'risk'>('overview');
+  const [canDelete, setCanDelete] = useState(false); // صلاحية الحذف
 
   // Editable form state
   const [formData, setFormData] = useState({
@@ -225,6 +226,16 @@ export default function TreatmentDetailPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
+
+        // جلب بيانات المستخدم الحالي للتحقق من صلاحية الحذف
+        const userRes = await fetch('/api/auth/session');
+        if (userRes.ok) {
+          const sessionData = await userRes.json();
+          if (sessionData?.user?.role) {
+            // فقط admin و riskManager يمكنهم الحذف
+            setCanDelete(['admin', 'riskManager'].includes(sessionData.user.role));
+          }
+        }
 
         // Fetch treatment details - treatmentId is actually the risk.id
         const res = await fetch(`/api/risks?includeTreatments=true`);
@@ -368,9 +379,13 @@ export default function TreatmentDetailPage() {
 
       if (res.ok) {
         router.push('/treatment');
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || 'فشل في حذف خطة المعالجة');
       }
     } catch (error) {
       console.error('Error deleting treatment:', error);
+      alert('حدث خطأ أثناء محاولة الحذف');
     } finally {
       setDeleting(false);
       setShowDeleteModal(false);
@@ -498,14 +513,16 @@ export default function TreatmentDetailPage() {
                     <Pencil className="h-4 w-4 me-2" />
                     {isAr ? 'تعديل' : 'Edit'}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowDeleteModal(true)}
-                    className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                  >
-                    <Trash2 className="h-4 w-4 me-2" />
-                    {isAr ? 'حذف' : 'Delete'}
-                  </Button>
+                  {canDelete && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDeleteModal(true)}
+                      className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                    >
+                      <Trash2 className="h-4 w-4 me-2" />
+                      {isAr ? 'حذف' : 'Delete'}
+                    </Button>
+                  )}
                 </>
               )}
             </div>
