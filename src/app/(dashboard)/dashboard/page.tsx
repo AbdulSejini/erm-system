@@ -207,6 +207,7 @@ export default function DashboardPage() {
   const isAr = language === 'ar';
   const [showAlerts, setShowAlerts] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
   // State for API data
   const [risks, setRisks] = useState<APIRisk[]>([]);
@@ -504,6 +505,24 @@ export default function DashboardPage() {
     return alerts;
   }, [risks, stats]);
 
+  // Active alerts (excluding dismissed)
+  const activeAlerts = useMemo(() => {
+    return alertsData.filter(alert => !dismissedAlerts.has(`${alert.titleEn}`));
+  }, [alertsData, dismissedAlerts]);
+
+  // Dismiss alert
+  const dismissAlert = (alertKey: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDismissedAlerts(prev => new Set([...prev, alertKey]));
+  };
+
+  // Mark all as read
+  const markAllAsRead = () => {
+    const allKeys = alertsData.map(a => a.titleEn);
+    setDismissedAlerts(new Set(allKeys));
+  };
+
   // Handle Monthly Report generation
   const handleMonthlyReport = () => {
     const headers = [
@@ -620,7 +639,7 @@ export default function DashboardPage() {
             >
               {isAr ? 'تقرير شهري' : 'Monthly Report'}
             </Button>
-            <div className="relative">
+            <div className="relative" style={{ zIndex: 200 }}>
               <Button
                 variant="outline"
                 size="sm"
@@ -629,64 +648,96 @@ export default function DashboardPage() {
                 className="bg-white/20 border-white/30 text-white hover:bg-white/30 rounded-xl backdrop-blur-sm relative"
               >
                 {isAr ? 'التنبيهات' : 'Alerts'}
-                {alertsData.length > 0 && (
+                {activeAlerts.length > 0 && (
                   <span className="absolute -top-2 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white font-bold animate-bounce">
-                    {alertsData.length}
+                    {activeAlerts.length}
                   </span>
                 )}
               </Button>
 
-              {/* Alerts Dropdown */}
+              {/* Alerts Dropdown - Fixed positioning */}
               {showAlerts && (
                 <>
-                  <div className="fixed inset-0 z-[100]" onClick={() => setShowAlerts(false)} />
-                  <div className={`absolute top-full z-[110] mt-2 w-80 sm:w-96 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl ${isAr ? 'left-0' : 'right-0'} animate-slideDown`}>
+                  <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setShowAlerts(false)} />
+                  <div
+                    className={`fixed top-20 ${isAr ? 'start-4' : 'end-4'} w-80 sm:w-96 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl animate-slideDown`}
+                    style={{ zIndex: 9999 }}
+                  >
                     <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 p-4">
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                      <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Bell className="h-4 w-4 text-orange-500" />
                         {isAr ? 'التنبيهات' : 'Alerts'}
-                        <span className="ms-2 text-xs font-normal text-gray-500">
-                          ({alertsData.length})
-                        </span>
+                        {activeAlerts.length > 0 && (
+                          <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                            {activeAlerts.length}
+                          </span>
+                        )}
                       </h3>
+                      {activeAlerts.length > 0 && (
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+                        >
+                          {isAr ? 'تحديد الكل كمقروء' : 'Mark all as read'}
+                        </button>
+                      )}
                     </div>
-                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-                      {alertsData.length === 0 ? (
+                    <div className="max-h-96 overflow-y-auto">
+                      {activeAlerts.length === 0 ? (
                         <div className="p-8 text-center">
                           <CheckCircle className="mx-auto h-12 w-12 text-emerald-500" />
-                          <p className="mt-2 text-sm text-gray-500">
-                            {isAr ? 'لا توجد تنبيهات - كل شيء على ما يرام!' : 'No alerts - everything is fine!'}
+                          <p className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {isAr ? 'لا توجد تنبيهات' : 'No alerts'}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {isAr ? 'كل شيء على ما يرام!' : 'Everything is fine!'}
                           </p>
                         </div>
                       ) : (
-                        alertsData.map((alert, index) => (
-                          <Link
-                            key={index}
-                            href={alert.link || '#'}
-                            className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                            onClick={() => setShowAlerts(false)}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className={`p-2 rounded-xl ${
-                                alert.type === 'critical' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                                alert.type === 'warning' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
-                                'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                              }`}>
-                                {alert.type === 'critical' ? <AlertTriangle className="h-4 w-4" /> :
-                                 alert.type === 'warning' ? <AlertCircle className="h-4 w-4" /> :
-                                 <Info className="h-4 w-4" />}
+                        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                          {activeAlerts.map((alert, index) => (
+                            <div
+                              key={index}
+                              className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={`p-2 rounded-xl shrink-0 ${
+                                  alert.type === 'critical' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                                  alert.type === 'warning' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
+                                  'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                                }`}>
+                                  {alert.type === 'critical' ? <AlertTriangle className="h-4 w-4" /> :
+                                   alert.type === 'warning' ? <AlertCircle className="h-4 w-4" /> :
+                                   <Info className="h-4 w-4" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {isAr ? alert.titleAr : alert.titleEn}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                    {isAr ? alert.descAr : alert.descEn}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <Link
+                                      href={alert.link || '#'}
+                                      onClick={() => setShowAlerts(false)}
+                                      className="text-xs text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1"
+                                    >
+                                      {isAr ? 'عرض' : 'View'}
+                                      <ChevronRight className="h-3 w-3" />
+                                    </Link>
+                                    <button
+                                      onClick={(e) => dismissAlert(alert.titleEn, e)}
+                                      className="text-xs text-gray-400 hover:text-gray-600 font-medium"
+                                    >
+                                      {isAr ? 'تجاهل' : 'Dismiss'}
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {isAr ? alert.titleAr : alert.titleEn}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {isAr ? alert.descAr : alert.descEn}
-                                </p>
-                              </div>
-                              <ChevronRight className="h-4 w-4 text-gray-400" />
                             </div>
-                          </Link>
-                        ))
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1052,77 +1103,112 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Champion Performance */}
+        {/* Quick Actions - More Practical */}
         <Card className="border border-gray-200 dark:border-gray-800 shadow-sm rounded-2xl overflow-hidden bg-white dark:bg-gray-900">
           <div className="border-b border-gray-200 dark:border-gray-800 p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Users className="h-5 w-5 text-orange-500" />
-                {isAr ? 'أداء الرواد' : 'Champion Performance'}
-              </h3>
-              <Link href="/users">
-                <Button variant="ghost" size="sm" className="text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20" rightIcon={<ChevronRight className="h-4 w-4" />}>
-                  {isAr ? 'عرض الكل' : 'View All'}
-                </Button>
-              </Link>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <Zap className="h-5 w-5 text-orange-500" />
+              {isAr ? 'إجراءات سريعة' : 'Quick Actions'}
+            </h3>
           </div>
-          <CardContent className="p-4">
-            {championPerformance.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
-                <p className="text-sm text-gray-500">{isAr ? 'لا يوجد رواد مخاطر بعد' : 'No risk champions yet'}</p>
+          <CardContent className="p-4 space-y-3">
+            {/* Add New Risk */}
+            <Link
+              href="/risks?action=new"
+              className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 transition-all group"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 text-white shadow-md group-hover:scale-110 transition-transform">
+                <AlertTriangle className="h-5 w-5" />
               </div>
-            ) : (
-              <div className="space-y-4">
-                {championPerformance.map((champion, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors animate-fadeIn"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-sm font-bold text-white shadow-md">
-                      {(isAr ? champion.nameAr : champion.nameEn).charAt(0)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {isAr ? champion.nameAr : champion.nameEn}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {isAr ? champion.departmentAr : champion.departmentEn} • {champion.risksManaged} {isAr ? 'مخاطر' : 'risks'}
-                          </p>
-                        </div>
-                        <div
-                          className={`text-sm font-bold px-2 py-1 rounded-lg ${
-                            champion.resolutionRate >= 80
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                              : champion.resolutionRate >= 60
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                          }`}
-                        >
-                          {champion.resolutionRate}%
-                        </div>
-                      </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                        <div
-                          className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                            champion.resolutionRate >= 80
-                              ? 'bg-emerald-500'
-                              : champion.resolutionRate >= 60
-                              ? 'bg-amber-500'
-                              : 'bg-red-500'
-                          }`}
-                          style={{ width: `${champion.resolutionRate}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {isAr ? 'تسجيل خطر جديد' : 'Register New Risk'}
+                </p>
+                <p className="text-xs text-gray-500">{isAr ? 'إضافة خطر للسجل' : 'Add risk to register'}</p>
               </div>
-            )}
+              <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-orange-500 group-hover:translate-x-1 transition-all" />
+            </Link>
+
+            {/* Track Risks */}
+            <Link
+              href="/tracking"
+              className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 transition-all group"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 text-white shadow-md group-hover:scale-110 transition-transform">
+                <Target className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {isAr ? 'متابعة المخاطر' : 'Track Risks'}
+                </p>
+                <p className="text-xs text-gray-500">{isAr ? 'متابعة حسب الإدارة' : 'Track by department'}</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+            </Link>
+
+            {/* Treatment Plans */}
+            <Link
+              href="/treatment"
+              className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-300 transition-all group"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 text-white shadow-md group-hover:scale-110 transition-transform">
+                <Wrench className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {isAr ? 'خطط المعالجة' : 'Treatment Plans'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {stats.inProgressTreatments > 0
+                    ? isAr ? `${stats.inProgressTreatments} قيد التنفيذ` : `${stats.inProgressTreatments} in progress`
+                    : isAr ? 'إدارة الخطط' : 'Manage plans'}
+                </p>
+              </div>
+              {stats.overdueTreatments > 0 && (
+                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                  {stats.overdueTreatments}
+                </span>
+              )}
+              <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+            </Link>
+
+            {/* View Reports */}
+            <Link
+              href="/reports"
+              className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 transition-all group"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-400 to-violet-500 text-white shadow-md group-hover:scale-110 transition-transform">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {isAr ? 'التقارير' : 'Reports'}
+                </p>
+                <p className="text-xs text-gray-500">{isAr ? 'عرض تقارير المخاطر' : 'View risk reports'}</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all" />
+            </Link>
+
+            {/* Risk Champions */}
+            <Link
+              href="/champions"
+              className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-300 transition-all group"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-md group-hover:scale-110 transition-transform">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {isAr ? 'رواد المخاطر' : 'Risk Champions'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {stats.activeChampions > 0
+                    ? isAr ? `${stats.activeChampions} رائد نشط` : `${stats.activeChampions} active`
+                    : isAr ? 'إدارة الرواد' : 'Manage champions'}
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
+            </Link>
           </CardContent>
         </Card>
       </div>
