@@ -253,6 +253,11 @@ export default function ChampionsPage() {
         const risksRes = await fetch('/api/risks?includeTreatments=true&filterByAccess=false');
         const risksData = await risksRes.json();
 
+        // Fetch departments to get risk champion assignments
+        const deptsRes = await fetch('/api/departments');
+        const deptsData = await deptsRes.json();
+        const departments = deptsData.success ? deptsData.data : [];
+
         const risks = risksData.success ? risksData.data : [];
 
         // Define risk and treatment interfaces
@@ -268,20 +273,38 @@ export default function ChampionsPage() {
           id: string;
           championId?: string;
           ownerId?: string;
+          departmentId?: string;
           owner?: { id: string };
           champion?: { id: string };
+          department?: { id: string };
           status: string;
           treatmentPlans?: TreatmentPlan[];
         }
 
+        interface Department {
+          id: string;
+          riskChampionId?: string;
+        }
+
         // Calculate stats for each champion based on real data
         const championsWithStats = usersData.data.map((user: APIChampion) => {
-          // Find risks where user is champion, owner, or risk owner
+          // Find departments where user is the risk champion
+          const userDepartmentIds = departments
+            .filter((dept: Department) => dept.riskChampionId === user.id)
+            .map((dept: Department) => dept.id);
+
+          // Also include accessible departments
+          const accessibleDeptIds = (user.accessibleDepartments || []).map(ad => ad.departmentId);
+          const allUserDeptIds = [...new Set([...userDepartmentIds, ...accessibleDeptIds])];
+
+          // Find risks where user is champion, owner, or department risk champion
           const championRisks = risks.filter((r: Risk) =>
             r.championId === user.id ||
             r.ownerId === user.id ||
             r.owner?.id === user.id ||
-            r.champion?.id === user.id
+            r.champion?.id === user.id ||
+            (r.departmentId && allUserDeptIds.includes(r.departmentId)) ||
+            (r.department?.id && allUserDeptIds.includes(r.department.id))
           );
 
           // Count resolved risks
