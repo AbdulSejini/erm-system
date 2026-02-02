@@ -396,32 +396,25 @@ export default function ChampionsPage() {
 
       const daysActive = Math.floor((Date.now() - new Date(champion.createdAt).getTime()) / (1000 * 60 * 60 * 24));
 
-      // Calculate points based on REAL performance
-      // Points system:
-      // - 100 points per resolved risk
+      // Calculate points based on REAL performance ONLY
+      // Points system (performance-based only):
+      // - 100 points per resolved risk (mitigated or closed)
       // - 50 points per completed treatment plan
-      // - 25 points per active treatment plan (work in progress)
-      // - Bonus for high resolution rate (up to 100 points)
-      // - Bonus for treatment completion rate (up to 100 points)
-      // - Penalty for overdue treatments (-20 points each)
-      // - Department responsibility bonus (25 per department)
+      // - Bonus for high resolution rate (up to 50 points if rate >= 50%)
+      // - Penalty for overdue treatments (-10 points each)
+      // NO points for: active treatments, departments, days active
 
       const riskPoints = risksResolved * 100;
       const treatmentCompletedPoints = treatmentsCompleted * 50;
-      const treatmentActivePoints = treatmentsActive * 25;
-      const riskRateBonus = Math.round(riskResolutionRate * 100);
-      const treatmentRateBonus = Math.round(treatmentCompletionRate * 100);
-      const overduePenalty = treatmentsOverdue * 20;
-      const departmentBonus = (champion.accessibleDepartments?.length || 0) * 25;
+      // Only give rate bonus if actually resolved something
+      const riskRateBonus = risksResolved > 0 && riskResolutionRate >= 0.5 ? Math.round(riskResolutionRate * 50) : 0;
+      const overduePenalty = treatmentsOverdue * 10;
 
       const totalPoints = Math.max(0,
         riskPoints +
         treatmentCompletedPoints +
-        treatmentActivePoints +
-        riskRateBonus +
-        treatmentRateBonus -
-        overduePenalty +
-        departmentBonus
+        riskRateBonus -
+        overduePenalty
       );
 
       // Calculate level (every 500 points = 1 level)
@@ -1227,7 +1220,7 @@ export default function ChampionsPage() {
             <ul className="space-y-2 text-sm text-[var(--foreground-secondary)]">
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'حل مخطر = 100 نقطة' : 'Resolve a risk = 100 pts'}</span>
+                <span>{isAr ? 'حل خطر (تخفيف/إغلاق) = 100 نقطة' : 'Resolve a risk = 100 pts'}</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
@@ -1235,19 +1228,11 @@ export default function ChampionsPage() {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'خطة معالجة نشطة = 25 نقطة' : 'Active treatment plan = 25 pts'}</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'معدل إنجاز عالي = حتى 100 نقطة مكافأة' : 'High completion rate = up to 100 bonus pts'}</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'كل قسم إضافي = 25 نقطة' : 'Each additional dept = 25 pts'}</span>
+                <span>{isAr ? 'معدل إنجاز ≥50% = حتى 50 نقطة مكافأة' : 'Resolution rate ≥50% = up to 50 bonus pts'}</span>
               </li>
               <li className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-red-500" />
-                <span>{isAr ? 'خطة متأخرة = -20 نقطة' : 'Overdue plan = -20 pts'}</span>
+                <span>{isAr ? 'خطة متأخرة = -10 نقطة' : 'Overdue plan = -10 pts'}</span>
               </li>
             </ul>
           </div>
