@@ -948,7 +948,7 @@ export default function TreatmentPage() {
                             id: t.id,
                             titleAr: t.titleAr,
                             titleEn: t.titleEn,
-                            dueDate: t.dueDate || '',
+                            dueDate: t.dueDate ? t.dueDate.split('T')[0] : '',
                             priority: (t.priority || 'medium') as 'high' | 'medium' | 'low',
                             assignedTo: '',
                             followedBy: '',

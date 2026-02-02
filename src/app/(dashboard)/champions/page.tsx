@@ -83,11 +83,13 @@ interface APIChampion {
     ownedRisks: number;
     championedRisks: number;
   };
-  // Stats from risks
+  // Stats from risks and treatment plans
   risksAssigned?: number;
   risksResolved?: number;
   treatmentPlansActive?: number;
   treatmentPlansCompleted?: number;
+  treatmentPlansTotal?: number;
+  treatmentPlansOverdue?: number;
 }
 
 // Extended champion with competition stats
@@ -237,7 +239,7 @@ export default function ChampionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch champions (users with role riskChampion)
+  // Fetch champions with real performance data from risks and treatment plans
   const fetchChampions = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setIsRefreshing(true);
 
@@ -247,28 +249,83 @@ export default function ChampionsPage() {
       const usersData = await usersRes.json();
 
       if (usersData.success) {
-        // Fetch risks to calculate stats for each champion
-        const risksRes = await fetch('/api/risks?filterByAccess=false');
+        // Fetch risks with treatment plans to calculate real stats
+        const risksRes = await fetch('/api/risks?includeTreatments=true&filterByAccess=false');
         const risksData = await risksRes.json();
 
         const risks = risksData.success ? risksData.data : [];
 
-        // Calculate stats for each champion
+        // Define risk and treatment interfaces
+        interface TreatmentPlan {
+          id: string;
+          status: string;
+          progress: number;
+          dueDate?: string;
+          responsible?: { id: string };
+        }
+
+        interface Risk {
+          id: string;
+          championId?: string;
+          ownerId?: string;
+          owner?: { id: string };
+          champion?: { id: string };
+          status: string;
+          treatmentPlans?: TreatmentPlan[];
+        }
+
+        // Calculate stats for each champion based on real data
         const championsWithStats = usersData.data.map((user: APIChampion) => {
-          const championRisks = risks.filter((r: { championId?: string; ownerId?: string }) =>
-            r.championId === user.id || r.ownerId === user.id
+          // Find risks where user is champion, owner, or risk owner
+          const championRisks = risks.filter((r: Risk) =>
+            r.championId === user.id ||
+            r.ownerId === user.id ||
+            r.owner?.id === user.id ||
+            r.champion?.id === user.id
           );
 
-          const resolved = championRisks.filter((r: { status: string }) =>
+          // Count resolved risks
+          const resolvedRisks = championRisks.filter((r: Risk) =>
             r.status === 'mitigated' || r.status === 'closed'
           ).length;
+
+          // Count treatment plans where user is responsible or related
+          let totalTreatmentPlans = 0;
+          let completedTreatmentPlans = 0;
+          let activeTreatmentPlans = 0;
+          let overdueTreatmentPlans = 0;
+
+          championRisks.forEach((risk: Risk) => {
+            if (risk.treatmentPlans && risk.treatmentPlans.length > 0) {
+              risk.treatmentPlans.forEach((plan: TreatmentPlan) => {
+                // Check if user is responsible for this treatment plan
+                const isResponsible = plan.responsible?.id === user.id;
+
+                // Count all treatments for risks owned/championed by user
+                totalTreatmentPlans++;
+
+                if (plan.status === 'completed') {
+                  completedTreatmentPlans++;
+                } else if (plan.status === 'inProgress') {
+                  activeTreatmentPlans++;
+                }
+
+                // Check if overdue
+                if (plan.dueDate && new Date(plan.dueDate) < new Date() && plan.status !== 'completed') {
+                  overdueTreatmentPlans++;
+                }
+              });
+            }
+          });
 
           return {
             ...user,
             risksAssigned: championRisks.length,
-            risksResolved: resolved,
-            treatmentPlansActive: championRisks.filter((r: { status: string }) => r.status === 'inProgress').length,
-            treatmentPlansCompleted: resolved,
+            risksResolved: resolvedRisks,
+            treatmentPlansActive: activeTreatmentPlans,
+            treatmentPlansCompleted: completedTreatmentPlans,
+            treatmentPlansTotal: totalTreatmentPlans,
+            treatmentPlansOverdue: overdueTreatmentPlans,
           };
         });
 
@@ -300,38 +357,74 @@ export default function ChampionsPage() {
     fetchDepartments();
   }, [fetchChampions, fetchDepartments]);
 
-  // Calculate competitive stats for champions
+  // Calculate competitive stats for champions with REAL data from risks and treatment plans
   const competitiveChampions: CompetitiveChampion[] = useMemo(() => {
-    return champions.map((champion, index) => {
+    return champions.map((champion) => {
       const risksAssigned = champion.risksAssigned || 0;
       const risksResolved = champion.risksResolved || 0;
-      const resolutionRate = risksAssigned > 0 ? risksResolved / risksAssigned : 0;
+      const treatmentsCompleted = champion.treatmentPlansCompleted || 0;
+      const treatmentsActive = champion.treatmentPlansActive || 0;
+      const treatmentsTotal = champion.treatmentPlansTotal || 0;
+      const treatmentsOverdue = champion.treatmentPlansOverdue || 0;
+
+      // Calculate resolution rates
+      const riskResolutionRate = risksAssigned > 0 ? risksResolved / risksAssigned : 0;
+      const treatmentCompletionRate = treatmentsTotal > 0 ? treatmentsCompleted / treatmentsTotal : 0;
+
       const daysActive = Math.floor((Date.now() - new Date(champion.createdAt).getTime()) / (1000 * 60 * 60 * 24));
 
-      // Calculate points (gamification)
-      const basePoints = risksResolved * 100;
-      const bonusPoints = Math.round(resolutionRate * 50);
-      const streakBonus = Math.min(daysActive, 30) * 2;
+      // Calculate points based on REAL performance
+      // Points system:
+      // - 100 points per resolved risk
+      // - 50 points per completed treatment plan
+      // - 25 points per active treatment plan (work in progress)
+      // - Bonus for high resolution rate (up to 100 points)
+      // - Bonus for treatment completion rate (up to 100 points)
+      // - Penalty for overdue treatments (-20 points each)
+      // - Department responsibility bonus (25 per department)
+
+      const riskPoints = risksResolved * 100;
+      const treatmentCompletedPoints = treatmentsCompleted * 50;
+      const treatmentActivePoints = treatmentsActive * 25;
+      const riskRateBonus = Math.round(riskResolutionRate * 100);
+      const treatmentRateBonus = Math.round(treatmentCompletionRate * 100);
+      const overduePenalty = treatmentsOverdue * 20;
       const departmentBonus = (champion.accessibleDepartments?.length || 0) * 25;
-      const totalPoints = basePoints + bonusPoints + streakBonus + departmentBonus;
+
+      const totalPoints = Math.max(0,
+        riskPoints +
+        treatmentCompletedPoints +
+        treatmentActivePoints +
+        riskRateBonus +
+        treatmentRateBonus -
+        overduePenalty +
+        departmentBonus
+      );
 
       // Calculate level (every 500 points = 1 level)
       const level = Math.floor(totalPoints / 500) + 1;
       const currentXP = totalPoints % 500;
       const xpToNextLevel = 500 - currentXP;
 
-      // Calculate badges
+      // Calculate badges based on REAL achievements
       const badges: string[] = [];
       if (risksResolved >= 1) badges.push('firstRisk');
       if (risksResolved >= 5) badges.push('fiveRisks');
       if (risksResolved >= 10) badges.push('tenRisks');
-      if (resolutionRate === 1 && risksAssigned > 0) badges.push('perfectRate');
+      if (riskResolutionRate === 1 && risksAssigned > 0) badges.push('perfectRate');
       if ((champion.accessibleDepartments?.length || 0) >= 3) badges.push('teamPlayer');
       if (daysActive >= 7) badges.push('streak7');
+      // New badges for treatment plans
+      if (treatmentsCompleted >= 3) badges.push('speedster'); // Completed 3+ treatments
 
-      // Simulate weekly/monthly progress (in real app, would calculate from actual data)
-      const weeklyProgress = Math.min(Math.round(Math.random() * 30 + risksResolved * 10), 100);
-      const monthlyProgress = Math.min(Math.round(Math.random() * 20 + risksResolved * 5), 100);
+      // Calculate REAL progress based on actual data
+      const weeklyProgress = treatmentsTotal > 0
+        ? Math.round(treatmentCompletionRate * 100)
+        : (risksAssigned > 0 ? Math.round(riskResolutionRate * 100) : 0);
+
+      const monthlyProgress = risksAssigned > 0
+        ? Math.round(((risksResolved + treatmentsCompleted) / (risksAssigned + treatmentsTotal || 1)) * 100)
+        : 0;
 
       return {
         ...champion,
@@ -339,8 +432,8 @@ export default function ChampionsPage() {
         rank: 0, // Will be set after sorting
         streak: Math.min(daysActive, 30),
         badges,
-        weeklyProgress,
-        monthlyProgress,
+        weeklyProgress: Math.min(weeklyProgress, 100),
+        monthlyProgress: Math.min(monthlyProgress, 100),
         level,
         xpToNextLevel,
         currentXP,
@@ -848,16 +941,16 @@ export default function ChampionsPage() {
                   )}
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <div className="bg-[var(--background-secondary)] rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-[var(--foreground)]">{champion.risksAssigned || 0}</p>
+                {/* Stats Grid - Risks */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="bg-[var(--background-secondary)] rounded-lg p-2 text-center">
+                    <p className="text-xl font-bold text-[var(--foreground)]">{champion.risksAssigned || 0}</p>
                     <p className="text-xs text-[var(--foreground-secondary)]">
-                      {isAr ? 'مخاطر مُسندة' : 'Assigned'}
+                      {isAr ? 'مخاطر مُسندة' : 'Risks'}
                     </p>
                   </div>
-                  <div className="bg-[var(--background-secondary)] rounded-lg p-3 text-center">
-                    <p className={`text-2xl font-bold ${resolutionRate >= 70 ? 'text-emerald-500' : resolutionRate >= 40 ? 'text-blue-500' : 'text-orange-500'}`}>
+                  <div className="bg-[var(--background-secondary)] rounded-lg p-2 text-center">
+                    <p className={`text-xl font-bold ${resolutionRate >= 70 ? 'text-emerald-500' : resolutionRate >= 40 ? 'text-blue-500' : 'text-orange-500'}`}>
                       {resolutionRate}%
                     </p>
                     <p className="text-xs text-[var(--foreground-secondary)]">
@@ -865,6 +958,32 @@ export default function ChampionsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Stats Grid - Treatment Plans */}
+                {(champion.treatmentPlansTotal || 0) > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 text-center">
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{champion.treatmentPlansActive || 0}</p>
+                      <p className="text-xs text-blue-600/70 dark:text-blue-400/70">
+                        {isAr ? 'خطط نشطة' : 'Active'}
+                      </p>
+                    </div>
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-2 text-center">
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{champion.treatmentPlansCompleted || 0}</p>
+                      <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                        {isAr ? 'مكتملة' : 'Done'}
+                      </p>
+                    </div>
+                    <div className={`rounded-lg p-2 text-center ${(champion.treatmentPlansOverdue || 0) > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-900/20'}`}>
+                      <p className={`text-lg font-bold ${(champion.treatmentPlansOverdue || 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500'}`}>
+                        {champion.treatmentPlansOverdue || 0}
+                      </p>
+                      <p className={`text-xs ${(champion.treatmentPlansOverdue || 0) > 0 ? 'text-red-600/70 dark:text-red-400/70' : 'text-gray-500/70'}`}>
+                        {isAr ? 'متأخرة' : 'Overdue'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Progress Bar */}
                 <div className="mb-4">
@@ -1089,15 +1208,23 @@ export default function ChampionsPage() {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'معدل إنجاز عالي = حتى 50 نقطة مكافأة' : 'High resolution rate = up to 50 bonus pts'}</span>
+                <span>{isAr ? 'إكمال خطة معالجة = 50 نقطة' : 'Complete treatment plan = 50 pts'}</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>{isAr ? 'نشاط يومي = 2 نقطة لكل يوم' : 'Daily activity = 2 pts per day'}</span>
+                <span>{isAr ? 'خطة معالجة نشطة = 25 نقطة' : 'Active treatment plan = 25 pts'}</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span>{isAr ? 'معدل إنجاز عالي = حتى 100 نقطة مكافأة' : 'High completion rate = up to 100 bonus pts'}</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
                 <span>{isAr ? 'كل قسم إضافي = 25 نقطة' : 'Each additional dept = 25 pts'}</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <span>{isAr ? 'خطة متأخرة = -20 نقطة' : 'Overdue plan = -20 pts'}</span>
               </li>
             </ul>
           </div>
