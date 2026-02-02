@@ -840,10 +840,15 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2 border border-gray-200 dark:border-gray-800 shadow-sm rounded-2xl overflow-hidden bg-white dark:bg-gray-900">
           <div className="border-b border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-orange-500" />
-                {t('dashboard.riskMatrix')}
-              </h3>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-orange-500" />
+                  {t('dashboard.riskMatrix')}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {isAr ? 'المخاطر الكامنة' : 'Inherent Risks'}
+                </p>
+              </div>
               <Link href="/assessment">
                 <Button variant="ghost" size="sm" className="text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20" rightIcon={<ChevronRight className="h-4 w-4" />}>
                   {isAr ? 'عرض التفاصيل' : 'View Details'}

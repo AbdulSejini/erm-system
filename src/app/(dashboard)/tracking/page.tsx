@@ -934,6 +934,31 @@ export default function RiskTrackingPage() {
                 <Zap className="h-4 w-4 text-amber-500" />
                 {isAr ? 'إجراءات سريعة' : 'Quick Actions'}
               </h3>
+
+              {/* Primary Actions */}
+              <div className="space-y-2 mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 justify-start text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/20"
+                  onClick={() => window.open(`/risks/${selectedRisk.id}`, '_blank')}
+                >
+                  <Eye className="h-4 w-4" />
+                  {isAr ? 'عرض الخطر كاملاً' : 'View Full Risk'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 justify-start text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/20"
+                  onClick={() => window.open(`/treatment?riskId=${selectedRisk.id}`, '_blank')}
+                >
+                  <FileText className="h-4 w-4" />
+                  {isAr ? 'إدارة خطط المعالجة' : 'Manage Treatment Plans'}
+                </Button>
+              </div>
+
+              {/* Status Actions */}
+              <p className="text-xs text-[var(--foreground-secondary)] mb-2">{isAr ? 'تحديث الحالة:' : 'Update Status:'}</p>
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant={selectedRisk.status === 'inProgress' ? 'primary' : 'outline'}
