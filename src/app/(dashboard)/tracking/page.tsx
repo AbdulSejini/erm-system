@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Textarea } from '@/components/ui/Textarea';
 import {
   AlertTriangle,
   Building2,
@@ -937,7 +936,7 @@ export default function RiskTrackingPage() {
               </h3>
               <div className="grid grid-cols-2 gap-2">
                 <Button
-                  variant={selectedRisk.status === 'inProgress' ? 'default' : 'outline'}
+                  variant={selectedRisk.status === 'inProgress' ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => updateRiskStatus('inProgress')}
                   disabled={isSaving || selectedRisk.status === 'inProgress'}
@@ -947,7 +946,7 @@ export default function RiskTrackingPage() {
                   {isAr ? 'بدء العمل' : 'Start'}
                 </Button>
                 <Button
-                  variant={selectedRisk.status === 'mitigated' ? 'default' : 'outline'}
+                  variant={selectedRisk.status === 'mitigated' ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => updateRiskStatus('mitigated')}
                   disabled={isSaving || selectedRisk.status === 'mitigated'}
@@ -957,7 +956,7 @@ export default function RiskTrackingPage() {
                   {isAr ? 'تم التخفيف' : 'Mitigated'}
                 </Button>
                 <Button
-                  variant={selectedRisk.status === 'accepted' ? 'default' : 'outline'}
+                  variant={selectedRisk.status === 'accepted' ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => updateRiskStatus('accepted')}
                   disabled={isSaving || selectedRisk.status === 'accepted'}
@@ -967,7 +966,7 @@ export default function RiskTrackingPage() {
                   {isAr ? 'قبول' : 'Accept'}
                 </Button>
                 <Button
-                  variant={selectedRisk.status === 'closed' ? 'default' : 'outline'}
+                  variant={selectedRisk.status === 'closed' ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => updateRiskStatus('closed')}
                   disabled={isSaving || selectedRisk.status === 'closed'}
