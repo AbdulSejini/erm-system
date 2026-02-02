@@ -338,7 +338,7 @@ export default function TreatmentPage() {
   // Form states - محسّن مع حقول إضافية للمهام وإعادة تقييم الخطر المتبقي
   const [formData, setFormData] = useState({
     riskId: '',
-    strategy: '' as TreatmentStrategy | '',
+    strategy: 'reduce' as TreatmentStrategy | '',
     titleAr: '',
     titleEn: '',
     responsibleId: '',
@@ -506,7 +506,7 @@ export default function TreatmentPage() {
   const resetForm = useCallback(() => {
     setFormData({
       riskId: '',
-      strategy: '',
+      strategy: 'reduce',
       titleAr: '',
       titleEn: '',
       responsibleId: '',
@@ -537,7 +537,13 @@ export default function TreatmentPage() {
   }, []);
 
   const handleSave = async () => {
-    if (!formData.riskId || !formData.strategy || !formData.responsibleId) return;
+    console.log('handleSave called with formData:', { riskId: formData.riskId, strategy: formData.strategy, responsibleId: formData.responsibleId, dueDate: formData.dueDate });
+
+    if (!formData.riskId || !formData.strategy || !formData.responsibleId) {
+      console.error('Missing required fields:', { riskId: formData.riskId, strategy: formData.strategy, responsibleId: formData.responsibleId });
+      alert(`حقول مطلوبة مفقودة: ${!formData.riskId ? 'الخطر، ' : ''}${!formData.strategy ? 'الاستراتيجية، ' : ''}${!formData.responsibleId ? 'المسؤول' : ''}`);
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -551,6 +557,8 @@ export default function TreatmentPage() {
                                   expectedResidualScore >= 10 ? 'Moderate' :
                                   expectedResidualScore >= 5 ? 'Minor' : 'Negligible';
       }
+
+      console.log('Sending POST request to:', `/api/risks/${formData.riskId}/treatments`);
 
       const response = await fetch(`/api/risks/${formData.riskId}/treatments`, {
         method: 'POST',
@@ -577,8 +585,11 @@ export default function TreatmentPage() {
         }),
       });
 
+      console.log('Response status:', response.status, response.ok);
+
       if (response.ok) {
         const result = await response.json();
+        console.log('Treatment created successfully:', result);
 
         // Create tasks if any
         if (formData.tasks.length > 0 && result.data?.id) {
@@ -600,14 +611,22 @@ export default function TreatmentPage() {
 
         closeAddModal();
         // Refresh data
+        console.log('Refreshing risks data...');
         const risksRes = await fetch('/api/risks?includeTreatments=true');
+        console.log('Risks refresh response:', risksRes.status, risksRes.ok);
         if (risksRes.ok) {
           const data = await risksRes.json();
+          console.log('Risks data received:', data.data?.length, 'risks, treatments:', data.data?.filter((r: { treatmentPlans?: unknown[] }) => r.treatmentPlans && r.treatmentPlans.length > 0).length);
           setRisks(data.data || []);
         }
+      } else {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        alert(`فشل في حفظ خطة المعالجة: ${errorData.error || 'خطأ غير معروف'}`);
       }
     } catch (error) {
       console.error('Error saving treatment:', error);
+      alert(`حدث خطأ أثناء الحفظ: ${error}`);
     } finally {
       setIsSaving(false);
     }
@@ -1147,8 +1166,10 @@ export default function TreatmentPage() {
 
                   {/* Responsible */}
                   <div>
-                    <label className="block text-sm font-medium mb-2">{isAr ? 'المسؤول' : 'Responsible'}</label>
+                    <label htmlFor="treatment-responsible" className="block text-sm font-medium mb-2">{isAr ? 'المسؤول' : 'Responsible'}</label>
                     <select
+                      id="treatment-responsible"
+                      name="responsibleId"
                       value={formData.responsibleId}
                       onChange={(e) => setFormData((prev) => ({ ...prev, responsibleId: e.target.value }))}
                       className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
@@ -1189,16 +1210,20 @@ export default function TreatmentPage() {
                   {/* Dates */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium mb-2">{isAr ? 'تاريخ البدء' : 'Start Date'}</label>
+                      <label htmlFor="treatment-start-date" className="block text-sm font-medium mb-2">{isAr ? 'تاريخ البدء' : 'Start Date'}</label>
                       <Input
+                        id="treatment-start-date"
+                        name="startDate"
                         type="date"
                         value={formData.startDate}
                         onChange={(e) => setFormData((prev) => ({ ...prev, startDate: e.target.value }))}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">{isAr ? 'تاريخ الانتهاء' : 'Due Date'}</label>
+                      <label htmlFor="treatment-due-date" className="block text-sm font-medium mb-2">{isAr ? 'تاريخ الانتهاء' : 'Due Date'}</label>
                       <Input
+                        id="treatment-due-date"
+                        name="dueDate"
                         type="date"
                         value={formData.dueDate}
                         onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
@@ -1209,8 +1234,10 @@ export default function TreatmentPage() {
                   {/* إعادة تقييم الخطر المتبقي - Residual Risk Re-assessment */}
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-3 mb-3">
-                      <label className="flex items-center gap-2 cursor-pointer">
+                      <label htmlFor="treatment-update-residual" className="flex items-center gap-2 cursor-pointer">
                         <input
+                          id="treatment-update-residual"
+                          name="updateResidualRisk"
                           type="checkbox"
                           checked={formData.updateResidualRisk}
                           onChange={(e) => setFormData((prev) => ({
@@ -1410,8 +1437,10 @@ export default function TreatmentPage() {
                           {/* Task Title */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}</label>
+                              <label htmlFor={`task-title-ar-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}</label>
                               <Input
+                                id={`task-title-ar-${index}`}
+                                name={`task-title-ar-${index}`}
                                 placeholder={isAr ? 'مثال: مراجعة السياسات الداخلية' : 'e.g., Review internal policies'}
                                 value={task.titleAr}
                                 onChange={(e) => updateTask(index, 'titleAr', e.target.value)}
@@ -1419,8 +1448,10 @@ export default function TreatmentPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'العنوان (إنجليزي)' : 'Title (English)'}</label>
+                              <label htmlFor={`task-title-en-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'العنوان (إنجليزي)' : 'Title (English)'}</label>
                               <Input
+                                id={`task-title-en-${index}`}
+                                name={`task-title-en-${index}`}
                                 placeholder={isAr ? 'مثال: Review internal policies' : 'e.g., Review internal policies'}
                                 value={task.titleEn}
                                 onChange={(e) => updateTask(index, 'titleEn', e.target.value)}
@@ -1433,8 +1464,10 @@ export default function TreatmentPage() {
                           <div className="grid grid-cols-3 gap-3 mb-3">
                             {/* Priority */}
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الأولوية' : 'Priority'}</label>
+                              <label htmlFor={`task-priority-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الأولوية' : 'Priority'}</label>
                               <select
+                                id={`task-priority-${index}`}
+                                name={`task-priority-${index}`}
                                 value={task.priority || 'medium'}
                                 onChange={(e) => updateTask(index, 'priority', e.target.value)}
                                 className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200]"
@@ -1447,8 +1480,10 @@ export default function TreatmentPage() {
 
                             {/* Due Date */}
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
+                              <label htmlFor={`task-due-date-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
                               <Input
+                                id={`task-due-date-${index}`}
+                                name={`task-due-date-${index}`}
                                 type="date"
                                 value={task.dueDate}
                                 onChange={(e) => updateTask(index, 'dueDate', e.target.value)}
@@ -1458,8 +1493,10 @@ export default function TreatmentPage() {
 
                             {/* Status */}
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الحالة' : 'Status'}</label>
+                              <label htmlFor={`task-status-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الحالة' : 'Status'}</label>
                               <select
+                                id={`task-status-${index}`}
+                                name={`task-status-${index}`}
                                 value={task.status || 'notStarted'}
                                 onChange={(e) => updateTask(index, 'status', e.target.value)}
                                 className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200]"
@@ -1475,8 +1512,10 @@ export default function TreatmentPage() {
                           <div className="grid grid-cols-2 gap-3">
                             {/* Assigned To - المكلف */}
                             <div className="relative">
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المكلف' : 'Assigned To'}</label>
+                              <label htmlFor={`task-assigned-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المكلف' : 'Assigned To'}</label>
                               <input
+                                id={`task-assigned-${index}`}
+                                name={`task-assigned-${index}`}
                                 type="text"
                                 value={assignedToSearch[index] !== undefined ? assignedToSearch[index] : (riskOwnersList.find(o => o.id === task.assignedTo)?.[isAr ? 'nameAr' : 'nameEn'] || '')}
                                 onChange={(e) => {
@@ -1522,8 +1561,10 @@ export default function TreatmentPage() {
 
                             {/* Followed By - المتابعة */}
                             <div className="relative">
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المتابعة' : 'Followed By'}</label>
+                              <label htmlFor={`task-followed-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المتابعة' : 'Followed By'}</label>
                               <input
+                                id={`task-followed-${index}`}
+                                name={`task-followed-${index}`}
                                 type="text"
                                 value={followedBySearch[index] !== undefined ? followedBySearch[index] : (riskOwnersList.find(o => o.id === task.followedBy)?.[isAr ? 'nameAr' : 'nameEn'] || '')}
                                 onChange={(e) => {
