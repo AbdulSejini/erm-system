@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useTransition, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -299,9 +299,14 @@ const ratingColors: Record<RiskRating, string> = {
 
 export default function TreatmentPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
   const [isPending, startTransition] = useTransition();
+
+  // URL params for pre-selecting risk
+  const preselectedRiskId = searchParams.get('riskId');
+  const autoOpen = searchParams.get('action') === 'add';
 
   // Core data states
   const [risks, setRisks] = useState<APIRisk[]>([]);
@@ -540,6 +545,24 @@ export default function TreatmentPage() {
     setSelectedTreatment(treatment);
     setShowViewModal(true);
   }, []);
+
+  // Open modal automatically if URL params specify
+  useEffect(() => {
+    if (autoOpen && !loading && risks.length > 0) {
+      // فتح النموذج تلقائياً
+      if (preselectedRiskId) {
+        // التحقق من وجود الخطر
+        const riskExists = risks.some(r => r.id === preselectedRiskId);
+        if (riskExists) {
+          setFormData(prev => ({ ...prev, riskId: preselectedRiskId }));
+        }
+      }
+      setShowAddModal(true);
+      // مسح الـ params من URL بدون إعادة تحميل
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [autoOpen, preselectedRiskId, loading, risks]);
 
   const handleSave = async () => {
     console.log('handleSave called with formData:', { riskId: formData.riskId, strategy: formData.strategy, responsibleId: formData.responsibleId, dueDate: formData.dueDate });

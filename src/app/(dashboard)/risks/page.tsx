@@ -54,7 +54,6 @@ import {
   ArrowDown,
   SortAsc,
   SortDesc,
-  Check,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { RiskDiscussion } from '@/components/RiskDiscussion';
@@ -675,21 +674,6 @@ export default function RisksPage() {
   const [modalIncidentsLoading, setModalIncidentsLoading] = useState(false);
   const [riskOwners, setRiskOwners] = useState<{ id: string; fullName: string; fullNameEn: string | null }[]>([]);
 
-  // Quick treatment form state (إضافة خطة معالجة سريعة من نافذة تفاصيل الخطر)
-  const [showQuickTreatmentForm, setShowQuickTreatmentForm] = useState(false);
-  const [quickTreatmentSaving, setQuickTreatmentSaving] = useState(false);
-  const [quickTreatmentForm, setQuickTreatmentForm] = useState({
-    strategy: 'reduce' as 'avoid' | 'reduce' | 'transfer' | 'accept',
-    titleAr: '',
-    titleEn: '',
-    responsibleId: '',
-    priority: 'medium' as 'high' | 'medium' | 'low',
-    startDate: new Date().toISOString().split('T')[0],
-    dueDate: '',
-    justificationAr: '',
-    justificationEn: '',
-  });
-  const [users, setUsers] = useState<{ id: string; fullName: string; fullNameEn: string | null }[]>([]);
 
   // Residual risk values reference (للعرض فقط - الخطر المتبقي لا يمكن تعديله من هنا)
 
@@ -961,87 +945,6 @@ export default function RisksPage() {
     fetchChangeLogs();
   }, [viewModalTab, selectedRisk]);
 
-  // Fetch users for quick treatment form (lazy load)
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!showQuickTreatmentForm || users.length > 0) return;
-      try {
-        const response = await fetch('/api/users');
-        const result = await response.json();
-        if (result.success) {
-          setUsers(result.data || []);
-        }
-      } catch (err) {
-        console.error('Error fetching users:', err);
-      }
-    };
-    fetchUsers();
-  }, [showQuickTreatmentForm, users.length]);
-
-  // Reset quick treatment form when closing
-  const resetQuickTreatmentForm = () => {
-    setQuickTreatmentForm({
-      strategy: 'reduce',
-      titleAr: '',
-      titleEn: '',
-      responsibleId: '',
-      priority: 'medium',
-      startDate: new Date().toISOString().split('T')[0],
-      dueDate: '',
-      justificationAr: '',
-      justificationEn: '',
-    });
-    setShowQuickTreatmentForm(false);
-  };
-
-  // Save quick treatment plan
-  const saveQuickTreatment = async () => {
-    if (!selectedRisk || !quickTreatmentForm.responsibleId || !quickTreatmentForm.dueDate) {
-      alert(isAr ? 'يرجى تعبئة الحقول المطلوبة (المسؤول وتاريخ الانتهاء)' : 'Please fill required fields (Responsible and Due Date)');
-      return;
-    }
-
-    setQuickTreatmentSaving(true);
-    try {
-      const response = await fetch(`/api/risks/${selectedRisk.id}/treatments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          titleAr: quickTreatmentForm.titleAr || `خطة معالجة - ${selectedRisk.riskNumber}`,
-          titleEn: quickTreatmentForm.titleEn || `Treatment Plan - ${selectedRisk.riskNumber}`,
-          descriptionAr: quickTreatmentForm.justificationAr || '',
-          descriptionEn: quickTreatmentForm.justificationEn || '',
-          strategy: quickTreatmentForm.strategy,
-          status: 'notStarted',
-          priority: quickTreatmentForm.priority,
-          responsibleId: quickTreatmentForm.responsibleId,
-          startDate: quickTreatmentForm.startDate,
-          dueDate: quickTreatmentForm.dueDate,
-          progress: 0,
-          justificationAr: quickTreatmentForm.justificationAr || null,
-          justificationEn: quickTreatmentForm.justificationEn || null,
-        }),
-      });
-
-      if (response.ok) {
-        // Refresh treatments list
-        const treatmentsRes = await fetch(`/api/risks/${selectedRisk.id}/treatments`);
-        const treatmentsResult = await treatmentsRes.json();
-        if (treatmentsResult.success) {
-          setModalTreatments(treatmentsResult.data);
-        }
-        resetQuickTreatmentForm();
-      } else {
-        const errorData = await response.json();
-        alert(errorData.error || (isAr ? 'حدث خطأ أثناء حفظ خطة المعالجة' : 'Error saving treatment plan'));
-      }
-    } catch (err) {
-      console.error('Error saving quick treatment:', err);
-      alert(isAr ? 'حدث خطأ أثناء حفظ خطة المعالجة' : 'Error saving treatment plan');
-    } finally {
-      setQuickTreatmentSaving(false);
-    }
-  };
 
   // Fetch treatments when treatments tab is selected
   useEffect(() => {
@@ -2773,189 +2676,33 @@ export default function RisksPage() {
               ) : viewModalTab === 'treatments' ? (
                 /* Treatments Tab */
                 <div className="py-2">
-                  {/* Quick Add Treatment Button/Form */}
-                  {!showQuickTreatmentForm ? (
-                    <div className="mb-4">
-                      <Button
-                        size="sm"
-                        onClick={() => setShowQuickTreatmentForm(true)}
-                        className="w-full border-2 border-dashed border-[var(--primary)] bg-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10"
-                      >
-                        <Plus className="h-4 w-4 me-2" />
-                        {isAr ? 'إضافة خطة معالجة جديدة' : 'Add New Treatment Plan'}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="mb-4 p-4 border border-[var(--primary)] rounded-lg bg-[var(--background-secondary)]">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-sm text-[var(--foreground)] flex items-center gap-2">
-                          <Plus className="h-4 w-4 text-[var(--primary)]" />
-                          {isAr ? 'إضافة خطة معالجة سريعة' : 'Quick Add Treatment Plan'}
-                        </h4>
-                        <button
-                          onClick={resetQuickTreatmentForm}
-                          className="text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      <div className="space-y-3">
-                        {/* Strategy Selection */}
-                        <div>
-                          <label className="block text-xs font-medium mb-1.5 text-[var(--foreground-secondary)]">
-                            {isAr ? 'الاستراتيجية' : 'Strategy'} *
-                          </label>
-                          <div className="grid grid-cols-4 gap-1">
-                            {(['avoid', 'reduce', 'transfer', 'accept'] as const).map((s) => (
-                              <button
-                                key={s}
-                                onClick={() => setQuickTreatmentForm(prev => ({ ...prev, strategy: s }))}
-                                className={`py-1.5 px-2 text-xs rounded border transition-all ${
-                                  quickTreatmentForm.strategy === s
-                                    ? s === 'avoid' ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20'
-                                    : s === 'reduce' ? 'border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/20'
-                                    : s === 'transfer' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20'
-                                    : 'border-gray-500 bg-gray-50 text-gray-700 dark:bg-gray-900/20'
-                                    : 'border-[var(--border)] hover:border-[var(--primary)]/50'
-                                }`}
-                              >
-                                {s === 'avoid' ? (isAr ? 'تجنب' : 'Avoid')
-                                : s === 'reduce' ? (isAr ? 'تقليل' : 'Reduce')
-                                : s === 'transfer' ? (isAr ? 'نقل' : 'Transfer')
-                                : (isAr ? 'قبول' : 'Accept')}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Responsible */}
-                        <div>
-                          <label className="block text-xs font-medium mb-1.5 text-[var(--foreground-secondary)]">
-                            {isAr ? 'المسؤول' : 'Responsible'} *
-                          </label>
-                          <select
-                            value={quickTreatmentForm.responsibleId}
-                            onChange={(e) => setQuickTreatmentForm(prev => ({ ...prev, responsibleId: e.target.value }))}
-                            className="w-full px-2 py-1.5 text-sm rounded border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-                          >
-                            <option value="">{isAr ? 'اختر المسؤول' : 'Select Responsible'}</option>
-                            {users.map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {isAr ? u.fullName : (u.fullNameEn || u.fullName)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Priority */}
-                        <div>
-                          <label className="block text-xs font-medium mb-1.5 text-[var(--foreground-secondary)]">
-                            {isAr ? 'الأولوية' : 'Priority'}
-                          </label>
-                          <div className="flex gap-1">
-                            {(['high', 'medium', 'low'] as const).map((p) => (
-                              <button
-                                key={p}
-                                onClick={() => setQuickTreatmentForm(prev => ({ ...prev, priority: p }))}
-                                className={`flex-1 py-1.5 text-xs rounded border transition-all ${
-                                  quickTreatmentForm.priority === p
-                                    ? p === 'high' ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20'
-                                    : p === 'medium' ? 'border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/20'
-                                    : 'border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20'
-                                    : 'border-[var(--border)]'
-                                }`}
-                              >
-                                {p === 'high' ? (isAr ? 'عالية' : 'High')
-                                : p === 'medium' ? (isAr ? 'متوسطة' : 'Medium')
-                                : (isAr ? 'منخفضة' : 'Low')}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Dates */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs font-medium mb-1.5 text-[var(--foreground-secondary)]">
-                              {isAr ? 'تاريخ البدء' : 'Start Date'}
-                            </label>
-                            <input
-                              type="date"
-                              value={quickTreatmentForm.startDate}
-                              onChange={(e) => setQuickTreatmentForm(prev => ({ ...prev, startDate: e.target.value }))}
-                              className="w-full px-2 py-1.5 text-sm rounded border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium mb-1.5 text-[var(--foreground-secondary)]">
-                              {isAr ? 'تاريخ الانتهاء' : 'Due Date'} *
-                            </label>
-                            <input
-                              type="date"
-                              value={quickTreatmentForm.dueDate}
-                              onChange={(e) => setQuickTreatmentForm(prev => ({ ...prev, dueDate: e.target.value }))}
-                              className="w-full px-2 py-1.5 text-sm rounded border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Justification */}
-                        <div>
-                          <label className="block text-xs font-medium mb-1.5 text-[var(--foreground-secondary)]">
-                            {isAr ? 'التعليق / التبرير' : 'Justification / Comment'}
-                          </label>
-                          <textarea
-                            value={quickTreatmentForm.justificationAr}
-                            onChange={(e) => setQuickTreatmentForm(prev => ({ ...prev, justificationAr: e.target.value }))}
-                            dir="rtl"
-                            rows={2}
-                            placeholder={isAr ? 'أدخل تبرير خطة المعالجة...' : 'Enter treatment justification...'}
-                            className="w-full px-2 py-1.5 text-sm rounded border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] resize-none"
-                          />
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={resetQuickTreatmentForm}
-                            className="flex-1"
-                          >
-                            {isAr ? 'إلغاء' : 'Cancel'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={saveQuickTreatment}
-                            disabled={quickTreatmentSaving || !quickTreatmentForm.responsibleId || !quickTreatmentForm.dueDate}
-                            className="flex-1"
-                          >
-                            {quickTreatmentSaving ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Check className="h-4 w-4 me-1" />
-                                {isAr ? 'حفظ' : 'Save'}
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {/* Add Treatment Button - redirects to treatment page */}
+                  <div className="mb-4">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (selectedRisk) {
+                          router.push(`/treatment?riskId=${selectedRisk.id}&action=add`);
+                        }
+                      }}
+                      className="w-full border-2 border-dashed border-[var(--primary)] bg-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10"
+                    >
+                      <Plus className="h-4 w-4 me-2" />
+                      {isAr ? 'إضافة خطة معالجة جديدة' : 'Add New Treatment Plan'}
+                    </Button>
+                  </div>
 
                   {modalTreatmentsLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
                     </div>
-                  ) : modalTreatments.length === 0 && !showQuickTreatmentForm ? (
+                  ) : modalTreatments.length === 0 ? (
                     <div className="text-center py-8 text-[var(--foreground-muted)]">
                       <ClipboardList className="h-12 w-12 mx-auto mb-2 opacity-50" />
                       <p>{isAr ? 'لا توجد خطط معالجة' : 'No treatment plans'}</p>
                       <p className="text-xs mt-1">{isAr ? 'انقر على الزر أعلاه لإضافة خطة معالجة' : 'Click the button above to add a treatment plan'}</p>
                     </div>
-                  ) : modalTreatments.length === 0 ? null : (
+                  ) : (
                     <div className="space-y-4">
                       {modalTreatments.map((plan, index) => (
                         <div key={plan.id} className="border border-[var(--border)] rounded-lg overflow-hidden">
