@@ -197,9 +197,11 @@ NEXTAUTH_URL=http://localhost:3000
    - Title in Arabic OR English (at least one required)
    - Task Description (required)
 3. **OneDrive Attachments for Tasks**:
-   - Upload files from OneDrive/SharePoint
-   - Validates sharing with Saudi Cables Company (sceco.com.sa)
-   - Shows error message with solution if not shared properly
+   - Manual URL paste method (no OAuth/Admin consent required)
+   - User copies share link from OneDrive/SharePoint and pastes it
+   - Validates that URL is from OneDrive/SharePoint domains
+   - Shows instructions for proper sharing with organization
+   - Supports: saudicable.sharepoint.com, saudicable-my.sharepoint.com, sceco domains
 
 ### Residual Risk Governance
 1. **Treatment Plan Justification**: Added `justificationAr`/`justificationEn` fields to treatment plans for documenting reasons
