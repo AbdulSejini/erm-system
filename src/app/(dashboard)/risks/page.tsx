@@ -1301,10 +1301,83 @@ export default function RisksPage() {
     return t(`risks.statuses.${statusCode}`);
   };
 
-  const handleSaveRisk = (data: unknown) => {
-    console.log('Saving risk:', data);
-    setShowWizard(false);
-    // Here you would typically save to database
+  const handleSaveRisk = async (data: unknown) => {
+    try {
+      // أولاً: إنشاء الخطر في قاعدة البيانات
+      const riskData = data as {
+        titleAr: string;
+        titleEn: string;
+        descriptionAr: string;
+        descriptionEn: string;
+        issuedBy: string;
+        categoryId: string;
+        departmentId: string;
+        processText: string;
+        subProcessText: string;
+        potentialCauseAr: string;
+        potentialCauseEn: string;
+        potentialImpactAr: string;
+        potentialImpactEn: string;
+        inherentLikelihood: number;
+        inherentImpact: number;
+        existingControlsAr: string;
+        existingControlsEn: string;
+        mitigationActionsAr: string;
+        mitigationActionsEn: string;
+        riskOwnerId: string;
+        championId: string;
+        complianceRequired: boolean;
+        complianceNoteAr: string;
+      };
+
+      // توليد رقم خطر تلقائي
+      const riskNumber = `${riskData.categoryId}-R-${String(Date.now()).slice(-4)}`;
+
+      const response = await fetch('/api/risks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...riskData,
+          riskNumber,
+          layersOfProtectionAr: riskData.existingControlsAr,
+          layersOfProtectionEn: riskData.existingControlsEn,
+          ownerId: riskData.riskOwnerId, // للتوافق مع API الحالي
+          status: 'open',
+          approvalStatus: 'Draft',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'فشل في إنشاء الخطر');
+      }
+
+      const result = await response.json();
+      const createdRisk = result.data;
+
+      // ثانياً: إرسال طلب الاعتماد لمدير المخاطر
+      const approvalResponse = await fetch('/api/risk-approval-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          riskId: createdRisk.id,
+        }),
+      });
+
+      if (!approvalResponse.ok) {
+        console.error('فشل في إرسال طلب الاعتماد');
+      }
+
+      // إغلاق المعالج وتحديث القائمة
+      setShowWizard(false);
+      fetchRisks();
+
+      // عرض رسالة نجاح
+      alert(isAr ? 'تم إرسال الخطر لمدير المخاطر للاعتماد' : 'Risk sent to Risk Manager for approval');
+    } catch (error) {
+      console.error('Error saving risk:', error);
+      alert(isAr ? 'فشل في إنشاء الخطر' : 'Failed to create risk');
+    }
   };
 
   // Handle View Risk

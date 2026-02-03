@@ -59,6 +59,7 @@
   "navigation": {
     "dashboard": "لوحة المعلومات",
     "risks": "سجل المخاطر",
+    "riskApprovals": "اعتمادات المخاطر",
     "assessment": "تقييم المخاطر",
     "treatment": "خطط المعالجة",
     "treatmentMonitoring": "متابعة المعالجة",

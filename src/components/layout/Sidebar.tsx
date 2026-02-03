@@ -23,6 +23,7 @@ import {
   Target,
   Circle,
   Activity,
+  CheckSquare,
 } from 'lucide-react';
 
 interface OnlineUser {
@@ -55,6 +56,11 @@ const navItems: NavItem[] = [
     href: '/risks',
     labelKey: 'navigation.risks',
     icon: AlertTriangle,
+  },
+  {
+    href: '/risk-approvals',
+    labelKey: 'navigation.riskApprovals',
+    icon: CheckSquare,
   },
   {
     href: '/assessment',

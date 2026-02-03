@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -12,10 +12,11 @@ import {
   ChevronRight,
   Check,
   AlertCircle,
-  Info,
   HelpCircle,
   Lightbulb,
   X,
+  Send,
+  Loader2,
 } from 'lucide-react';
 import {
   calculateRiskScore,
@@ -24,8 +25,30 @@ import {
   DEFAULT_RISK_CATEGORIES,
   DEFAULT_LIKELIHOOD_CRITERIA,
   DEFAULT_IMPACT_CRITERIA,
-  type RiskRating,
 } from '@/types';
+
+// Types for data from database
+interface Department {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  code: string;
+}
+
+interface RiskOwnerType {
+  id: string;
+  fullName: string;
+  fullNameEn?: string;
+  email?: string;
+  departmentId?: string;
+}
+
+interface User {
+  id: string;
+  fullName: string;
+  fullNameEn?: string;
+  role: string;
+}
 
 interface RiskFormData {
   // Step 1: Basic Info
@@ -38,8 +61,8 @@ interface RiskFormData {
   // Step 2: Classification
   categoryId: string;
   departmentId: string;
-  processId: string;
-  subProcessId: string;
+  processText: string;      // العملية كنص حر
+  subProcessText: string;   // العملية الفرعية كنص حر
 
   // Step 3: Causes & Impacts
   potentialCauseAr: string;
@@ -52,8 +75,8 @@ interface RiskFormData {
   inherentImpact: number;
 
   // Step 5: Controls & Treatment
-  layersOfProtectionAr: string;
-  layersOfProtectionEn: string;
+  existingControlsAr: string;  // الضوابط الحالية (بدلاً من طبقات الحماية)
+  existingControlsEn: string;
   krisAr: string;
   krisEn: string;
   mitigationActionsAr: string;
@@ -63,8 +86,8 @@ interface RiskFormData {
   complianceNoteEn: string;
 
   // Responsible
-  ownerId: string;
-  championId: string;
+  riskOwnerId: string;   // مالك الخطر من جدول RiskOwner
+  championId: string;    // رائد المخاطر (يجب أن يكون دوره riskChampion)
 }
 
 const initialFormData: RiskFormData = {
@@ -75,16 +98,16 @@ const initialFormData: RiskFormData = {
   issuedBy: 'Internal',
   categoryId: '',
   departmentId: '',
-  processId: '',
-  subProcessId: '',
+  processText: '',
+  subProcessText: '',
   potentialCauseAr: '',
   potentialCauseEn: '',
   potentialImpactAr: '',
   potentialImpactEn: '',
   inherentLikelihood: 3,
   inherentImpact: 3,
-  layersOfProtectionAr: '',
-  layersOfProtectionEn: '',
+  existingControlsAr: '',
+  existingControlsEn: '',
   krisAr: '',
   krisEn: '',
   mitigationActionsAr: '',
@@ -92,130 +115,14 @@ const initialFormData: RiskFormData = {
   complianceRequired: false,
   complianceNoteAr: '',
   complianceNoteEn: '',
-  ownerId: '',
+  riskOwnerId: '',
   championId: '',
 };
 
-// Mock data for departments and processes
-const mockDepartments = [
-  { id: '1', nameAr: 'المالية', nameEn: 'Finance', code: 'FIN' },
-  { id: '2', nameAr: 'العمليات', nameEn: 'Operations', code: 'OPS' },
-  { id: '3', nameAr: 'تقنية المعلومات', nameEn: 'IT', code: 'IT' },
-  { id: '4', nameAr: 'سلسلة التوريد', nameEn: 'Supply Chain', code: 'SC' },
-  { id: '5', nameAr: 'السلامة والبيئة', nameEn: 'HSE', code: 'HSE' },
-  { id: '6', nameAr: 'الموارد البشرية', nameEn: 'Human Resources', code: 'HR' },
-];
-
-const mockProcesses: Record<string, Array<{ id: string; nameAr: string; nameEn: string; code: string }>> = {
-  '1': [
-    { id: 'p1', nameAr: 'المحاسبة', nameEn: 'Accounting', code: 'ACC' },
-    { id: 'p2', nameAr: 'الخزينة', nameEn: 'Treasury', code: 'TRS' },
-    { id: 'p3', nameAr: 'التقارير المالية', nameEn: 'Financial Reporting', code: 'FRP' },
-  ],
-  '2': [
-    { id: 'p4', nameAr: 'الإنتاج', nameEn: 'Production', code: 'PRD' },
-    { id: 'p5', nameAr: 'الصيانة', nameEn: 'Maintenance', code: 'MNT' },
-    { id: 'p6', nameAr: 'الجودة', nameEn: 'Quality', code: 'QA' },
-  ],
-  '3': [
-    { id: 'p7', nameAr: 'البنية التحتية', nameEn: 'Infrastructure', code: 'INF' },
-    { id: 'p8', nameAr: 'الأمن السيبراني', nameEn: 'Cybersecurity', code: 'SEC' },
-    { id: 'p9', nameAr: 'تطوير الأنظمة', nameEn: 'System Development', code: 'DEV' },
-  ],
-  '4': [
-    { id: 'p10', nameAr: 'المشتريات', nameEn: 'Procurement', code: 'PRC' },
-    { id: 'p11', nameAr: 'المخازن', nameEn: 'Warehousing', code: 'WHS' },
-    { id: 'p12', nameAr: 'اللوجستيات', nameEn: 'Logistics', code: 'LOG' },
-  ],
-  '5': [
-    { id: 'p13', nameAr: 'السلامة المهنية', nameEn: 'Occupational Safety', code: 'OSH' },
-    { id: 'p14', nameAr: 'البيئة', nameEn: 'Environment', code: 'ENV' },
-  ],
-  '6': [
-    { id: 'p15', nameAr: 'التوظيف', nameEn: 'Recruitment', code: 'REC' },
-    { id: 'p16', nameAr: 'التدريب', nameEn: 'Training', code: 'TRN' },
-  ],
-};
-
-// العمليات الفرعية حسب العملية
-const mockSubProcesses: Record<string, Array<{ id: string; nameAr: string; nameEn: string; code: string }>> = {
-  'p1': [ // المحاسبة
-    { id: 'sp1', nameAr: 'الحسابات الدائنة', nameEn: 'Accounts Payable', code: 'AP' },
-    { id: 'sp2', nameAr: 'الحسابات المدينة', nameEn: 'Accounts Receivable', code: 'AR' },
-  ],
-  'p2': [ // الخزينة
-    { id: 'sp3', nameAr: 'إدارة النقد', nameEn: 'Cash Management', code: 'CM' },
-    { id: 'sp4', nameAr: 'التحويلات', nameEn: 'Transfers', code: 'TRF' },
-  ],
-  'p3': [ // التقارير المالية
-    { id: 'sp5', nameAr: 'التقارير الشهرية', nameEn: 'Monthly Reports', code: 'MR' },
-    { id: 'sp6', nameAr: 'التقارير السنوية', nameEn: 'Annual Reports', code: 'AR' },
-  ],
-  'p4': [ // الإنتاج
-    { id: 'sp7', nameAr: 'تخطيط الإنتاج', nameEn: 'Production Planning', code: 'PP' },
-    { id: 'sp8', nameAr: 'مراقبة الإنتاج', nameEn: 'Production Control', code: 'PC' },
-  ],
-  'p5': [ // الصيانة
-    { id: 'sp9', nameAr: 'الصيانة الوقائية', nameEn: 'Preventive Maintenance', code: 'PM' },
-    { id: 'sp10', nameAr: 'الصيانة التصحيحية', nameEn: 'Corrective Maintenance', code: 'CM' },
-  ],
-  'p6': [ // الجودة
-    { id: 'sp11', nameAr: 'ضبط الجودة', nameEn: 'Quality Control', code: 'QC' },
-    { id: 'sp12', nameAr: 'ضمان الجودة', nameEn: 'Quality Assurance', code: 'QA' },
-  ],
-  'p7': [ // البنية التحتية
-    { id: 'sp13', nameAr: 'الشبكات', nameEn: 'Networks', code: 'NET' },
-    { id: 'sp14', nameAr: 'الخوادم', nameEn: 'Servers', code: 'SRV' },
-  ],
-  'p8': [ // الأمن السيبراني
-    { id: 'sp15', nameAr: 'أمن المعلومات', nameEn: 'Information Security', code: 'IS' },
-    { id: 'sp16', nameAr: 'إدارة الثغرات', nameEn: 'Vulnerability Management', code: 'VM' },
-  ],
-  'p9': [ // تطوير الأنظمة
-    { id: 'sp17', nameAr: 'تحليل الأعمال', nameEn: 'Business Analysis', code: 'BA' },
-    { id: 'sp18', nameAr: 'البرمجة', nameEn: 'Development', code: 'DEV' },
-  ],
-  'p10': [ // المشتريات
-    { id: 'sp19', nameAr: 'إدارة الموردين', nameEn: 'Supplier Management', code: 'SM' },
-    { id: 'sp20', nameAr: 'إدارة العقود', nameEn: 'Contract Management', code: 'CTM' },
-  ],
-  'p11': [ // المخازن
-    { id: 'sp21', nameAr: 'استلام المواد', nameEn: 'Material Receipt', code: 'MR' },
-    { id: 'sp22', nameAr: 'صرف المواد', nameEn: 'Material Issuance', code: 'MI' },
-  ],
-  'p12': [ // اللوجستيات
-    { id: 'sp23', nameAr: 'النقل', nameEn: 'Transportation', code: 'TRP' },
-    { id: 'sp24', nameAr: 'التوزيع', nameEn: 'Distribution', code: 'DST' },
-  ],
-  'p13': [ // السلامة المهنية
-    { id: 'sp25', nameAr: 'تقييم المخاطر', nameEn: 'Risk Assessment', code: 'RA' },
-    { id: 'sp26', nameAr: 'التحقيقات', nameEn: 'Investigations', code: 'INV' },
-  ],
-  'p14': [ // البيئة
-    { id: 'sp27', nameAr: 'إدارة النفايات', nameEn: 'Waste Management', code: 'WM' },
-    { id: 'sp28', nameAr: 'الامتثال البيئي', nameEn: 'Environmental Compliance', code: 'EC' },
-  ],
-  'p15': [ // التوظيف
-    { id: 'sp29', nameAr: 'الاستقطاب', nameEn: 'Recruitment', code: 'REC' },
-    { id: 'sp30', nameAr: 'المقابلات', nameEn: 'Interviews', code: 'INT' },
-  ],
-  'p16': [ // التدريب
-    { id: 'sp31', nameAr: 'تحديد الاحتياجات', nameEn: 'Needs Assessment', code: 'NA' },
-    { id: 'sp32', nameAr: 'تنفيذ البرامج', nameEn: 'Program Delivery', code: 'PD' },
-  ],
-};
-
-const mockUsers = [
-  { id: 'u1', nameAr: 'أحمد محمد', nameEn: 'Ahmed Mohammed' },
-  { id: 'u2', nameAr: 'سارة علي', nameEn: 'Sarah Ali' },
-  { id: 'u3', nameAr: 'خالد أحمد', nameEn: 'Khalid Ahmed' },
-  { id: 'u4', nameAr: 'فاطمة حسن', nameEn: 'Fatima Hassan' },
-  { id: 'u5', nameAr: 'محمد عبدالله', nameEn: 'Mohammed Abdullah' },
-];
 
 interface RiskWizardProps {
   onClose: () => void;
-  onSave: (data: RiskFormData) => void;
+  onSave: (data: RiskFormData) => Promise<void>;
 }
 
 export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
@@ -227,7 +134,51 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
   const [errors, setErrors] = useState<Partial<Record<keyof RiskFormData, string>>>({});
   const [showGuidance, setShowGuidance] = useState(true);
 
+  // Data from API
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [riskOwners, setRiskOwners] = useState<RiskOwnerType[]>([]);
+  const [riskChampions, setRiskChampions] = useState<User[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const totalSteps = 6;
+
+  // Fetch data from API on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoadingData(true);
+      try {
+        // Fetch departments
+        const deptRes = await fetch('/api/departments');
+        if (deptRes.ok) {
+          const deptData = await deptRes.json();
+          setDepartments(deptData.data || []);
+        }
+
+        // Fetch risk owners from RiskOwner table
+        const ownersRes = await fetch('/api/risk-owners');
+        if (ownersRes.ok) {
+          const ownersData = await ownersRes.json();
+          setRiskOwners(ownersData.data || []);
+        }
+
+        // Fetch users with role riskChampion for risk champion field
+        const championsRes = await fetch('/api/users?role=riskChampion');
+        if (championsRes.ok) {
+          const championsData = await championsRes.json();
+          setRiskChampions(championsData.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Calculate risk score and rating
   const riskScore = useMemo(() =>
@@ -236,19 +187,6 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
   );
 
   const riskRating = useMemo(() => getRiskRating(riskScore), [riskScore]);
-  const riskColor = useMemo(() => getRiskRatingColor(riskRating), [riskRating]);
-
-  // Get processes based on selected department
-  const availableProcesses = useMemo(() => {
-    if (!formData.departmentId) return [];
-    return mockProcesses[formData.departmentId] || [];
-  }, [formData.departmentId]);
-
-  // Get sub-processes based on selected process
-  const availableSubProcesses = useMemo(() => {
-    if (!formData.processId) return [];
-    return mockSubProcesses[formData.processId] || [];
-  }, [formData.processId]);
 
   const updateField = useCallback(<K extends keyof RiskFormData>(
     field: K,
@@ -278,6 +216,16 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
         if (!formData.categoryId) newErrors.categoryId = t('validation.selectOption');
         if (!formData.departmentId) newErrors.departmentId = t('validation.selectOption');
         break;
+      case 3:
+        // السبب المحتمل إجباري (عربي أو إنجليزي)
+        if (!formData.potentialCauseAr.trim() && !formData.potentialCauseEn.trim()) {
+          newErrors.potentialCauseAr = isAr ? 'يرجى إدخال السبب المحتمل بالعربي أو الإنجليزي' : 'Please enter potential cause in Arabic or English';
+        }
+        // التأثير المحتمل إجباري (عربي أو إنجليزي)
+        if (!formData.potentialImpactAr.trim() && !formData.potentialImpactEn.trim()) {
+          newErrors.potentialImpactAr = isAr ? 'يرجى إدخال التأثير المحتمل بالعربي أو الإنجليزي' : 'Please enter potential impact in Arabic or English';
+        }
+        break;
       case 4:
         if (formData.inherentLikelihood < 1 || formData.inherentLikelihood > 5) {
           newErrors.inherentLikelihood = t('validation.required');
@@ -287,13 +235,13 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
         }
         break;
       case 5:
-        if (!formData.ownerId) newErrors.ownerId = t('validation.selectOption');
+        if (!formData.riskOwnerId) newErrors.riskOwnerId = t('validation.selectOption');
         break;
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, t]);
+  }, [formData, t, isAr]);
 
   const handleNext = useCallback(() => {
     if (validateStep(currentStep)) {
@@ -309,11 +257,21 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     }
   }, [currentStep]);
 
-  const handleSave = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
+    // منع الضغط المتكرر
+    if (isSubmitting) return;
+
     if (validateStep(currentStep)) {
-      onSave(formData);
+      setIsSubmitting(true);
+      try {
+        await onSave(formData);
+      } catch (error) {
+        console.error('Error submitting risk:', error);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
-  }, [currentStep, formData, onSave, validateStep]);
+  }, [currentStep, formData, onSave, validateStep, isSubmitting]);
 
   // Step content components
   const steps = [
@@ -455,63 +413,38 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
 
         <div>
           <Select
-            label={`${t('risks.department')} *`}
-            options={mockDepartments.map(dept => ({
+            label={`${isAr ? 'الوظيفة' : 'Function'} *`}
+            options={departments.map(dept => ({
               value: dept.id,
               label: isAr ? dept.nameAr : dept.nameEn,
             }))}
             value={formData.departmentId}
-            onChange={(value) => {
-              updateField('departmentId', value);
-              updateField('processId', '');
-              updateField('subProcessId', '');
-            }}
+            onChange={(value) => updateField('departmentId', value)}
             placeholder={isAr ? 'اختر الوظيفة' : 'Select Function'}
             error={errors.departmentId}
+            disabled={isLoadingData}
           />
         </div>
       </div>
 
+      {/* حقول العملية والعملية الفرعية كنص حر */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Select
-            label={t('risks.process')}
-            options={availableProcesses.map(proc => ({
-              value: proc.id,
-              label: isAr ? proc.nameAr : proc.nameEn,
-            }))}
-            value={formData.processId}
-            onChange={(value) => {
-              updateField('processId', value);
-              updateField('subProcessId', '');
-            }}
-            placeholder={isAr ? 'اختر العملية' : 'Select Process'}
-            disabled={!formData.departmentId}
+          <Input
+            label={isAr ? 'العملية' : 'Process'}
+            value={formData.processText}
+            onChange={(e) => updateField('processText', e.target.value)}
+            placeholder={isAr ? 'أدخل العملية...' : 'Enter process...'}
           />
-          {!formData.departmentId && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-              {t('risks.wizard.selectDepartmentFirst')}
-            </p>
-          )}
         </div>
 
         <div>
-          <Select
-            label={t('risks.subProcess')}
-            options={availableSubProcesses.map(subProc => ({
-              value: subProc.id,
-              label: isAr ? subProc.nameAr : subProc.nameEn,
-            }))}
-            value={formData.subProcessId}
-            onChange={(value) => updateField('subProcessId', value)}
-            placeholder={isAr ? 'اختر العملية الفرعية' : 'Select Sub Process'}
-            disabled={!formData.processId}
+          <Input
+            label={isAr ? 'العملية الفرعية' : 'Sub Process'}
+            value={formData.subProcessText}
+            onChange={(e) => updateField('subProcessText', e.target.value)}
+            placeholder={isAr ? 'أدخل العملية الفرعية...' : 'Enter sub process...'}
           />
-          {formData.departmentId && !formData.processId && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-              {t('risks.wizard.selectProcessFirst')}
-            </p>
-          )}
         </div>
       </div>
 
@@ -541,19 +474,22 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-          {t('risks.potentialCause')} ({isAr ? 'عربي' : 'Arabic'})
+          {isAr ? 'السبب المحتمل (عربي) *' : 'Potential Cause (Arabic) *'}
         </label>
         <textarea
-          className="flex min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-20"
+          className={`flex min-h-20 w-full rounded-lg border ${errors.potentialCauseAr ? 'border-red-500' : 'border-[var(--border)]'} bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-20`}
           value={formData.potentialCauseAr}
           onChange={(e) => updateField('potentialCauseAr', e.target.value)}
           placeholder={isAr ? 'ما هي العوامل التي قد تسبب حدوث هذا الخطر؟' : 'What factors could cause this risk?'}
         />
+        {errors.potentialCauseAr && (
+          <p className="mt-1 text-xs text-red-500">{errors.potentialCauseAr}</p>
+        )}
       </div>
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-          {t('risks.potentialCause')} ({isAr ? 'إنجليزي' : 'English'})
+          {isAr ? 'السبب المحتمل (إنجليزي) *' : 'Potential Cause (English) *'}
         </label>
         <textarea
           className="flex min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-20"
@@ -561,6 +497,9 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
           onChange={(e) => updateField('potentialCauseEn', e.target.value)}
           placeholder="What factors could cause this risk?"
         />
+        <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+          {isAr ? '* مطلوب إدخال السبب المحتمل بالعربي أو الإنجليزي على الأقل' : '* At least Arabic or English cause is required'}
+        </p>
       </div>
 
       {showGuidance && (
@@ -574,19 +513,22 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-          {t('risks.potentialImpact')} ({isAr ? 'عربي' : 'Arabic'})
+          {isAr ? 'التأثير المحتمل (عربي) *' : 'Potential Impact (Arabic) *'}
         </label>
         <textarea
-          className="flex min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-20"
+          className={`flex min-h-20 w-full rounded-lg border ${errors.potentialImpactAr ? 'border-red-500' : 'border-[var(--border)]'} bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-20`}
           value={formData.potentialImpactAr}
           onChange={(e) => updateField('potentialImpactAr', e.target.value)}
           placeholder={isAr ? 'ما هي النتائج المحتملة إذا حدث هذا الخطر؟' : 'What are the potential consequences?'}
         />
+        {errors.potentialImpactAr && (
+          <p className="mt-1 text-xs text-red-500">{errors.potentialImpactAr}</p>
+        )}
       </div>
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-          {t('risks.potentialImpact')} ({isAr ? 'إنجليزي' : 'English'})
+          {isAr ? 'التأثير المحتمل (إنجليزي) *' : 'Potential Impact (English) *'}
         </label>
         <textarea
           className="flex min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-20"
@@ -594,6 +536,9 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
           onChange={(e) => updateField('potentialImpactEn', e.target.value)}
           placeholder="What are the potential consequences?"
         />
+        <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+          {isAr ? '* مطلوب إدخال التأثير المحتمل بالعربي أو الإنجليزي على الأقل' : '* At least Arabic or English impact is required'}
+        </p>
       </div>
     </div>
   );
@@ -742,26 +687,27 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
         t('risks.guidance.controlsHelp')
       )}
 
+      {/* الضوابط الحالية (بدلاً من طبقات الحماية) */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-          {t('risks.layersOfProtection')} ({isAr ? 'عربي' : 'Arabic'})
+          {isAr ? 'الضوابط الحالية (عربي)' : 'Existing Controls (Arabic)'}
         </label>
         <textarea
           className="flex min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-20"
-          value={formData.layersOfProtectionAr}
-          onChange={(e) => updateField('layersOfProtectionAr', e.target.value)}
+          value={formData.existingControlsAr}
+          onChange={(e) => updateField('existingControlsAr', e.target.value)}
           placeholder={isAr ? 'ما هي الضوابط الحالية للتحكم في هذا الخطر؟' : 'What current controls are in place?'}
         />
       </div>
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-          {t('risks.layersOfProtection')} ({isAr ? 'إنجليزي' : 'English'})
+          {isAr ? 'الضوابط الحالية (إنجليزي)' : 'Existing Controls (English)'}
         </label>
         <textarea
           className="flex min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-20"
-          value={formData.layersOfProtectionEn}
-          onChange={(e) => updateField('layersOfProtectionEn', e.target.value)}
+          value={formData.existingControlsEn}
+          onChange={(e) => updateField('existingControlsEn', e.target.value)}
           placeholder="What current controls are in place?"
         />
       </div>
@@ -791,30 +737,34 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        {/* مالك الخطر - من جدول RiskOwner */}
         <div>
           <Select
-            label={`${t('risks.riskOwner')} *`}
-            options={mockUsers.map(user => ({
-              value: user.id,
-              label: isAr ? user.nameAr : user.nameEn,
+            label={`${isAr ? 'مالك الخطر' : 'Risk Owner'} *`}
+            options={riskOwners.map(owner => ({
+              value: owner.id,
+              label: isAr ? owner.fullName : (owner.fullNameEn || owner.fullName),
             }))}
-            value={formData.ownerId}
-            onChange={(value) => updateField('ownerId', value)}
+            value={formData.riskOwnerId}
+            onChange={(value) => updateField('riskOwnerId', value)}
             placeholder={isAr ? 'اختر مالك الخطر' : 'Select Risk Owner'}
-            error={errors.ownerId}
+            error={errors.riskOwnerId}
+            disabled={isLoadingData}
           />
         </div>
 
+        {/* رائد المخاطر - من جدول Users مع فلترة دور riskChampion */}
         <div>
           <Select
-            label={t('risks.riskChampion')}
-            options={mockUsers.map(user => ({
+            label={isAr ? 'رائد المخاطر' : 'Risk Champion'}
+            options={riskChampions.map(user => ({
               value: user.id,
-              label: isAr ? user.nameAr : user.nameEn,
+              label: isAr ? user.fullName : (user.fullNameEn || user.fullName),
             }))}
             value={formData.championId}
             onChange={(value) => updateField('championId', value)}
             placeholder={isAr ? 'اختر رائد المخاطر' : 'Select Risk Champion'}
+            disabled={isLoadingData}
           />
         </div>
       </div>
@@ -849,18 +799,17 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
 
   const renderStep6 = () => {
     const selectedCategory = DEFAULT_RISK_CATEGORIES.find(c => c.code === formData.categoryId);
-    const selectedDept = mockDepartments.find(d => d.id === formData.departmentId);
-    const selectedProcess = availableProcesses.find(p => p.id === formData.processId);
-    const selectedOwner = mockUsers.find(u => u.id === formData.ownerId);
-    const selectedChampion = mockUsers.find(u => u.id === formData.championId);
+    const selectedDept = departments.find(d => d.id === formData.departmentId);
+    const selectedOwner = riskOwners.find(o => o.id === formData.riskOwnerId);
+    const selectedChampion = riskChampions.find(u => u.id === formData.championId);
 
     return (
       <div className="space-y-6">
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
           <div className="flex items-center gap-3">
-            <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <p className="font-medium text-green-900 dark:text-green-100">
-              {isAr ? 'مراجعة المعلومات قبل الحفظ' : 'Review information before saving'}
+            <Send className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <p className="font-medium text-amber-900 dark:text-amber-100">
+              {isAr ? 'مراجعة المعلومات قبل الإرسال لمدير المخاطر للموافقة' : 'Review information before sending to Risk Manager for approval'}
             </p>
           </div>
         </div>
@@ -897,16 +846,18 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
                 </span>
               </div>
               <div>
-                <span className="text-[var(--foreground-secondary)]">{t('risks.department')}: </span>
+                <span className="text-[var(--foreground-secondary)]">{isAr ? 'الوظيفة' : 'Function'}: </span>
                 <span className="font-medium">
                   {selectedDept ? (isAr ? selectedDept.nameAr : selectedDept.nameEn) : '-'}
                 </span>
               </div>
               <div>
-                <span className="text-[var(--foreground-secondary)]">{t('risks.process')}: </span>
-                <span className="font-medium">
-                  {selectedProcess ? (isAr ? selectedProcess.nameAr : selectedProcess.nameEn) : '-'}
-                </span>
+                <span className="text-[var(--foreground-secondary)]">{isAr ? 'العملية' : 'Process'}: </span>
+                <span className="font-medium">{formData.processText || '-'}</span>
+              </div>
+              <div>
+                <span className="text-[var(--foreground-secondary)]">{isAr ? 'العملية الفرعية' : 'Sub Process'}: </span>
+                <span className="font-medium">{formData.subProcessText || '-'}</span>
               </div>
             </div>
           </Card>
@@ -952,15 +903,15 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
             </h4>
             <div className="space-y-2 text-sm">
               <div>
-                <span className="text-[var(--foreground-secondary)]">{t('risks.riskOwner')}: </span>
+                <span className="text-[var(--foreground-secondary)]">{isAr ? 'مالك الخطر' : 'Risk Owner'}: </span>
                 <span className="font-medium">
-                  {selectedOwner ? (isAr ? selectedOwner.nameAr : selectedOwner.nameEn) : '-'}
+                  {selectedOwner ? (isAr ? selectedOwner.fullName : (selectedOwner.fullNameEn || selectedOwner.fullName)) : '-'}
                 </span>
               </div>
               <div>
-                <span className="text-[var(--foreground-secondary)]">{t('risks.riskChampion')}: </span>
+                <span className="text-[var(--foreground-secondary)]">{isAr ? 'رائد المخاطر' : 'Risk Champion'}: </span>
                 <span className="font-medium">
-                  {selectedChampion ? (isAr ? selectedChampion.nameAr : selectedChampion.nameEn) : '-'}
+                  {selectedChampion ? (isAr ? selectedChampion.fullName : (selectedChampion.fullNameEn || selectedChampion.fullName)) : '-'}
                 </span>
               </div>
             </div>
@@ -1065,10 +1016,13 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
               </Button>
             ) : (
               <Button
-                onClick={handleSave}
-                leftIcon={<Check className="h-4 w-4" />}
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                leftIcon={isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               >
-                {t('common.save')}
+                {isSubmitting
+                  ? (isAr ? 'جاري الإرسال...' : 'Sending...')
+                  : (isAr ? 'إرسال لمدير المخاطر للموافقة' : 'Send to Risk Manager for Approval')}
               </Button>
             )}
           </div>
@@ -1077,3 +1031,5 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     </div>
   );
 }
+
+export type { RiskFormData };

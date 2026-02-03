@@ -59,6 +59,7 @@
   "navigation": {
     "dashboard": "Dashboard",
     "risks": "Risk Register",
+    "riskApprovals": "Risk Approvals",
     "assessment": "Risk Assessment",
     "treatment": "Treatment Plans",
     "treatmentMonitoring": "Treatment Monitoring",

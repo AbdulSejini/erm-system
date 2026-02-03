@@ -188,7 +188,60 @@ NEXTAUTH_URL=http://localhost:3000
 
 ## Recent Updates
 
-### Treatment Plan Wizard Validation (Latest)
+### Risk Creation Wizard & Approval Workflow (Latest)
+1. **New Risk Approval Workflow**:
+   - When any user creates a new risk, it's sent to Risk Manager for approval
+   - Submit button: "إرسال لمدير المخاطر للموافقة" / "Send to Risk Manager for Approval"
+   - Double-click prevention on submit button
+   - Notifications sent to all Risk Managers when new risk is submitted
+
+2. **Risk Approval Page** (`/risk-approvals`):
+   - Accessible to Risk Managers and Admins only
+   - Shows pending approval requests
+   - Four approval actions:
+     - **قبول (Approve)**: Risk is approved and active
+     - **رفض (Reject)**: Risk is rejected, status returns to Draft
+     - **طلب تعديل (Request Revision)**: User notified to make changes
+     - **تأجيل (Defer)**: Review postponed, status set to "Under Discussing"
+   - Optional reviewer notes for each action
+   - Full risk details displayed before decision
+
+3. **Risk Wizard Form Changes**:
+   - **Process & Sub-Process**: Changed from dropdown to free text input
+   - **Potential Cause**: Required (Arabic OR English)
+   - **Potential Impact**: Required (Arabic OR English)
+   - **Existing Controls**: Renamed from "Layers of Protection" / "طبقات الحماية" to "الضوابط الحالية"
+   - **Risk Owner**: Now reads from `RiskOwner` table (not `User` table)
+   - **Risk Champion**: Filtered to show only users with `riskChampion` role
+
+4. **New Database Model** - `RiskApprovalRequest`:
+   ```prisma
+   model RiskApprovalRequest {
+     id              String    @id
+     riskId          String    @unique
+     requesterId     String
+     status          String    // pending, approved, rejected, deferred, revision_requested
+     reviewerId      String?
+     reviewNoteAr    String?
+     reviewNoteEn    String?
+     reviewedAt      DateTime?
+   }
+   ```
+
+5. **New API Endpoints**:
+   - `GET /api/risk-approval-requests` - List approval requests
+   - `POST /api/risk-approval-requests` - Create approval request (when risk is submitted)
+   - `GET /api/risk-approval-requests/[id]` - Get single request
+   - `PATCH /api/risk-approval-requests/[id]` - Review request (approve/reject/defer/revision)
+
+6. **New Notification Types**:
+   - `risk_approval_pending` - Sent to Risk Managers when new risk submitted
+   - `risk_approved` - Sent to requester when risk is approved
+   - `risk_rejected` - Sent to requester when risk is rejected
+   - `risk_deferred` - Sent to requester when review is deferred
+   - `risk_revision_requested` - Sent to requester when revision is needed
+
+### Treatment Plan Wizard Validation
 1. **Step 1 - Required Fields**:
    - Risk selection (required)
    - Responsible person (required) - moved from Step 2
@@ -196,12 +249,20 @@ NEXTAUTH_URL=http://localhost:3000
    - Assigned To / المكلف (required)
    - Title in Arabic OR English (at least one required)
    - Task Description (required)
-3. **OneDrive Attachments for Tasks**:
-   - Manual URL paste method (no OAuth/Admin consent required)
-   - User copies share link from OneDrive/SharePoint and pastes it
-   - Validates that URL is from OneDrive/SharePoint domains
-   - Shows instructions for proper sharing with organization
-   - Supports: saudicable.sharepoint.com, saudicable-my.sharepoint.com, sceco domains
+3. **OneDrive/SharePoint Attachments for Tasks**:
+   - **Inline URL paste** - no modal, no OAuth required
+   - Auto-adds attachment when valid URL is pasted
+   - Visual feedback: green border on valid URL, red on invalid
+   - Quick access buttons:
+     - OneDrive: `https://onedrive.live.com/`
+     - SharePoint: `https://saudicableco.sharepoint.com/sites/Debtors`
+   - Supported domains:
+     - `onedrive.live.com`, `1drv.ms`
+     - `sharepoint.com` (all subdomains)
+     - `saudicable.sharepoint.com`, `saudicable-my.sharepoint.com`
+     - `saudicableco.sharepoint.com`, `saudicableco-my.sharepoint.com`
+     - `sceco.sharepoint.com`, `sceco-my.sharepoint.com`
+   - Component: `/src/components/OneDrivePicker.tsx`
 
 ### Residual Risk Governance
 1. **Treatment Plan Justification**: Added `justificationAr`/`justificationEn` fields to treatment plans for documenting reasons

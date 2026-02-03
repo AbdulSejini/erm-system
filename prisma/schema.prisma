@@ -50,6 +50,8 @@ model User {
   receivedDirectMessages DirectMessage[]       @relation("DirectMessageTarget")
   residualRiskChangeRequests ResidualRiskChangeRequest[] @relation("ChangeRequester")
   reviewedResidualRiskChanges ResidualRiskChangeRequest[] @relation("ChangeReviewer")
+  riskApprovalRequests       RiskApprovalRequest[] @relation("RiskApprovalRequester")
+  reviewedRiskApprovals      RiskApprovalRequest[] @relation("RiskApprovalReviewer")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -217,6 +219,7 @@ model Risk {
   comments      RiskComment[]     // المحادثات والتعليقات على الخطر
   changeLogs    RiskChangeLog[]   // سجل التعديلات على الخطر
   residualRiskChangeRequests ResidualRiskChangeRequest[] // طلبات تغيير الخطر المتبقي
+  approvalRequest RiskApprovalRequest? // طلب اعتماد الخطر الجديد
 
   @@index([categoryId])
   @@index([departmentId])
@@ -644,6 +647,36 @@ model ResidualRiskChangeRequest {
   requester     User            @relation("ChangeRequester", fields: [requesterId], references: [id])
   reviewer      User?           @relation("ChangeReviewer", fields: [reviewerId], references: [id])
   treatmentPlan TreatmentPlan?  @relation(fields: [treatmentPlanId], references: [id])
+
+  @@index([riskId])
+  @@index([requesterId])
+  @@index([reviewerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// طلبات اعتماد المخاطر الجديدة (New Risk Approval Requests)
+model RiskApprovalRequest {
+  id                      String    @id @default(cuid())
+  riskId                  String    @unique  // الخطر المطلوب اعتماده (فريد لكل خطر)
+  requesterId             String    // المستخدم الذي أرسل الخطر للاعتماد
+
+  // حالة الطلب
+  status                  String    @default("pending") // pending, approved, rejected, deferred, revision_requested
+
+  // المراجعة
+  reviewerId              String?   // مدير المخاطر الذي راجع الطلب
+  reviewNoteAr            String?   // ملاحظات المراجعة بالعربي
+  reviewNoteEn            String?   // ملاحظات المراجعة بالإنجليزي
+  reviewedAt              DateTime?
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // العلاقات
+  risk          Risk    @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  requester     User    @relation("RiskApprovalRequester", fields: [requesterId], references: [id])
+  reviewer      User?   @relation("RiskApprovalReviewer", fields: [reviewerId], references: [id])
 
   @@index([riskId])
   @@index([requesterId])
