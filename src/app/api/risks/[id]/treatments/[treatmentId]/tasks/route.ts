@@ -32,19 +32,33 @@ export async function POST(
 
     const body = await request.json();
 
+    // التحقق من وجود عنوان واحد على الأقل
+    const titleAr = body.titleAr?.trim() || body.titleEn?.trim() || 'مهمة جديدة';
+    const titleEn = body.titleEn?.trim() || body.titleAr?.trim() || 'New Task';
+
+    console.log('Creating task with data:', {
+      treatmentPlanId: treatmentId,
+      titleAr,
+      titleEn,
+      actionOwnerId: body.actionOwnerId,
+      assignedToId: body.assignedToId,
+      monitorId: body.monitorId,
+    });
+
     // إنشاء المهمة
     const task = await prisma.treatmentTask.create({
       data: {
         treatmentPlanId: treatmentId,
-        titleAr: body.titleAr,
-        titleEn: body.titleEn,
+        titleAr: titleAr,
+        titleEn: titleEn,
         descriptionAr: body.descriptionAr || null,
         descriptionEn: body.descriptionEn || null,
         status: body.status || 'notStarted',
         priority: body.priority || 'medium',
         assignedToId: body.assignedToId || null,
         actionOwnerId: body.actionOwnerId || null,
-        monitorId: body.monitorId || null,
+        monitorId: null, // للتوافق القديم مع Users
+        monitorOwnerId: body.monitorOwnerId || body.monitorId || null, // المتابع من ملاك المخاطر
         successIndicatorAr: body.successIndicatorAr || null,
         successIndicatorEn: body.successIndicatorEn || null,
         dueDate: body.dueDate ? new Date(body.dueDate) : null,
@@ -66,6 +80,7 @@ export async function POST(
             id: true,
             fullName: true,
             fullNameEn: true,
+            email: true,
           },
         },
         monitor: {
@@ -75,8 +90,18 @@ export async function POST(
             fullNameEn: true,
           },
         },
+        monitorOwner: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+            email: true,
+          },
+        },
       },
     });
+
+    console.log('Task created successfully:', task.id);
 
     return NextResponse.json({
       success: true,
@@ -114,6 +139,7 @@ export async function GET(
             id: true,
             fullName: true,
             fullNameEn: true,
+            email: true,
           },
         },
         monitor: {
@@ -121,6 +147,14 @@ export async function GET(
             id: true,
             fullName: true,
             fullNameEn: true,
+          },
+        },
+        monitorOwner: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+            email: true,
           },
         },
       },

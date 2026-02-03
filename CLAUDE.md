@@ -315,6 +315,29 @@ NEXTAUTH_URL=http://localhost:3000
 - Filter by status, priority, department, responsible
 - Progress visualization
 
+### Treatment Task Assignment (Fixed)
+- **Task Assignment Fields**:
+  - `actionOwnerId` - منفذ الإجراء (من ملاك المخاطر / RiskOwner)
+  - `monitorOwnerId` - متابع التنفيذ (من ملاك المخاطر / RiskOwner)
+  - `assignedToId` - للتوافق القديم مع Users (deprecated)
+  - `monitorId` - للتوافق القديم مع Users (deprecated)
+- **Task creation now properly saves**:
+  - Task titles (Arabic and/or English)
+  - Task descriptions
+  - Assigned to (actionOwnerId from RiskOwner)
+  - Monitor (monitorOwnerId from RiskOwner)
+  - OneDrive/SharePoint attachments
+- API endpoints updated: `/api/risks/[id]/treatments/[treatmentId]/tasks`
+
+### Treatment Plan Wizard Data Flow
+- **Justification fields** (`justificationAr`, `justificationEn`) are saved to database
+- **Tasks** are created after treatment plan creation via separate API calls
+- **Data flow**:
+  1. Step 1: Risk & Responsible selection
+  2. Step 2: Strategy, Priority, Dates, Justification, Residual Risk
+  3. Step 3: Tasks with assignee/monitor from RiskOwner
+  4. Save: POST treatment plan → POST tasks sequentially
+
 ## Localization
 - Arabic (default): `/src/locales/ar.json`
 - English: `/src/locales/en.json`

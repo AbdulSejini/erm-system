@@ -594,7 +594,16 @@ export default function TreatmentPage() {
   }, [autoOpen, preselectedRiskId, loading, risks]);
 
   const handleSave = async () => {
-    console.log('handleSave called with formData:', { riskId: formData.riskId, strategy: formData.strategy, responsibleId: formData.responsibleId, dueDate: formData.dueDate });
+    console.log('handleSave called with FULL formData:', JSON.stringify({
+      riskId: formData.riskId,
+      strategy: formData.strategy,
+      responsibleId: formData.responsibleId,
+      dueDate: formData.dueDate,
+      justificationAr: formData.justificationAr,
+      justificationEn: formData.justificationEn,
+      tasksCount: formData.tasks.length,
+      tasks: formData.tasks,
+    }, null, 2));
 
     if (!formData.riskId || !formData.strategy || !formData.responsibleId) {
       console.error('Missing required fields:', { riskId: formData.riskId, strategy: formData.strategy, responsibleId: formData.responsibleId });
@@ -653,25 +662,40 @@ export default function TreatmentPage() {
 
         // Create tasks if any
         if (formData.tasks.length > 0 && result.data?.id) {
-          for (const task of formData.tasks) {
-            await fetch(`/api/risks/${formData.riskId}/treatments/${result.data.id}/tasks`, {
+          console.log('Creating tasks for treatment plan:', result.data.id);
+          console.log('Tasks to create:', formData.tasks);
+
+          for (let i = 0; i < formData.tasks.length; i++) {
+            const task = formData.tasks[i];
+            console.log(`Creating task ${i + 1}:`, task);
+
+            const taskResponse = await fetch(`/api/risks/${formData.riskId}/treatments/${result.data.id}/tasks`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                titleAr: task.titleAr,
-                titleEn: task.titleEn,
+                titleAr: task.titleAr || '',
+                titleEn: task.titleEn || '',
                 descriptionAr: task.description || null,
+                descriptionEn: task.description || null,
                 status: task.status || 'notStarted',
                 priority: task.priority || 'medium',
-                dueDate: task.dueDate,
-                order: formData.tasks.indexOf(task),
-                actionOwnerId: task.assignedTo || null,
-                monitorId: task.followedBy || null,
+                dueDate: task.dueDate || null,
+                order: i,
+                assignedToId: null, // للتوافق القديم مع Users
+                actionOwnerId: task.assignedTo || null, // منفذ الإجراء من ملاك المخاطر
+                monitorOwnerId: task.followedBy || null, // المتابع من ملاك المخاطر
                 // OneDrive attachment
                 oneDriveUrl: task.oneDriveUrl || null,
                 oneDriveFileName: task.oneDriveFileName || null,
               }),
             });
+
+            const taskResult = await taskResponse.json();
+            console.log(`Task ${i + 1} creation result:`, taskResult);
+
+            if (!taskResponse.ok) {
+              console.error(`Failed to create task ${i + 1}:`, taskResult.error);
+            }
           }
         }
 
@@ -775,7 +799,12 @@ Risk Management Team`;
       oneDriveUrl: '',
       oneDriveFileName: '',
     };
-    setFormData((prev) => ({ ...prev, tasks: [...prev.tasks, newTask] }));
+    console.log('Adding new task:', newTask);
+    setFormData((prev) => {
+      const newFormData = { ...prev, tasks: [...prev.tasks, newTask] };
+      console.log('FormData after adding task:', { tasksCount: newFormData.tasks.length, justificationAr: newFormData.justificationAr });
+      return newFormData;
+    });
   };
 
   const updateTask = (index: number, field: string, value: string) => {
@@ -1464,7 +1493,10 @@ Risk Management Team`;
                         <textarea
                           id="justification-ar"
                           value={formData.justificationAr}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, justificationAr: e.target.value }))}
+                          onChange={(e) => {
+                            console.log('Justification AR changed:', e.target.value);
+                            setFormData((prev) => ({ ...prev, justificationAr: e.target.value }));
+                          }}
                           dir="rtl"
                           rows={3}
                           placeholder={isAr ? 'أدخل تبرير/تعليق خطة المعالجة...' : 'Enter treatment plan justification...'}

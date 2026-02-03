@@ -308,7 +308,8 @@ model TreatmentTask {
   priority          String    @default("medium") // high, medium, low - أولوية المهمة
   assignedToId      String?   // منفذ الإجراء (من Users - للتوافق القديم)
   actionOwnerId     String?   // منفذ الإجراء (من ملاك المخاطر)
-  monitorId         String?   // متابع التنفيذ (من المستخدمين)
+  monitorId         String?   // متابع التنفيذ (من المستخدمين - للتوافق القديم)
+  monitorOwnerId    String?   // متابع التنفيذ (من ملاك المخاطر)
   successIndicatorAr String?  // مؤشر الإنجاز بالعربي (كيف يعرف المتابع أن المهمة تمت)
   successIndicatorEn String?  // مؤشر الإنجاز بالإنجليزي
   dueDate           DateTime? // تاريخ الاستحقاق
@@ -325,6 +326,7 @@ model TreatmentTask {
   assignedTo    User?         @relation("TaskAssignee", fields: [assignedToId], references: [id])
   actionOwner   RiskOwner?    @relation("TaskActionOwner", fields: [actionOwnerId], references: [id])
   monitor       User?         @relation("TaskMonitor", fields: [monitorId], references: [id])
+  monitorOwner  RiskOwner?    @relation("TaskMonitorOwner", fields: [monitorOwnerId], references: [id])
 }
 
 // الحوادث
@@ -476,6 +478,7 @@ model RiskOwner {
   risks              Risk[]           @relation("RiskToOwner")
   treatmentPlans     TreatmentPlan[]  @relation("TreatmentRiskOwner")
   treatmentTasks     TreatmentTask[]  @relation("TaskActionOwner")
+  monitoredTasks     TreatmentTask[]  @relation("TaskMonitorOwner")
 }
 
 // معايير الاحتمالية

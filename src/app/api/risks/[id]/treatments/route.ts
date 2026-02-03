@@ -87,6 +87,14 @@ export async function POST(
     const body = await request.json();
     const clientInfo = getClientInfo(request);
 
+    // تسجيل البيانات المستلمة للتصحيح
+    console.log('API received body:', JSON.stringify({
+      justificationAr: body.justificationAr,
+      justificationEn: body.justificationEn,
+      strategy: body.strategy,
+      responsibleId: body.responsibleId,
+    }, null, 2));
+
     // إنشاء خطة المعالجة
     const treatmentPlan = await prisma.treatmentPlan.create({
       data: {
@@ -337,6 +345,7 @@ export async function GET(
                 id: true,
                 fullName: true,
                 fullNameEn: true,
+                email: true,
               },
             },
             monitor: {
@@ -344,6 +353,14 @@ export async function GET(
                 id: true,
                 fullName: true,
                 fullNameEn: true,
+              },
+            },
+            monitorOwner: {
+              select: {
+                id: true,
+                fullName: true,
+                fullNameEn: true,
+                email: true,
               },
             },
           },
