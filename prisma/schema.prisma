@@ -48,6 +48,8 @@ model User {
   riskChangeLogs        RiskChangeLog[]        @relation("RiskChangeLogUser")
   sentDirectMessages    DirectMessage[]        @relation("DirectMessageAuthor")
   receivedDirectMessages DirectMessage[]       @relation("DirectMessageTarget")
+  residualRiskChangeRequests ResidualRiskChangeRequest[] @relation("ChangeRequester")
+  reviewedResidualRiskChanges ResidualRiskChangeRequest[] @relation("ChangeReviewer")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -214,6 +216,7 @@ model Risk {
   incidents     Incident[]
   comments      RiskComment[]     // المحادثات والتعليقات على الخطر
   changeLogs    RiskChangeLog[]   // سجل التعديلات على الخطر
+  residualRiskChangeRequests ResidualRiskChangeRequest[] // طلبات تغيير الخطر المتبقي
 
   @@index([categoryId])
   @@index([departmentId])
@@ -283,6 +286,7 @@ model TreatmentPlan {
   monitor     User?           @relation("TreatmentMonitor", fields: [monitorId], references: [id])
   createdBy   User            @relation("TreatmentCreator", fields: [createdById], references: [id])
   tasks       TreatmentTask[]
+  residualRiskChangeRequests ResidualRiskChangeRequest[] // طلبات تغيير الخطر المتبقي المرتبطة
 }
 
 // مهام المعالجة
@@ -589,5 +593,54 @@ model RiskChangeLog {
   @@index([riskId])
   @@index([userId])
   @@index([changeType])
+  @@index([createdAt])
+}
+
+// طلبات تغيير الخطر المتبقي (Residual Risk Change Requests)
+model ResidualRiskChangeRequest {
+  id                      String    @id @default(cuid())
+  riskId                  String
+  requesterId             String    // المستخدم الذي طلب التغيير
+  treatmentPlanId         String?   // خطة المعالجة المرتبطة (إن وجدت)
+
+  // القيم الحالية
+  currentLikelihood       Int?
+  currentImpact           Int?
+  currentScore            Int?
+  currentRating           String?
+
+  // القيم المقترحة
+  proposedLikelihood      Int
+  proposedImpact          Int
+  proposedScore           Int       // محسوب تلقائياً
+  proposedRating          String    // محسوب تلقائياً
+
+  // التبرير
+  justificationAr         String    // سبب التعديل بالعربي
+  justificationEn         String?   // سبب التعديل بالإنجليزي
+
+  // الموافقة
+  status                  String    @default("pending") // pending, approved, rejected, auto_approved
+  reviewerId              String?   // مدير المخاطر الذي راجع الطلب
+  reviewNoteAr            String?   // ملاحظات المراجعة بالعربي
+  reviewNoteEn            String?   // ملاحظات المراجعة بالإنجليزي
+  reviewedAt              DateTime?
+
+  // نوع الطلب
+  requestType             String    @default("manual") // manual (تعديل يدوي), treatment_completion (إكمال خطة معالجة)
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // العلاقات
+  risk          Risk            @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  requester     User            @relation("ChangeRequester", fields: [requesterId], references: [id])
+  reviewer      User?           @relation("ChangeReviewer", fields: [reviewerId], references: [id])
+  treatmentPlan TreatmentPlan?  @relation(fields: [treatmentPlanId], references: [id])
+
+  @@index([riskId])
+  @@index([requesterId])
+  @@index([reviewerId])
+  @@index([status])
   @@index([createdAt])
 }

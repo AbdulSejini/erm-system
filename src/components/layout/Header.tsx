@@ -34,6 +34,55 @@ interface Notification {
   createdAt: string;
 }
 
+// CSS keyframes for bell animation - injected via style tag
+const bellAnimationStyles = `
+@keyframes bell-ring {
+  0% { transform: rotate(0); }
+  5% { transform: rotate(15deg); }
+  10% { transform: rotate(-15deg); }
+  15% { transform: rotate(15deg); }
+  20% { transform: rotate(-15deg); }
+  25% { transform: rotate(10deg); }
+  30% { transform: rotate(-10deg); }
+  35% { transform: rotate(5deg); }
+  40% { transform: rotate(-5deg); }
+  45% { transform: rotate(0); }
+  100% { transform: rotate(0); }
+}
+
+@keyframes badge-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes badge-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes notification-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 8px 4px rgba(239, 68, 68, 0.3); }
+}
+
+.bell-animate {
+  animation: bell-ring 2s ease-in-out;
+}
+
+.badge-pulse {
+  animation: badge-pulse 1.5s ease-in-out infinite;
+}
+
+.badge-bounce {
+  animation: badge-bounce 0.6s ease-in-out infinite;
+}
+
+.notification-glow {
+  animation: notification-glow 2s ease-in-out infinite;
+}
+`;
+
 interface HeaderProps {
   onMobileMenuClick: () => void;
 }
@@ -50,6 +99,19 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [bellAnimating, setBellAnimating] = useState(false);
+  const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
+
+  // Inject animation styles
+  useEffect(() => {
+    const styleId = 'bell-animation-styles';
+    if (!document.getElementById(styleId)) {
+      const styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      styleTag.textContent = bellAnimationStyles;
+      document.head.appendChild(styleTag);
+    }
+  }, []);
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
@@ -59,14 +121,23 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       const result = await response.json();
       if (result.success) {
         setNotifications(result.data.notifications);
-        setUnreadCount(result.data.unreadCount);
+        const newUnreadCount = result.data.unreadCount;
+
+        // Trigger animation if new notifications arrived
+        if (newUnreadCount > previousUnreadCount && previousUnreadCount >= 0) {
+          setBellAnimating(true);
+          setTimeout(() => setBellAnimating(false), 2000);
+        }
+
+        setPreviousUnreadCount(unreadCount);
+        setUnreadCount(newUnreadCount);
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
     } finally {
       setLoadingNotifications(false);
     }
-  }, []);
+  }, [previousUnreadCount, unreadCount]);
 
   // Fetch notifications on mount and every 30 seconds
   useEffect(() => {
@@ -218,11 +289,20 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
               setShowNotifications(!showNotifications);
               if (!showNotifications) fetchNotifications();
             }}
-            className="relative rounded-xl text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--background-tertiary)]"
+            className={cn(
+              "relative rounded-xl text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--background-tertiary)]",
+              unreadCount > 0 && "notification-glow"
+            )}
           >
-            <Bell className="h-5 w-5" />
+            <Bell className={cn(
+              "h-5 w-5 transition-all",
+              bellAnimating && "bell-animate"
+            )} />
             {unreadCount > 0 && (
-              <span className="absolute end-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--status-error)] text-[10px] font-bold text-white ring-2 ring-white">
+              <span className={cn(
+                "absolute end-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--status-error)] text-[10px] font-bold text-white ring-2 ring-white",
+                bellAnimating ? "badge-bounce" : "badge-pulse"
+              )}>
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}

@@ -140,6 +140,146 @@ export async function PATCH(
       },
     });
 
+    // إذا تم إكمال خطة المعالجة، إنشاء طلب تحديث الخطر المتبقي تلقائياً
+    const statusChangedToCompleted = body.status === 'completed' && existingTreatment.status !== 'completed';
+
+    if (statusChangedToCompleted && updatedTreatment.expectedResidualLikelihood && updatedTreatment.expectedResidualImpact) {
+      // جلب معلومات الخطر الحالية
+      const risk = await prisma.risk.findUnique({
+        where: { id: riskId },
+        select: {
+          id: true,
+          riskNumber: true,
+          titleAr: true,
+          titleEn: true,
+          residualLikelihood: true,
+          residualImpact: true,
+          residualScore: true,
+          residualRating: true,
+        },
+      });
+
+      if (risk) {
+        // دالة لحساب التصنيف
+        const calculateRating = (score: number): string => {
+          if (score >= 17) return 'Critical';
+          if (score >= 13) return 'Major';
+          if (score >= 9) return 'Moderate';
+          if (score >= 5) return 'Minor';
+          return 'Negligible';
+        };
+
+        const proposedScore = updatedTreatment.expectedResidualLikelihood * updatedTreatment.expectedResidualImpact;
+        const proposedRating = updatedTreatment.expectedResidualRating || calculateRating(proposedScore);
+
+        // التحقق مما إذا كانت القيم المقترحة مختلفة عن القيم الحالية
+        const valuesChanged = risk.residualLikelihood !== updatedTreatment.expectedResidualLikelihood ||
+          risk.residualImpact !== updatedTreatment.expectedResidualImpact;
+
+        if (valuesChanged) {
+          // التحقق مما إذا كان المستخدم مدير مخاطر
+          const isRiskManager = session.user.role === 'admin' || session.user.role === 'riskManager';
+
+          // إنشاء طلب تغيير الخطر المتبقي
+          const changeRequest = await prisma.residualRiskChangeRequest.create({
+            data: {
+              riskId,
+              requesterId: session.user.id,
+              treatmentPlanId: treatmentId,
+              currentLikelihood: risk.residualLikelihood,
+              currentImpact: risk.residualImpact,
+              currentScore: risk.residualScore,
+              currentRating: risk.residualRating,
+              proposedLikelihood: updatedTreatment.expectedResidualLikelihood,
+              proposedImpact: updatedTreatment.expectedResidualImpact,
+              proposedScore: proposedScore,
+              proposedRating: proposedRating,
+              justificationAr: `تم إكمال خطة المعالجة: ${existingTreatment.titleAr}`,
+              justificationEn: `Treatment plan completed: ${existingTreatment.titleEn}`,
+              requestType: 'treatment_completion',
+              status: isRiskManager ? 'auto_approved' : 'pending',
+              reviewerId: isRiskManager ? session.user.id : null,
+              reviewedAt: isRiskManager ? new Date() : null,
+              reviewNoteAr: isRiskManager ? 'موافقة تلقائية - اكتمال خطة المعالجة بواسطة مدير المخاطر' : null,
+              reviewNoteEn: isRiskManager ? 'Auto-approved - Treatment plan completed by Risk Manager' : null,
+            },
+          });
+
+          // إذا تمت الموافقة التلقائية، تحديث الخطر مباشرة
+          if (isRiskManager) {
+            await prisma.risk.update({
+              where: { id: riskId },
+              data: {
+                residualLikelihood: updatedTreatment.expectedResidualLikelihood,
+                residualImpact: updatedTreatment.expectedResidualImpact,
+                residualScore: proposedScore,
+                residualRating: proposedRating,
+              },
+            });
+
+            // تسجيل التغيير في سجل التعديلات
+            await prisma.riskChangeLog.create({
+              data: {
+                riskId,
+                userId: session.user.id,
+                changeType: 'field_update',
+                changeCategory: 'assessment',
+                fieldName: 'residualRisk',
+                fieldNameAr: 'الخطر المتبقي',
+                oldValue: JSON.stringify({
+                  likelihood: risk.residualLikelihood,
+                  impact: risk.residualImpact,
+                  score: risk.residualScore,
+                  rating: risk.residualRating,
+                }),
+                newValue: JSON.stringify({
+                  likelihood: updatedTreatment.expectedResidualLikelihood,
+                  impact: updatedTreatment.expectedResidualImpact,
+                  score: proposedScore,
+                  rating: proposedRating,
+                }),
+                description: `Residual risk auto-updated after treatment plan completion: ${existingTreatment.titleEn}`,
+                descriptionAr: `تم تحديث الخطر المتبقي تلقائياً بعد اكتمال خطة المعالجة: ${existingTreatment.titleAr}`,
+                relatedEntityId: changeRequest.id,
+                ipAddress: clientInfo.ipAddress || null,
+                userAgent: clientInfo.userAgent || null,
+              },
+            });
+          } else {
+            // إرسال إشعار لمديري المخاطر
+            const riskManagers = await prisma.user.findMany({
+              where: {
+                role: { in: ['admin', 'riskManager'] },
+                status: 'active',
+              },
+              select: { id: true },
+            });
+
+            const user = await prisma.user.findUnique({
+              where: { id: session.user.id },
+              select: { fullName: true, fullNameEn: true },
+            });
+
+            // إنشاء إشعارات لكل مدير مخاطر
+            const notifications = riskManagers.map((manager) => ({
+              userId: manager.id,
+              type: 'residual_risk_approval',
+              titleAr: 'طلب موافقة على تحديث الخطر المتبقي (اكتمال خطة معالجة)',
+              titleEn: 'Residual Risk Update Approval (Treatment Plan Completed)',
+              messageAr: `تم إكمال خطة المعالجة "${existingTreatment.titleAr}" للخطر ${risk.riskNumber} بواسطة ${user?.fullName || 'مستخدم'}. يتطلب تحديث الخطر المتبقي موافقتكم.`,
+              messageEn: `Treatment plan "${existingTreatment.titleEn}" for risk ${risk.riskNumber} has been completed by ${user?.fullNameEn || user?.fullName || 'User'}. Residual risk update requires your approval.`,
+              link: `/risks/${riskId}?tab=approval`,
+              isRead: false,
+            }));
+
+            await prisma.notification.createMany({
+              data: notifications,
+            });
+          }
+        }
+      }
+    }
+
     // تسجيل التعديلات
     const changeLogs: Array<{
       riskId: string;

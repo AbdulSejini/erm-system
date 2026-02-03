@@ -22,6 +22,7 @@ import {
   MessageSquare,
   Target,
   Circle,
+  Activity,
 } from 'lucide-react';
 
 interface OnlineUser {
@@ -64,6 +65,11 @@ const navItems: NavItem[] = [
     href: '/treatment',
     labelKey: 'navigation.treatment',
     icon: Wrench,
+  },
+  {
+    href: '/treatment-monitoring',
+    labelKey: 'navigation.treatmentMonitoring',
+    icon: Activity,
   },
   {
     href: '/champions',
