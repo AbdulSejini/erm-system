@@ -587,6 +587,8 @@ export default function TreatmentPage() {
       tasks: [],
     });
     setWizardStep(1);
+    // إعادة تعيين الخطة المحددة (مهم للتفريق بين الإضافة والتعديل)
+    setSelectedTreatment(null);
     // مسح حالة OneDrive
     setOneDriveValidating({});
     setOneDriveError({});
@@ -657,10 +659,17 @@ export default function TreatmentPage() {
                                   expectedResidualScore >= 5 ? 'Minor' : 'Negligible';
       }
 
-      console.log('Sending POST request to:', `/api/risks/${formData.riskId}/treatments`);
+      // تحديد إذا كان تعديل أو إنشاء جديد
+      const isEditing = selectedTreatment !== null;
+      const apiUrl = isEditing
+        ? `/api/risks/${formData.riskId}/treatments/${selectedTreatment.id}`
+        : `/api/risks/${formData.riskId}/treatments`;
+      const method = isEditing ? 'PATCH' : 'POST';
 
-      const response = await fetch(`/api/risks/${formData.riskId}/treatments`, {
-        method: 'POST',
+      console.log(`Sending ${method} request to:`, apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           titleAr: formData.titleAr || `خطة معالجة`,
@@ -668,12 +677,12 @@ export default function TreatmentPage() {
           descriptionAr: formData.justificationAr || '',
           descriptionEn: formData.justificationEn || '',
           strategy: formData.strategy,
-          status: 'notStarted',
+          status: isEditing ? undefined : 'notStarted', // لا نغير الحالة عند التعديل
           priority: formData.priority,
           responsibleId: formData.responsibleId,
           startDate: formData.startDate,
           dueDate: formData.dueDate,
-          progress: 0,
+          progress: isEditing ? undefined : 0, // لا نغير التقدم عند التعديل
           // تعليق/تبرير خطة المعالجة
           justificationAr: formData.justificationAr || null,
           justificationEn: formData.justificationEn || null,
@@ -691,19 +700,27 @@ export default function TreatmentPage() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Treatment created successfully:', result);
+        console.log(`Treatment ${isEditing ? 'updated' : 'created'} successfully:`, result);
 
-        // Create tasks if any
-        if (formData.tasks.length > 0 && result.data?.id) {
-          console.log('Creating tasks for treatment plan:', result.data.id);
-          console.log('Tasks to create:', formData.tasks);
+        // Create or update tasks if any
+        const treatmentId = result.data?.id || selectedTreatment?.id;
+        if (formData.tasks.length > 0 && treatmentId) {
+          console.log(`${isEditing ? 'Updating' : 'Creating'} tasks for treatment plan:`, treatmentId);
+          console.log('Tasks:', formData.tasks);
 
           for (let i = 0; i < formData.tasks.length; i++) {
             const task = formData.tasks[i];
-            console.log(`Creating task ${i + 1}:`, task);
+            // تحديد إذا كانت المهمة موجودة (لها id حقيقي وليس temp-)
+            const isExistingTask = task.id && !task.id.startsWith('temp-');
+            const taskMethod = isExistingTask ? 'PATCH' : 'POST';
+            const taskUrl = isExistingTask
+              ? `/api/risks/${formData.riskId}/treatments/${treatmentId}/tasks/${task.id}`
+              : `/api/risks/${formData.riskId}/treatments/${treatmentId}/tasks`;
 
-            const taskResponse = await fetch(`/api/risks/${formData.riskId}/treatments/${result.data.id}/tasks`, {
-              method: 'POST',
+            console.log(`${taskMethod} task ${i + 1}:`, task);
+
+            const taskResponse = await fetch(taskUrl, {
+              method: taskMethod,
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 titleAr: task.titleAr || '',
@@ -724,10 +741,10 @@ export default function TreatmentPage() {
             });
 
             const taskResult = await taskResponse.json();
-            console.log(`Task ${i + 1} creation result:`, taskResult);
+            console.log(`Task ${i + 1} ${isExistingTask ? 'update' : 'creation'} result:`, taskResult);
 
             if (!taskResponse.ok) {
-              console.error(`Failed to create task ${i + 1}:`, taskResult.error);
+              console.error(`Failed to ${isExistingTask ? 'update' : 'create'} task ${i + 1}:`, taskResult.error);
             }
           }
         }
