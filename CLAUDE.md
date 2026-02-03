@@ -264,6 +264,26 @@ NEXTAUTH_URL=http://localhost:3000
      - `sceco.sharepoint.com`, `sceco-my.sharepoint.com`
    - Component: `/src/components/OneDrivePicker.tsx`
 
+### Treatment Plan Permissions
+- **Who can create treatment plans**:
+  - `admin` - Full access
+  - `riskManager` - Risk management access
+  - `riskChampion` - Department risk champions
+  - Users in Risk Management department (name contains "risk" or "مخاطر")
+- API check in `/api/risks/[id]/treatments/route.ts`
+- Error message shown if unauthorized
+
+### Email Copy Feature (After Treatment Plan Creation)
+- Modal appears after successful treatment plan creation
+- Allows copying email information to send to responsible person:
+  - **Copy Subject**: Email subject with risk number and title
+  - **Copy Body**: Full email body with plan details, tasks count, and link
+  - **Copy All**: Both subject and body
+  - **Copy Link Only**: Direct link to treatment plan
+  - **Open Email**: Opens default email client with pre-filled data
+- Bilingual support (Arabic/English)
+- Visual feedback for copy actions (green checkmark)
+
 ### Residual Risk Governance
 1. **Treatment Plan Justification**: Added `justificationAr`/`justificationEn` fields to treatment plans for documenting reasons
 2. **Read-Only Residual Risk**: Residual risk section in risk edit modal is now read-only with info message

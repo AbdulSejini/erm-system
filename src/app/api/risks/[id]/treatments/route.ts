@@ -19,6 +19,49 @@ export async function POST(
       );
     }
 
+    // جلب بيانات المستخدم للتحقق من صلاحياته
+    const currentUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        role: true,
+        departmentId: true,
+        department: {
+          select: {
+            nameAr: true,
+            nameEn: true,
+          },
+        },
+      },
+    });
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: 'المستخدم غير موجود' },
+        { status: 404 }
+      );
+    }
+
+    // التحقق من صلاحية إنشاء خطط المعالجة
+    // يُسمح لـ: admin, riskManager, riskChampion, أو أي مستخدم في إدارة المخاطر
+    const allowedRoles = ['admin', 'riskManager', 'riskChampion'];
+    const isAllowedRole = allowedRoles.includes(currentUser.role);
+
+    // التحقق إذا كان المستخدم يعمل في إدارة المخاطر (Risk Management Department)
+    const isInRiskManagementDept = currentUser.department?.nameEn?.toLowerCase().includes('risk') ||
+                                   currentUser.department?.nameAr?.includes('مخاطر') ||
+                                   currentUser.department?.nameAr?.includes('المخاطر');
+
+    if (!isAllowedRole && !isInRiskManagementDept) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'غير مصرح بإنشاء خطط المعالجة. يُسمح فقط لمدير المخاطر أو رائد المخاطر أو العاملين في إدارة المخاطر.'
+        },
+        { status: 403 }
+      );
+    }
+
     // التحقق من وجود الخطر وجلب بياناته الحالية
     const risk = await prisma.risk.findUnique({
       where: { id: riskId },

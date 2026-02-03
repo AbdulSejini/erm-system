@@ -49,6 +49,8 @@ import {
   Link,
   ExternalLink,
   CheckCircle as CheckIcon,
+  Copy,
+  Mail,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 import OneDrivePicker from '@/components/OneDrivePicker';
@@ -345,6 +347,17 @@ export default function TreatmentPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
+
+  // Email copy modal state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailData, setEmailData] = useState<{
+    recipientEmail: string;
+    recipientName: string;
+    subject: string;
+    body: string;
+    treatmentUrl: string;
+  } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Wizard states
   const [wizardStep, setWizardStep] = useState(1);
@@ -662,7 +675,70 @@ export default function TreatmentPage() {
           }
         }
 
+        // جلب بيانات المسؤول لإعداد البريد الإلكتروني
+        const responsibleUser = responsibleOptions.find(u => u.id === formData.responsibleId);
+        const selectedRiskData = risks.find(r => r.id === formData.riskId);
+        const treatmentUrl = `${window.location.origin}/treatment/${result.data.id}`;
+
+        // إعداد بيانات البريد الإلكتروني
+        const emailSubject = isAr
+          ? `خطة معالجة جديدة للخطر: ${selectedRiskData?.riskNumber || ''} - ${selectedRiskData?.titleAr || ''}`
+          : `New Treatment Plan for Risk: ${selectedRiskData?.riskNumber || ''} - ${selectedRiskData?.titleEn || selectedRiskData?.titleAr || ''}`;
+
+        const emailBody = isAr
+          ? `السلام عليكم ${responsibleUser?.name || ''},
+
+تم إنشاء خطة معالجة جديدة وتم تعيينك كمسؤول عنها:
+
+📋 تفاصيل خطة المعالجة:
+━━━━━━━━━━━━━━━━━━━━━━
+• رقم الخطر: ${selectedRiskData?.riskNumber || ''}
+• عنوان الخطر: ${selectedRiskData?.titleAr || ''}
+• عنوان الخطة: ${formData.titleAr || formData.titleEn || 'خطة معالجة'}
+• الاستراتيجية: ${strategyConfig[formData.strategy as TreatmentStrategy]?.labelAr || formData.strategy}
+• تاريخ الاستحقاق: ${formData.dueDate}
+• عدد المهام: ${formData.tasks.length}
+
+🔗 رابط الخطة:
+${treatmentUrl}
+
+يرجى مراجعة الخطة والبدء في تنفيذها.
+
+مع تحيات فريق إدارة المخاطر`
+          : `Hello ${responsibleUser?.nameEn || responsibleUser?.name || ''},
+
+A new treatment plan has been created and you have been assigned as the responsible person:
+
+📋 Treatment Plan Details:
+━━━━━━━━━━━━━━━━━━━━━━
+• Risk Number: ${selectedRiskData?.riskNumber || ''}
+• Risk Title: ${selectedRiskData?.titleEn || selectedRiskData?.titleAr || ''}
+• Plan Title: ${formData.titleEn || formData.titleAr || 'Treatment Plan'}
+• Strategy: ${strategyConfig[formData.strategy as TreatmentStrategy]?.labelEn || formData.strategy}
+• Due Date: ${formData.dueDate}
+• Number of Tasks: ${formData.tasks.length}
+
+🔗 Plan Link:
+${treatmentUrl}
+
+Please review the plan and start implementation.
+
+Best regards,
+Risk Management Team`;
+
+        // إعداد بيانات modal البريد
+        setEmailData({
+          recipientEmail: '', // سيتم ملؤه من بيانات المستخدم إذا متاحة
+          recipientName: responsibleUser?.name || responsibleUser?.nameEn || '',
+          subject: emailSubject,
+          body: emailBody,
+          treatmentUrl,
+        });
+
         closeAddModal();
+        // إظهار modal نسخ البريد
+        setShowEmailModal(true);
+
         // Refresh data
         console.log('Refreshing risks data...');
         const risksRes = await fetch('/api/risks?includeTreatments=true');
@@ -2102,6 +2178,204 @@ export default function TreatmentPage() {
           <ModalFooter>
             <Button variant="outline" onClick={() => setShowViewModal(false)}>
               {isAr ? 'إغلاق' : 'Close'}
+            </Button>
+          </ModalFooter>
+        </Modal>
+      )}
+
+      {/* Email Copy Modal - نافذة نسخ البريد الإلكتروني */}
+      {showEmailModal && emailData && (
+        <Modal
+          isOpen={showEmailModal}
+          onClose={() => {
+            setShowEmailModal(false);
+            setEmailData(null);
+            setCopiedField(null);
+          }}
+          title={isAr ? '✅ تم إنشاء خطة المعالجة بنجاح' : '✅ Treatment Plan Created Successfully'}
+          size="lg"
+        >
+          <div className="space-y-6">
+            {/* Success Message */}
+            <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-green-500 text-white">
+                  <Check className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-green-800 dark:text-green-200">
+                    {isAr ? 'تم الإنشاء بنجاح!' : 'Successfully Created!'}
+                  </h3>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    {isAr
+                      ? 'يمكنك نسخ معلومات البريد الإلكتروني أدناه لإرسالها للمسؤول.'
+                      : 'You can copy the email information below to send to the responsible person.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Recipient Name */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {isAr ? 'المسؤول' : 'Recipient'}
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 p-3 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)]">
+                  <span className="font-medium">{emailData.recipientName}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Email Subject */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {isAr ? 'موضوع البريد' : 'Email Subject'}
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 p-3 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)] overflow-x-auto">
+                  <span className="text-sm whitespace-nowrap">{emailData.subject}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(emailData.subject);
+                    setCopiedField('subject');
+                    setTimeout(() => setCopiedField(null), 2000);
+                  }}
+                  className="shrink-0"
+                >
+                  {copiedField === 'subject' ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-500 me-1" />
+                      {isAr ? 'تم!' : 'Copied!'}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 me-1" />
+                      {isAr ? 'نسخ' : 'Copy'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Email Body */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--foreground-secondary)]">
+                {isAr ? 'نص البريد' : 'Email Body'}
+              </label>
+              <div className="relative">
+                <div className="p-4 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)] max-h-60 overflow-y-auto">
+                  <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">{emailData.body}</pre>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(emailData.body);
+                    setCopiedField('body');
+                    setTimeout(() => setCopiedField(null), 2000);
+                  }}
+                  className="absolute top-2 end-2"
+                >
+                  {copiedField === 'body' ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-500 me-1" />
+                      {isAr ? 'تم!' : 'Copied!'}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 me-1" />
+                      {isAr ? 'نسخ' : 'Copy'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Copy All Button */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={() => {
+                  const fullEmail = `${isAr ? 'الموضوع: ' : 'Subject: '}${emailData.subject}\n\n${emailData.body}`;
+                  navigator.clipboard.writeText(fullEmail);
+                  setCopiedField('all');
+                  setTimeout(() => setCopiedField(null), 2000);
+                }}
+              >
+                {copiedField === 'all' ? (
+                  <>
+                    <Check className="h-4 w-4 text-green-500" />
+                    {isAr ? 'تم نسخ الكل!' : 'All Copied!'}
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    {isAr ? 'نسخ الكل' : 'Copy All'}
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={() => {
+                  navigator.clipboard.writeText(emailData.treatmentUrl);
+                  setCopiedField('link');
+                  setTimeout(() => setCopiedField(null), 2000);
+                }}
+              >
+                {copiedField === 'link' ? (
+                  <>
+                    <Check className="h-4 w-4 text-green-500" />
+                    {isAr ? 'تم نسخ الرابط!' : 'Link Copied!'}
+                  </>
+                ) : (
+                  <>
+                    <Link className="h-4 w-4" />
+                    {isAr ? 'نسخ الرابط فقط' : 'Copy Link Only'}
+                  </>
+                )}
+              </Button>
+
+              <Button
+                className="flex-1 gap-2 bg-[#F39200] hover:bg-[#e08600]"
+                onClick={() => {
+                  // فتح تطبيق البريد الإلكتروني مع البيانات
+                  const mailtoLink = `mailto:?subject=${encodeURIComponent(emailData.subject)}&body=${encodeURIComponent(emailData.body)}`;
+                  window.open(mailtoLink, '_blank');
+                }}
+              >
+                <Mail className="h-4 w-4" />
+                {isAr ? 'فتح البريد' : 'Open Email'}
+              </Button>
+            </div>
+          </div>
+
+          <ModalFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEmailModal(false);
+                setEmailData(null);
+                setCopiedField(null);
+              }}
+            >
+              {isAr ? 'إغلاق' : 'Close'}
+            </Button>
+            <Button
+              onClick={() => {
+                setShowEmailModal(false);
+                setEmailData(null);
+                setCopiedField(null);
+                router.push(`/treatment/${emailData.treatmentUrl.split('/').pop()}`);
+              }}
+            >
+              {isAr ? 'عرض الخطة' : 'View Plan'}
             </Button>
           </ModalFooter>
         </Modal>
