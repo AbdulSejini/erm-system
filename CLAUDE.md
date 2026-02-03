@@ -274,6 +274,15 @@ NEXTAUTH_URL=http://localhost:3000
 - API check in `/api/risks/[id]/treatments/route.ts`
 - Error message shown if unauthorized
 
+### Risk Owner Management Permissions
+- **Who can add/edit/delete risk owners**:
+  - `admin` - Full access
+  - `riskManager` - Risk management access
+  - `riskAnalyst` - Risk analysts
+- API check in `/api/risk-owners/route.ts` and `/api/risk-owners/[id]/route.ts`
+- GET requests allowed for all authenticated users
+- POST/PATCH/DELETE require admin, riskManager, or riskAnalyst role
+
 ### Email Copy Feature (After Treatment Plan Creation)
 - Modal appears after successful treatment plan creation
 - Allows copying email information to send to responsible person:

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { auth } from '@/lib/auth';
 
 // GET - الحصول على جميع ملاك المخاطر
 export async function GET() {
@@ -37,6 +38,30 @@ export async function GET() {
 // POST - إنشاء مالك خطر جديد
 export async function POST(request: NextRequest) {
   try {
+    // التحقق من الجلسة والصلاحيات
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'غير مصرح' },
+        { status: 401 }
+      );
+    }
+
+    // جلب بيانات المستخدم
+    const currentUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    // التحقق من الصلاحيات - يُسمح لـ admin, riskManager, riskAnalyst
+    const allowedRoles = ['admin', 'riskManager', 'riskAnalyst'];
+    if (!currentUser || !allowedRoles.includes(currentUser.role)) {
+      return NextResponse.json(
+        { success: false, error: 'غير مصرح بإضافة ملاك المخاطر' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     // التحقق من البيانات المطلوبة

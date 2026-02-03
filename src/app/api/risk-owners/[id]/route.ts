@@ -1,5 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { auth } from '@/lib/auth';
+
+// دالة مساعدة للتحقق من صلاحيات التعديل/الحذف
+async function checkEditPermission() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { allowed: false, error: 'غير مصرح', status: 401 };
+  }
+
+  const currentUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+
+  // التحقق من الصلاحيات - يُسمح لـ admin, riskManager, riskAnalyst
+  const allowedRoles = ['admin', 'riskManager', 'riskAnalyst'];
+  if (!currentUser || !allowedRoles.includes(currentUser.role)) {
+    return { allowed: false, error: 'غير مصرح بتعديل ملاك المخاطر', status: 403 };
+  }
+
+  return { allowed: true };
+}
 
 // GET - الحصول على مالك خطر محدد
 export async function GET(
@@ -52,6 +74,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // التحقق من الصلاحيات
+    const permCheck = await checkEditPermission();
+    if (!permCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: permCheck.error },
+        { status: permCheck.status }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -112,6 +143,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // التحقق من الصلاحيات
+    const permCheck = await checkEditPermission();
+    if (!permCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: permCheck.error },
+        { status: permCheck.status }
+      );
+    }
+
     const { id } = await params;
 
     const existingOwner = await prisma.riskOwner.findUnique({
