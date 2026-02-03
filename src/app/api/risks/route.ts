@@ -203,6 +203,14 @@ export async function GET(request: NextRequest) {
                       email: true,
                     },
                   },
+                  monitorOwner: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      fullNameEn: true,
+                      email: true,
+                    },
+                  },
                 },
               },
             },

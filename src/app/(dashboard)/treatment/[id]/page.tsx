@@ -48,6 +48,8 @@ import {
   Copy,
   Link,
   Check,
+  ExternalLink,
+  FileCheck,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 
@@ -153,14 +155,23 @@ interface Task {
   id: string;
   titleAr: string;
   titleEn: string;
+  descriptionAr?: string;
+  descriptionEn?: string;
   dueDate: string;
   priority: 'high' | 'medium' | 'low';
   status: string;
-  assignedTo?: string | TaskAssignee;
+  assignedTo?: TaskAssignee;
+  assignedToId?: string;
   actionOwner?: TaskAssignee;
+  actionOwnerId?: string;
   monitor?: TaskAssignee;
-  followedBy?: string;
-  description?: string;
+  monitorOwner?: TaskAssignee;
+  monitorOwnerId?: string;
+  oneDriveUrl?: string;
+  oneDriveFileName?: string;
+  successIndicatorAr?: string;
+  successIndicatorEn?: string;
+  completedAt?: string;
 }
 
 interface TreatmentPlan {
@@ -442,12 +453,14 @@ export default function TreatmentDetailPage() {
       id: `temp-${Date.now()}`,
       titleAr: '',
       titleEn: '',
+      descriptionAr: '',
+      descriptionEn: '',
       dueDate: formData.dueDate,
       priority: 'medium',
       status: 'notStarted',
-      assignedTo: '',
-      followedBy: '',
-      description: '',
+      actionOwnerId: '',
+      monitorOwnerId: '',
+      oneDriveUrl: '',
     };
     setFormData({ ...formData, tasks: [...formData.tasks, newTask] });
   };
@@ -808,7 +821,7 @@ export default function TreatmentDetailPage() {
                     className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30 hover:shadow-sm transition-all"
                   >
                     {isEditing ? (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-[#F39200]">
                             {isAr ? `المهمة ${index + 1}` : `Task ${index + 1}`}
@@ -822,6 +835,7 @@ export default function TreatmentDetailPage() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
+                        {/* العناوين */}
                         <div className="grid grid-cols-2 gap-3">
                           <Input
                             placeholder={isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}
@@ -834,54 +848,201 @@ export default function TreatmentDetailPage() {
                             onChange={(e) => updateTask(index, 'titleEn', e.target.value)}
                           />
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <select
-                            value={task.priority}
-                            onChange={(e) => updateTask(index, 'priority', e.target.value)}
-                            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
-                          >
-                            <option value="high">{isAr ? 'عالية' : 'High'}</option>
-                            <option value="medium">{isAr ? 'متوسطة' : 'Medium'}</option>
-                            <option value="low">{isAr ? 'منخفضة' : 'Low'}</option>
-                          </select>
-                          <Input
-                            type="date"
-                            value={task.dueDate?.split('T')[0] || ''}
-                            onChange={(e) => updateTask(index, 'dueDate', e.target.value)}
+                        {/* وصف المهمة */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <textarea
+                            placeholder={isAr ? 'وصف المهمة (عربي)' : 'Task Description (Arabic)'}
+                            value={task.descriptionAr || ''}
+                            onChange={(e) => updateTask(index, 'descriptionAr', e.target.value)}
+                            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm min-h-[80px]"
                           />
-                          <select
-                            value={task.status}
-                            onChange={(e) => updateTask(index, 'status', e.target.value)}
-                            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
-                          >
-                            <option value="notStarted">{isAr ? 'لم يبدأ' : 'Not Started'}</option>
-                            <option value="inProgress">{isAr ? 'قيد التنفيذ' : 'In Progress'}</option>
-                            <option value="completed">{isAr ? 'مكتمل' : 'Completed'}</option>
-                          </select>
+                          <textarea
+                            placeholder={isAr ? 'وصف المهمة (إنجليزي)' : 'Task Description (English)'}
+                            value={task.descriptionEn || ''}
+                            onChange={(e) => updateTask(index, 'descriptionEn', e.target.value)}
+                            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm min-h-[80px]"
+                          />
+                        </div>
+                        {/* المكلف والمتابع */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">
+                              {isAr ? 'المكلف (منفذ الإجراء)' : 'Assigned To (Action Owner)'}
+                            </label>
+                            <select
+                              value={task.actionOwnerId || ''}
+                              onChange={(e) => updateTask(index, 'actionOwnerId', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+                            >
+                              <option value="">{isAr ? '-- اختر المكلف --' : '-- Select Assignee --'}</option>
+                              {riskOwnersList.map((owner) => (
+                                <option key={owner.id} value={owner.id}>
+                                  {isAr ? owner.nameAr : owner.nameEn}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">
+                              {isAr ? 'المتابع' : 'Monitor'}
+                            </label>
+                            <select
+                              value={task.monitorOwnerId || ''}
+                              onChange={(e) => updateTask(index, 'monitorOwnerId', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+                            >
+                              <option value="">{isAr ? '-- اختر المتابع --' : '-- Select Monitor --'}</option>
+                              {riskOwnersList.map((owner) => (
+                                <option key={owner.id} value={owner.id}>
+                                  {isAr ? owner.nameAr : owner.nameEn}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        {/* الأولوية والتاريخ والحالة */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">
+                              {isAr ? 'الأولوية' : 'Priority'}
+                            </label>
+                            <select
+                              value={task.priority}
+                              onChange={(e) => updateTask(index, 'priority', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+                            >
+                              <option value="high">{isAr ? 'عالية' : 'High'}</option>
+                              <option value="medium">{isAr ? 'متوسطة' : 'Medium'}</option>
+                              <option value="low">{isAr ? 'منخفضة' : 'Low'}</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">
+                              {isAr ? 'تاريخ الاستحقاق' : 'Due Date'}
+                            </label>
+                            <Input
+                              type="date"
+                              value={task.dueDate?.split('T')[0] || ''}
+                              onChange={(e) => updateTask(index, 'dueDate', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">
+                              {isAr ? 'الحالة' : 'Status'}
+                            </label>
+                            <select
+                              value={task.status}
+                              onChange={(e) => updateTask(index, 'status', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+                            >
+                              <option value="notStarted">{isAr ? 'لم يبدأ' : 'Not Started'}</option>
+                              <option value="inProgress">{isAr ? 'قيد التنفيذ' : 'In Progress'}</option>
+                              <option value="completed">{isAr ? 'مكتمل' : 'Completed'}</option>
+                            </select>
+                          </div>
+                        </div>
+                        {/* رابط OneDrive */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">
+                            {isAr ? 'رابط OneDrive/SharePoint' : 'OneDrive/SharePoint Link'}
+                          </label>
+                          <Input
+                            placeholder={isAr ? 'الصق رابط OneDrive أو SharePoint هنا' : 'Paste OneDrive or SharePoint link here'}
+                            value={task.oneDriveUrl || ''}
+                            onChange={(e) => updateTask(index, 'oneDriveUrl', e.target.value)}
+                          />
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-800 dark:text-gray-100">
-                            {isAr ? task.titleAr : task.titleEn}
-                          </h4>
-                          <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {task.dueDate ? new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : '-'}
+                      <div className="space-y-3">
+                        {/* العنوان والحالة */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-800 dark:text-gray-100">
+                              {isAr ? task.titleAr : task.titleEn}
+                            </h4>
+                            {(task.descriptionAr || task.descriptionEn) && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {isAr ? task.descriptionAr : task.descriptionEn}
+                              </p>
+                            )}
+                          </div>
+                          <Badge className={`${statusConfig[task.status as TreatmentStatus]?.bgClass} ${statusConfig[task.status as TreatmentStatus]?.colorClass}`}>
+                            {isAr ? statusConfig[task.status as TreatmentStatus]?.labelAr : statusConfig[task.status as TreatmentStatus]?.labelEn}
+                          </Badge>
+                        </div>
+
+                        {/* المكلف والمتابع */}
+                        <div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-gray-100 dark:bg-gray-700/50">
+                          <div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                              {isAr ? 'المكلف (منفذ الإجراء)' : 'Assigned To'}
                             </span>
-                            <Badge
-                              variant={task.priority === 'high' ? 'danger' : task.priority === 'medium' ? 'warning' : 'secondary'}
-                              className="text-xs"
-                            >
-                              {isAr ? (task.priority === 'high' ? 'عالية' : task.priority === 'medium' ? 'متوسطة' : 'منخفضة') : task.priority}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-[#F39200]" />
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                {task.actionOwner
+                                  ? (isAr ? task.actionOwner.fullName : task.actionOwner.fullNameEn || task.actionOwner.fullName)
+                                  : (isAr ? 'غير محدد' : 'Not assigned')}
+                              </span>
+                            </div>
+                            {task.actionOwner?.email && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
+                                {task.actionOwner.email}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                              {isAr ? 'المتابع' : 'Monitor'}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-sky-500" />
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                {task.monitorOwner
+                                  ? (isAr ? task.monitorOwner.fullName : task.monitorOwner.fullNameEn || task.monitorOwner.fullName)
+                                  : task.monitor
+                                    ? (isAr ? task.monitor.fullName : task.monitor.fullNameEn || task.monitor.fullName)
+                                    : (isAr ? 'غير محدد' : 'Not assigned')}
+                              </span>
+                            </div>
+                            {(task.monitorOwner?.email || task.monitor?.email) && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
+                                {task.monitorOwner?.email || task.monitor?.email}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <Badge className={`${statusConfig[task.status as TreatmentStatus]?.bgClass} ${statusConfig[task.status as TreatmentStatus]?.colorClass}`}>
-                          {isAr ? statusConfig[task.status as TreatmentStatus]?.labelAr : statusConfig[task.status as TreatmentStatus]?.labelEn}
-                        </Badge>
+
+                        {/* التاريخ والأولوية */}
+                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {task.dueDate ? new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : '-'}
+                          </span>
+                          <Badge
+                            variant={task.priority === 'high' ? 'danger' : task.priority === 'medium' ? 'warning' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {isAr ? (task.priority === 'high' ? 'عالية' : task.priority === 'medium' ? 'متوسطة' : 'منخفضة') : task.priority}
+                          </Badge>
+                        </div>
+
+                        {/* رابط OneDrive */}
+                        {task.oneDriveUrl && (
+                          <div className="flex items-center gap-2 p-2 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
+                            <FileCheck className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                            <a
+                              href={task.oneDriveUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1"
+                            >
+                              {task.oneDriveFileName || (isAr ? 'عرض المرفق' : 'View Attachment')}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
