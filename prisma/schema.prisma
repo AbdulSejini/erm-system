@@ -230,6 +230,11 @@ model Risk {
   @@index([sourceId])
   @@index([riskOwnerId])
   @@index([isDeleted])
+  @@index([createdAt])
+  @@index([inherentScore])
+  @@index([residualScore])
+  @@index([ownerId])
+  @@index([championId])
 }
 
 // تقييمات المخاطر (سجل التاريخ)

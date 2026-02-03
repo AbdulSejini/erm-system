@@ -385,3 +385,68 @@ Located in `/src/components/ui/`:
 - **Vercel URL**: https://erm-system-jet.vercel.app
 - **Auto-deploy**: Enabled on push to main branch
 - After pushing schema changes, run `npx prisma db push` locally (uses production DATABASE_URL from .env)
+
+## Security & Performance Features
+
+### Rate Limiting
+- **Location**: `/src/lib/rate-limit.ts`
+- **Implementation**: In-memory rate limiter for API routes
+- **Configurations**:
+  - `standard`: 100 requests/minute (general APIs)
+  - `auth`: 10 requests/minute (authentication)
+  - `write`: 30 requests/minute (create/update/delete)
+  - `heavy`: 10 requests/minute (reports/exports)
+- **Usage in API**:
+  ```typescript
+  import { checkRateLimit, getClientIP, rateLimitConfigs } from '@/lib/rate-limit';
+
+  const clientIP = getClientIP(request);
+  const rateLimit = checkRateLimit(`endpoint-${clientIP}`, rateLimitConfigs.standard);
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+  ```
+
+### API Pagination
+- **Risks API** (`/api/risks`) supports pagination:
+  - `?page=1&limit=10` - Get page 1 with 10 items
+  - `?limit=0` or no limit param - Returns all (backward compatible)
+- **Response includes pagination info**:
+  ```json
+  {
+    "success": true,
+    "data": [...],
+    "count": 10,
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 150,
+      "pages": 15,
+      "hasMore": true
+    }
+  }
+  ```
+
+### Database Indexes
+- **Risk Model Indexes**:
+  - `categoryId`, `departmentId`, `status`, `statusId`
+  - `approvalStatus`, `inherentRating`, `sourceId`
+  - `riskOwnerId`, `isDeleted`, `createdAt`
+  - `inherentScore`, `residualScore`, `ownerId`, `championId`
+- Run `npx prisma db push` after schema changes to apply indexes
+
+### Online Users Tracking
+- **Timeout**: 5 minutes (user considered offline after 5 min of inactivity)
+- **Heartbeat**: Sent every 2 minutes from client
+- **Location**: `/api/users/online` and `/src/components/layout/Sidebar.tsx`
+
+### Treatment Plan Task Details (Fixed)
+- **Task Display** (`/treatment/[id]`):
+  - Shows task description (Arabic/English)
+  - Shows assigned person (المكلف) with name and email
+  - Shows monitor (المتابع) with name and email
+  - Shows OneDrive/SharePoint attachment links
+- **Task Editing**:
+  - Full form for editing all task fields
+  - Dropdown selection for assignee/monitor from RiskOwner list
+  - OneDrive URL input field

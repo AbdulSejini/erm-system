@@ -2,10 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { createAuditLog, getClientInfo } from '@/lib/audit';
+import { checkRateLimit, getClientIP, rateLimitConfigs } from '@/lib/rate-limit';
 
 // GET - الحصول على جميع المخاطر مع فلترة الصلاحيات
 export async function GET(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientIP = getClientIP(request);
+    const rateLimit = checkRateLimit(`risks-get-${clientIP}`, rateLimitConfigs.standard);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { success: false, error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimit.resetTime.toString(),
+          }
+        }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const departmentId = searchParams.get('departmentId');
     const categoryId = searchParams.get('categoryId');
@@ -13,6 +30,11 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     const filterByAccess = searchParams.get('filterByAccess') !== 'false'; // افتراضياً يتم الفلترة
     const includeTreatments = searchParams.get('includeTreatments') === 'true'; // جلب خطط المعالجة
+
+    // Pagination parameters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '0'); // 0 means no limit (backward compatible)
+    const skip = limit > 0 ? (page - 1) * limit : undefined;
 
     // الحصول على الجلسة للتحقق من صلاحيات المستخدم
     const session = await auth();
@@ -223,7 +245,12 @@ export async function GET(request: NextRequest) {
         { isDeleted: 'asc' },
         { createdAt: 'desc' },
       ],
+      // Pagination - only apply if limit > 0
+      ...(limit > 0 && { skip, take: limit }),
     });
+
+    // Get total count for pagination (only if pagination is enabled)
+    const total = limit > 0 ? await prisma.risk.count({ where }) : risks.length;
 
     // تحويل اسم treatments إلى treatmentPlans للتوافق مع الـ frontend
     const risksWithTreatmentPlans = includeTreatments
@@ -241,6 +268,16 @@ export async function GET(request: NextRequest) {
       success: true,
       data: risksWithTreatmentPlans,
       count: risks.length,
+      // Pagination info (only if pagination is enabled)
+      ...(limit > 0 && {
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+          hasMore: page * limit < total,
+        }
+      }),
     });
   } catch (error) {
     console.error('Error fetching risks:', error);
