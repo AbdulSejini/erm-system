@@ -163,8 +163,8 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
       }
     };
 
-    // Send heartbeat every 5 minutes
-    const interval = setInterval(sendHeartbeat, 5 * 60 * 1000);
+    // Send heartbeat every 2 minutes
+    const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
 
     // Initial heartbeat
     sendHeartbeat();

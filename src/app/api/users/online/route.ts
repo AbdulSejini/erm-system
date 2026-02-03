@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 
-// GET - Get online users (users who logged in within the last 15 minutes)
+// GET - Get online users (users who logged in within the last 5 minutes)
 export async function GET() {
   try {
     const session = await auth();
@@ -12,14 +12,14 @@ export async function GET() {
       return NextResponse.json({ users: [] });
     }
 
-    // Consider users online if they logged in within the last 15 minutes
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    // Consider users online if they logged in within the last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
     const onlineUsers = await prisma.user.findMany({
       where: {
         status: 'active',
         lastLogin: {
-          gte: fifteenMinutesAgo,
+          gte: fiveMinutesAgo,
         },
       },
       select: {
