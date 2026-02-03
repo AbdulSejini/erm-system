@@ -43,8 +43,8 @@ export async function POST(
     }
 
     // التحقق من صلاحية إنشاء خطط المعالجة
-    // يُسمح لـ: admin, riskManager, riskChampion, أو أي مستخدم في إدارة المخاطر
-    const allowedRoles = ['admin', 'riskManager', 'riskChampion'];
+    // يُسمح لـ: admin, riskManager, riskChampion, riskAnalyst, أو أي مستخدم في إدارة المخاطر
+    const allowedRoles = ['admin', 'riskManager', 'riskChampion', 'riskAnalyst'];
     const isAllowedRole = allowedRoles.includes(currentUser.role);
 
     // التحقق إذا كان المستخدم يعمل في إدارة المخاطر (Risk Management Department)
@@ -56,7 +56,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error: 'غير مصرح بإنشاء خطط المعالجة. يُسمح فقط لمدير المخاطر أو رائد المخاطر أو العاملين في إدارة المخاطر.'
+          error: 'غير مصرح بإنشاء خطط المعالجة. يُسمح فقط لمدير المخاطر أو رائد المخاطر أو محلل المخاطر أو العاملين في إدارة المخاطر.'
         },
         { status: 403 }
       );

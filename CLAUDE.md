@@ -269,6 +269,7 @@ NEXTAUTH_URL=http://localhost:3000
   - `admin` - Full access
   - `riskManager` - Risk management access
   - `riskChampion` - Department risk champions
+  - `riskAnalyst` - Risk analysts
   - Users in Risk Management department (name contains "risk" or "مخاطر")
 - API check in `/api/risks/[id]/treatments/route.ts`
 - Error message shown if unauthorized
