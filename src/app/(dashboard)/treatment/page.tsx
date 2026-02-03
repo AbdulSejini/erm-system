@@ -710,8 +710,10 @@ export default function TreatmentPage() {
 
           for (let i = 0; i < formData.tasks.length; i++) {
             const task = formData.tasks[i];
-            // تحديد إذا كانت المهمة موجودة (لها id حقيقي وليس temp-)
-            const isExistingTask = task.id && !task.id.startsWith('temp-');
+            // تحديد إذا كانت المهمة موجودة (لها id حقيقي وليس temp- أو task-)
+            // المهام المؤقتة تبدأ بـ temp- أو task- (للتوافق مع المدخلات القديمة)
+            const isTemporaryTask = task.id && (task.id.startsWith('temp-') || task.id.startsWith('task-'));
+            const isExistingTask = task.id && !isTemporaryTask;
             const taskMethod = isExistingTask ? 'PATCH' : 'POST';
             const taskUrl = isExistingTask
               ? `/api/risks/${formData.riskId}/treatments/${treatmentId}/tasks/${task.id}`
@@ -837,7 +839,7 @@ Risk Management Team`;
 
   const addTask = () => {
     const newTask = {
-      id: `task-${Date.now()}`,
+      id: `temp-${Date.now()}`,
       titleAr: '',
       titleEn: '',
       dueDate: formData.dueDate,
