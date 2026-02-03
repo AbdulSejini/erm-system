@@ -1087,18 +1087,42 @@ Risk Management Team`;
                   </div>
                 </div>
 
-                {/* Recipient */}
+                {/* Recipient Email */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-[var(--foreground-secondary)]">
-                    {isAr ? 'المسؤول' : 'Recipient'}
+                    {isAr ? 'البريد الإلكتروني' : 'Email Address'}
                   </label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 p-3 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)]">
                       <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <span className="font-medium">{isAr ? responsibleName : responsibleNameEn}</span>
+                        <Mail className="h-4 w-4 text-gray-500" />
+                        <span className="font-medium">{responsiblePerson?.email || (isAr ? 'غير متوفر' : 'Not available')}</span>
                       </div>
                     </div>
+                    {responsiblePerson?.email && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(responsiblePerson.email || '');
+                          setCopiedField('email');
+                          setTimeout(() => setCopiedField(null), 2000);
+                        }}
+                        className="shrink-0"
+                      >
+                        {copiedField === 'email' ? (
+                          <>
+                            <Check className="h-4 w-4 text-green-500 me-1" />
+                            {isAr ? 'تم!' : 'Copied!'}
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 me-1" />
+                            {isAr ? 'نسخ' : 'Copy'}
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
 
