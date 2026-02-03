@@ -93,7 +93,24 @@ export async function POST(
       justificationEn: body.justificationEn,
       strategy: body.strategy,
       responsibleId: body.responsibleId,
+      startDate: body.startDate,
+      dueDate: body.dueDate,
     }, null, 2));
+
+    // التحقق من البيانات المطلوبة
+    if (!body.responsibleId) {
+      return NextResponse.json(
+        { success: false, error: 'المسؤول مطلوب' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.startDate || !body.dueDate) {
+      return NextResponse.json(
+        { success: false, error: 'تاريخ البدء وتاريخ الاستحقاق مطلوبان' },
+        { status: 400 }
+      );
+    }
 
     // إنشاء خطة المعالجة
     const treatmentPlan = await prisma.treatmentPlan.create({
@@ -284,8 +301,13 @@ export async function POST(
     });
   } catch (error) {
     console.error('Error creating treatment plan:', error);
+    // تسجيل تفاصيل الخطأ للتصحيح
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('Error details:', { message: errorMessage, stack: errorStack });
+
     return NextResponse.json(
-      { success: false, error: 'فشل في إنشاء خطة المعالجة' },
+      { success: false, error: `فشل في إنشاء خطة المعالجة: ${errorMessage}` },
       { status: 500 }
     );
   }
