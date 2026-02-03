@@ -2069,18 +2069,25 @@ Risk Management Team`;
                   onClick={() => startTransition(() => setWizardStep(wizardStep + 1))}
                   disabled={
                     (wizardStep === 1 && (!formData.riskId || !formData.responsibleId)) ||
-                    (wizardStep === 2 && formData.tasks.length > 0 && formData.tasks.some(t =>
-                      !t.assignedTo ||
-                      (!t.titleAr && !t.titleEn) ||
-                      !t.description
-                    ))
+                    (wizardStep === 2 && !formData.strategy)
                   }
                 >
                   {isAr ? 'التالي' : 'Next'}
                   <ArrowRight className="h-4 w-4 ms-1" />
                 </Button>
               ) : (
-                <Button onClick={handleSave} disabled={isSaving || !formData.strategy || !formData.responsibleId}>
+                <Button
+                  onClick={handleSave}
+                  disabled={
+                    isSaving ||
+                    !formData.strategy ||
+                    !formData.responsibleId ||
+                    (formData.tasks.length > 0 && formData.tasks.some(t =>
+                      !t.assignedTo ||
+                      (!t.titleAr && !t.titleEn) ||
+                      !t.description
+                    ))
+                  }>
                   {isSaving ? (
                     <>
                       <Loader2 className="h-4 w-4 me-1 animate-spin" />
