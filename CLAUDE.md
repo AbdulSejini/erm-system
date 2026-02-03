@@ -338,6 +338,28 @@ NEXTAUTH_URL=http://localhost:3000
   3. Step 3: Tasks with assignee/monitor from RiskOwner
   4. Save: POST treatment plan → POST tasks sequentially
 
+### Treatment Plan Edit Mode (Fixed)
+- When editing a treatment plan, all existing data is now loaded:
+  - `responsibleId` - المسؤول عن الخطة
+  - `justificationAr/En` - التبرير/مسببات التعديل
+  - `expectedResidualLikelihood/Impact` - إعادة تقييم الخطر المتبقي
+  - Task details: `actionOwnerId`, `monitorOwnerId`, `description`, `oneDriveUrl`
+- Risk selection is preserved (not editable after creation)
+
+### Risk Details Page - Treatment Plans Display
+- Full treatment plan details shown on `/risks/[id]` page
+- Includes:
+  - Justification section (تعليق / مسببات التعديل)
+  - Plan details: responsible, dates, progress, priority
+  - Task list with full details:
+    - Task title (Arabic + English)
+    - Task description
+    - Assigned to (المكلف) with email
+    - Monitor (المتابع) with email
+    - Due date, completion date, status, priority
+- Print-friendly styling for PDF export
+- Use browser print (Ctrl+P) → Save as PDF
+
 ## Localization
 - Arabic (default): `/src/locales/ar.json`
 - English: `/src/locales/en.json`
