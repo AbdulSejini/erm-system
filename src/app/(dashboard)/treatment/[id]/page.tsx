@@ -142,6 +142,13 @@ const ratingColors: Record<RiskRating, { bg: string; text: string; border: strin
   Negligible: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-300 dark:border-blue-700', label: { ar: 'ضئيل', en: 'Negligible' } },
 };
 
+interface TaskAssignee {
+  id: string;
+  fullName: string;
+  fullNameEn?: string;
+  email?: string;
+}
+
 interface Task {
   id: string;
   titleAr: string;
@@ -149,7 +156,9 @@ interface Task {
   dueDate: string;
   priority: 'high' | 'medium' | 'low';
   status: string;
-  assignedTo?: string;
+  assignedTo?: string | TaskAssignee;
+  actionOwner?: TaskAssignee;
+  monitor?: TaskAssignee;
   followedBy?: string;
   description?: string;
 }
@@ -1008,6 +1017,59 @@ export default function TreatmentDetailPage() {
             const treatmentUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/treatment/${treatmentId}`;
             const responsibleName = responsiblePerson?.name || treatment.risk.owner?.fullName || '';
             const responsibleNameEn = responsiblePerson?.nameEn || treatment.risk.owner?.fullNameEn || responsibleName;
+            const responsibleEmail = responsiblePerson?.email || '';
+
+            // بناء قسم المهام
+            const getTaskAssigneeName = (task: Task, isArabic: boolean) => {
+              const assignee = task.actionOwner || (typeof task.assignedTo === 'object' ? task.assignedTo : null);
+              if (!assignee) return isArabic ? 'غير محدد' : 'Not assigned';
+              return isArabic ? assignee.fullName : (assignee.fullNameEn || assignee.fullName);
+            };
+
+            const getTaskAssigneeEmail = (task: Task) => {
+              const assignee = task.actionOwner || (typeof task.assignedTo === 'object' ? task.assignedTo : null);
+              return assignee?.email || '';
+            };
+
+            const getTaskMonitorName = (task: Task, isArabic: boolean) => {
+              if (!task.monitor) return isArabic ? 'غير محدد' : 'Not assigned';
+              return isArabic ? task.monitor.fullName : (task.monitor.fullNameEn || task.monitor.fullName);
+            };
+
+            const getTaskMonitorEmail = (task: Task) => {
+              return task.monitor?.email || '';
+            };
+
+            // بناء نص المهام
+            const tasksTextAr = treatment.tasks && treatment.tasks.length > 0
+              ? treatment.tasks.map((task, index) => {
+                  const assigneeName = getTaskAssigneeName(task, true);
+                  const assigneeEmail = getTaskAssigneeEmail(task);
+                  const monitorName = getTaskMonitorName(task, true);
+                  const monitorEmail = getTaskMonitorEmail(task);
+                  return `
+  ${index + 1}. ${task.titleAr || task.titleEn || 'مهمة'}
+     • المكلف: ${assigneeName}${assigneeEmail ? ` (${assigneeEmail})` : ''}
+     • المتابع: ${monitorName}${monitorEmail ? ` (${monitorEmail})` : ''}
+     • تاريخ الاستحقاق: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString('ar-SA') : 'غير محدد'}
+     • الحالة: ${statusConfig[task.status as TreatmentStatus]?.labelAr || task.status}`;
+                }).join('\n')
+              : '  لا توجد مهام';
+
+            const tasksTextEn = treatment.tasks && treatment.tasks.length > 0
+              ? treatment.tasks.map((task, index) => {
+                  const assigneeName = getTaskAssigneeName(task, false);
+                  const assigneeEmail = getTaskAssigneeEmail(task);
+                  const monitorName = getTaskMonitorName(task, false);
+                  const monitorEmail = getTaskMonitorEmail(task);
+                  return `
+  ${index + 1}. ${task.titleEn || task.titleAr || 'Task'}
+     • Assigned To: ${assigneeName}${assigneeEmail ? ` (${assigneeEmail})` : ''}
+     • Monitor: ${monitorName}${monitorEmail ? ` (${monitorEmail})` : ''}
+     • Due Date: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US') : 'Not specified'}
+     • Status: ${statusConfig[task.status as TreatmentStatus]?.labelEn || task.status}`;
+                }).join('\n')
+              : '  No tasks';
 
             const emailSubject = isAr
               ? `خطة معالجة للخطر: ${treatment.risk.riskNumber} - ${treatment.risk.titleAr}`
@@ -1027,11 +1089,15 @@ export default function TreatmentDetailPage() {
 • الحالة: ${statusConfig[treatment.status]?.labelAr || treatment.status}
 • تاريخ الاستحقاق: ${new Date(treatment.dueDate).toLocaleDateString('ar-SA')}
 • نسبة الإنجاز: ${treatment.progress}%
-• عدد المهام: ${treatment.tasks?.length || 0}
+• المسؤول: ${responsibleName}${responsibleEmail ? ` (${responsibleEmail})` : ''}
 
 📊 درجة الخطر:
 • الدرجة الكامنة: ${treatment.risk.inherentScore} (${treatment.risk.inherentRating})
 • الدرجة المتبقية: ${treatment.risk.residualScore || 'غير محدد'}
+
+📝 المهام (${treatment.tasks?.length || 0}):
+━━━━━━━━━━━━━━━━━━━━━━
+${tasksTextAr}
 
 🔗 رابط الخطة:
 ${treatmentUrl}
@@ -1052,11 +1118,15 @@ You have been assigned as the responsible person for the following treatment pla
 • Status: ${statusConfig[treatment.status]?.labelEn || treatment.status}
 • Due Date: ${new Date(treatment.dueDate).toLocaleDateString('en-US')}
 • Progress: ${treatment.progress}%
-• Number of Tasks: ${treatment.tasks?.length || 0}
+• Responsible: ${responsibleNameEn}${responsibleEmail ? ` (${responsibleEmail})` : ''}
 
 📊 Risk Score:
 • Inherent Score: ${treatment.risk.inherentScore} (${treatment.risk.inherentRating})
 • Residual Score: ${treatment.risk.residualScore || 'Not specified'}
+
+📝 Tasks (${treatment.tasks?.length || 0}):
+━━━━━━━━━━━━━━━━━━━━━━
+${tasksTextEn}
 
 🔗 Plan Link:
 ${treatmentUrl}

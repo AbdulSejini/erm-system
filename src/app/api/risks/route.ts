@@ -184,6 +184,23 @@ export async function GET(request: NextRequest) {
                       id: true,
                       fullName: true,
                       fullNameEn: true,
+                      email: true,
+                    },
+                  },
+                  actionOwner: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      fullNameEn: true,
+                      email: true,
+                    },
+                  },
+                  monitor: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      fullNameEn: true,
+                      email: true,
                     },
                   },
                 },
