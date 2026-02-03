@@ -122,16 +122,26 @@ interface TreatmentPlanData {
     fullName: string;
     fullNameEn: string | null;
   };
-  tasks?: TaskData[];
+  justificationAr?: string | null;
+  justificationEn?: string | null;
+  expectedResidualLikelihood?: number | null;
+  expectedResidualImpact?: number | null;
+  tasks?: Record<string, unknown>[];
 }
 
 interface TaskData {
   id: string;
   titleAr: string;
   titleEn: string;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
   status: string;
   priority: string;
   dueDate: string | null;
+  actionOwnerId: string | null;
+  monitorOwnerId: string | null;
+  oneDriveUrl: string | null;
+  oneDriveFileName: string | null;
 }
 
 interface Treatment {
@@ -150,10 +160,15 @@ interface Treatment {
   currentResidualScore: number;
   progress: number;
   priority: string;
+  responsibleId: string;
   responsibleAr: string;
   responsibleEn: string;
   startDate: string;
   dueDate: string;
+  justificationAr: string | null;
+  justificationEn: string | null;
+  expectedResidualLikelihood: number | null;
+  expectedResidualImpact: number | null;
   tasks: TaskData[];
   departmentId: string;
   departmentAr: string;
@@ -486,11 +501,29 @@ export default function TreatmentPage() {
           currentResidualScore: risk.residualScore || risk.inherentScore,
           progress: plan.progress || 0,
           priority: (plan.priority || 'medium') as 'high' | 'medium' | 'low',
+          responsibleId: plan.responsibleId || '',
           responsibleAr: plan.responsible?.fullName || risk.owner?.fullName || 'غير محدد',
           responsibleEn: plan.responsible?.fullNameEn || risk.owner?.fullNameEn || 'Not Assigned',
           startDate: plan.startDate || risk.createdAt,
           dueDate: plan.dueDate || risk.followUpDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          tasks: plan.tasks || [],
+          justificationAr: plan.justificationAr || null,
+          justificationEn: plan.justificationEn || null,
+          expectedResidualLikelihood: plan.expectedResidualLikelihood || null,
+          expectedResidualImpact: plan.expectedResidualImpact || null,
+          tasks: (plan.tasks || []).map((t: Record<string, unknown>) => ({
+            id: t.id as string,
+            titleAr: t.titleAr as string,
+            titleEn: t.titleEn as string,
+            descriptionAr: (t.descriptionAr as string) || null,
+            descriptionEn: (t.descriptionEn as string) || null,
+            status: t.status as string,
+            priority: (t.priority as string) || 'medium',
+            dueDate: (t.dueDate as string) || null,
+            actionOwnerId: (t.actionOwnerId as string) || null,
+            monitorOwnerId: (t.monitorOwnerId as string) || null,
+            oneDriveUrl: (t.oneDriveUrl as string) || null,
+            oneDriveFileName: (t.oneDriveFileName as string) || null,
+          })),
           departmentId: risk.department?.id || '',
           departmentAr: risk.department?.nameAr || 'غير محدد',
           departmentEn: risk.department?.nameEn || 'Not Assigned',
@@ -1159,27 +1192,27 @@ Risk Management Team`;
                           strategy: treatment.strategy,
                           titleAr: treatment.titleAr,
                           titleEn: treatment.titleEn,
-                          responsibleId: '',
+                          responsibleId: treatment.responsibleId || '',
                           priority: treatment.priority as 'high' | 'medium' | 'low',
                           startDate: treatment.startDate.split('T')[0],
                           dueDate: treatment.dueDate.split('T')[0],
-                          justificationAr: '',
-                          justificationEn: '',
-                          residualLikelihood: null,
-                          residualImpact: null,
-                          updateResidualRisk: false,
+                          justificationAr: treatment.justificationAr || '',
+                          justificationEn: treatment.justificationEn || '',
+                          residualLikelihood: treatment.expectedResidualLikelihood || null,
+                          residualImpact: treatment.expectedResidualImpact || null,
+                          updateResidualRisk: !!(treatment.expectedResidualLikelihood && treatment.expectedResidualImpact),
                           tasks: treatment.tasks.map(t => ({
                             id: t.id,
                             titleAr: t.titleAr,
                             titleEn: t.titleEn,
                             dueDate: t.dueDate ? t.dueDate.split('T')[0] : '',
                             priority: (t.priority || 'medium') as 'high' | 'medium' | 'low',
-                            assignedTo: '',
-                            followedBy: '',
-                            description: '',
+                            assignedTo: t.actionOwnerId || '',
+                            followedBy: t.monitorOwnerId || '',
+                            description: t.descriptionAr || t.descriptionEn || '',
                             status: t.status,
-                            oneDriveUrl: (t as { oneDriveUrl?: string }).oneDriveUrl || '',
-                            oneDriveFileName: (t as { oneDriveFileName?: string }).oneDriveFileName || '',
+                            oneDriveUrl: t.oneDriveUrl || '',
+                            oneDriveFileName: t.oneDriveFileName || '',
                           })),
                         });
                         setWizardStep(2);
