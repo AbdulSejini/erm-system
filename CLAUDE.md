@@ -450,3 +450,38 @@ Located in `/src/components/ui/`:
   - Full form for editing all task fields
   - Dropdown selection for assignee/monitor from RiskOwner list
   - OneDrive URL input field
+
+### Treatment Plan Tasks Fix (Latest)
+- **Problem**: Tasks were not saving when creating new treatment plans
+- **Root Cause**: New tasks had IDs starting with `task-` but code checked for `temp-`
+- **Solution**: Updated code to recognize both `temp-` and `task-` prefixes as temporary IDs
+- **Location**: `/src/app/(dashboard)/treatment/page.tsx`
+
+### Treatment Plan PDF Export
+- **Button Location**: Treatment detail page (`/treatment/[id]`)
+- **How to Use**: Click "PDF" button → Opens browser print dialog → Save as PDF
+- **Design**: Saudi Cable Company branded theme
+  - Orange (#F39200) accent color
+  - Company header and footer
+  - Professional formatting
+  - RTL support for Arabic
+- **Print Styles**: Embedded CSS in `/treatment/[id]/page.tsx`
+- **Features**:
+  - Hides navigation, buttons, and sidebars
+  - Shows treatment plan details
+  - Lists all tasks with assignees and monitors
+  - Includes risk scores and progress
+
+### Email Template Enhancement
+- **Location**: Treatment detail page (`/treatment/[id]`) → "Email Template" button
+- **Fixed**: Monitor name and email now correctly pulled from `monitorOwner` field
+- **Includes for each task**:
+  - Assigned To (المكلف) with email
+  - Monitor (المتابع) with email
+  - Due date and status
+- **Copy Options**:
+  - Copy email address
+  - Copy subject
+  - Copy body
+  - Copy all
+  - Open in email client

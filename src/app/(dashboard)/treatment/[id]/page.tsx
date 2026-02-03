@@ -50,6 +50,8 @@ import {
   Check,
   ExternalLink,
   FileCheck,
+  FileDown,
+  Printer,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 
@@ -515,7 +517,25 @@ export default function TreatmentDetailPage() {
   const residualRatingConf = treatment.risk.residualRating ? ratingColors[treatment.risk.residualRating] : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-transparent p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-transparent p-4 md:p-6 space-y-6 print-container">
+      {/* Print Header - Only shows when printing */}
+      <div className="print-only print-header hidden print:flex print:justify-between print:items-center print:border-b-4 print:border-[#F39200] print:pb-4 print:mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-[#2E2D2C]">
+            {isAr ? 'شركة الكابلات السعودية' : 'Saudi Cable Company'}
+          </h1>
+          <p className="text-sm text-gray-600">Enterprise Risk Management System</p>
+        </div>
+        <div className="text-right">
+          <p className="text-lg font-semibold text-[#F39200]">
+            {isAr ? 'خطة المعالجة' : 'Treatment Plan'}
+          </p>
+          <p className="text-sm text-gray-500">
+            {new Date().toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+          </p>
+        </div>
+      </div>
+
       {/* Hero Header with Animation */}
       <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-[#2E2D2C] border border-gray-100 dark:border-gray-700 shadow-sm animate-slideDown">
         {/* Background Gradient */}
@@ -523,8 +543,8 @@ export default function TreatmentDetailPage() {
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#F39200] via-amber-400 to-[#F39200]" />
 
         <div className="relative p-6">
-          {/* Back Button & Actions */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+          {/* Back Button & Actions - Hidden when printing */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 no-print print:hidden">
             <Button
               variant="outline"
               size="sm"
@@ -557,6 +577,14 @@ export default function TreatmentDetailPage() {
                 </>
               ) : (
                 <>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.print()}
+                    className="text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <FileDown className="h-4 w-4 me-2" />
+                    PDF
+                  </Button>
                   <Button
                     variant="outline"
                     onClick={() => setShowEmailModal(true)}
@@ -1163,6 +1191,16 @@ export default function TreatmentDetailPage() {
         </ModalFooter>
       </Modal>
 
+      {/* Print Footer - Only shows when printing */}
+      <div className="print-only hidden print:block print:fixed print:bottom-0 print:left-0 print:right-0 print:text-center print:text-xs print:text-gray-500 print:border-t print:border-gray-300 print:pt-2 print:bg-white">
+        <p>
+          {isAr
+            ? `تم إنشاء هذا التقرير من نظام إدارة المخاطر المؤسسية - شركة الكابلات السعودية | ${new Date().toLocaleDateString('ar-SA')}`
+            : `Generated from Enterprise Risk Management System - Saudi Cable Company | ${new Date().toLocaleDateString('en-US')}`
+          }
+        </p>
+      </div>
+
       {/* Email Template Modal - نموذج البريد الإلكتروني */}
       {showEmailModal && treatment && (
         <Modal
@@ -1193,12 +1231,13 @@ export default function TreatmentDetailPage() {
             };
 
             const getTaskMonitorName = (task: Task, isArabic: boolean) => {
-              if (!task.monitor) return isArabic ? 'غير محدد' : 'Not assigned';
-              return isArabic ? task.monitor.fullName : (task.monitor.fullNameEn || task.monitor.fullName);
+              const monitor = task.monitorOwner || task.monitor;
+              if (!monitor) return isArabic ? 'غير محدد' : 'Not assigned';
+              return isArabic ? monitor.fullName : (monitor.fullNameEn || monitor.fullName);
             };
 
             const getTaskMonitorEmail = (task: Task) => {
-              return task.monitor?.email || '';
+              return task.monitorOwner?.email || task.monitor?.email || '';
             };
 
             // بناء نص المهام
@@ -1544,6 +1583,193 @@ Risk Management Team`;
 
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
+        }
+
+        /* ========================================
+           PDF Print Styles - Saudi Cable Company Theme
+           ======================================== */
+        @media print {
+          /* Hide non-printable elements */
+          .no-print,
+          nav,
+          header,
+          aside,
+          button,
+          .sidebar,
+          [data-sidebar],
+          [role="navigation"] {
+            display: none !important;
+          }
+
+          /* Reset page styling */
+          @page {
+            size: A4;
+            margin: 15mm;
+          }
+
+          body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
+            font-size: 11pt !important;
+            line-height: 1.5 !important;
+            color: #2E2D2C !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Main container full width */
+          main,
+          .print-container {
+            width: 100% !important;
+            max-width: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          /* Saudi Cable Company Header */
+          .print-header {
+            display: flex !important;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #F39200 !important;
+            padding-bottom: 15px !important;
+            margin-bottom: 20px !important;
+          }
+
+          .print-header::before {
+            content: "Saudi Cable Company - شركة الكابلات السعودية";
+            font-size: 18pt !important;
+            font-weight: bold !important;
+            color: #2E2D2C !important;
+          }
+
+          .print-header::after {
+            content: "Enterprise Risk Management";
+            font-size: 12pt !important;
+            color: #F39200 !important;
+          }
+
+          /* Card styling for print */
+          .card,
+          [class*="Card"],
+          [class*="rounded-2xl"] {
+            border: 1px solid #E5E7EB !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+            margin-bottom: 15px !important;
+            padding: 15px !important;
+            background: white !important;
+          }
+
+          /* Section headers */
+          h1, h2, h3 {
+            color: #2E2D2C !important;
+            border-bottom: 2px solid #F39200 !important;
+            padding-bottom: 5px !important;
+            margin-bottom: 10px !important;
+          }
+
+          /* Strategy badge */
+          [class*="bg-rose-500"],
+          [class*="bg-orange-500"],
+          [class*="bg-sky-500"],
+          [class*="bg-emerald-500"],
+          [class*="bg-[#F39200]"] {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Risk scores */
+          .risk-score {
+            font-size: 14pt !important;
+            font-weight: bold !important;
+          }
+
+          /* Task list */
+          .task-item {
+            border-left: 3px solid #F39200 !important;
+            padding-left: 10px !important;
+            margin-bottom: 10px !important;
+            page-break-inside: avoid !important;
+          }
+
+          /* Progress bar */
+          [class*="bg-gradient"],
+          .progress-bar {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Tables */
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+          }
+
+          th, td {
+            border: 1px solid #E5E7EB !important;
+            padding: 8px !important;
+            text-align: right !important;
+          }
+
+          th {
+            background: #F39200 !important;
+            color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Footer */
+          .print-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 9pt !important;
+            color: #6B7280 !important;
+            border-top: 1px solid #E5E7EB !important;
+            padding-top: 10px !important;
+          }
+
+          .print-footer::before {
+            content: "Generated from Saudi Cable Company ERM System - ";
+          }
+
+          .print-footer::after {
+            content: " | Page " counter(page);
+          }
+
+          /* RTL Support */
+          [dir="rtl"] body,
+          .rtl {
+            direction: rtl !important;
+            text-align: right !important;
+          }
+
+          /* Badge colors */
+          .badge-critical { background: #EF4444 !important; color: white !important; }
+          .badge-major { background: #F97316 !important; color: white !important; }
+          .badge-moderate { background: #EAB308 !important; color: black !important; }
+          .badge-minor { background: #22C55E !important; color: white !important; }
+          .badge-negligible { background: #3B82F6 !important; color: white !important; }
+
+          /* Ensure colors print */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+
+        /* Print-specific content that only shows when printing */
+        .print-only {
+          display: none !important;
+        }
+
+        @media print {
+          .print-only {
+            display: block !important;
+          }
         }
       `}</style>
     </div>
