@@ -661,12 +661,21 @@ export default function TreatmentPage() {
 
       // تحديد إذا كان تعديل أو إنشاء جديد
       const isEditing = selectedTreatment !== null;
+
+      // التحقق مرة أخرى من وجود riskId قبل بناء URL
+      if (!formData.riskId) {
+        alert('خطأ: لم يتم تحديد الخطر. يرجى اختيار خطر من القائمة.');
+        setIsSaving(false);
+        return;
+      }
+
       const apiUrl = isEditing
         ? `/api/risks/${formData.riskId}/treatments/${selectedTreatment.id}`
         : `/api/risks/${formData.riskId}/treatments`;
       const method = isEditing ? 'PATCH' : 'POST';
 
       console.log(`Sending ${method} request to:`, apiUrl);
+      console.log('formData.riskId:', formData.riskId);
 
       const response = await fetch(apiUrl, {
         method,
