@@ -51,6 +51,7 @@ import {
   CheckCircle as CheckIcon,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
+import OneDrivePicker from '@/components/OneDrivePicker';
 
 // ============================================
 // Types & Interfaces
@@ -1822,6 +1823,26 @@ export default function TreatmentPage() {
                               {isAr ? 'مرفق OneDrive (اختياري)' : 'OneDrive Attachment (Optional)'}
                             </label>
                             <div className="relative">
+                              {/* خيارات الرفع */}
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {/* زر اختيار من OneDrive */}
+                                <OneDrivePicker
+                                  isAr={isAr}
+                                  onFileSelect={(file) => {
+                                    updateTask(index, 'oneDriveUrl', file.url);
+                                    updateTask(index, 'oneDriveFileName', file.name);
+                                    setOneDriveValid(prev => ({ ...prev, [index]: true }));
+                                    setOneDriveError(prev => ({ ...prev, [index]: '' }));
+                                  }}
+                                />
+
+                                {/* أو لصق الرابط يدوياً */}
+                                <span className="text-xs text-gray-400 self-center">
+                                  {isAr ? 'أو الصق الرابط:' : 'or paste link:'}
+                                </span>
+                              </div>
+
+                              {/* حقل الرابط اليدوي */}
                               <div className="flex gap-2">
                                 <div className="relative flex-1">
                                   <input
@@ -1865,6 +1886,21 @@ export default function TreatmentPage() {
                                     {isAr ? 'فتح' : 'Open'}
                                   </a>
                                 )}
+                                {task.oneDriveUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateTask(index, 'oneDriveUrl', '');
+                                      updateTask(index, 'oneDriveFileName', '');
+                                      setOneDriveValid(prev => ({ ...prev, [index]: false }));
+                                      setOneDriveError(prev => ({ ...prev, [index]: '' }));
+                                    }}
+                                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                    title={isAr ? 'إزالة الملف' : 'Remove file'}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                )}
                               </div>
 
                               {/* رسالة الخطأ/التوجيه */}
@@ -1884,15 +1920,6 @@ export default function TreatmentPage() {
                                     {isAr ? `✓ الملف مرفق: ${task.oneDriveFileName || 'ملف مرفق'}` : `✓ File attached: ${task.oneDriveFileName || 'Attached file'}`}
                                   </p>
                                 </div>
-                              )}
-
-                              {/* تلميح للمستخدم */}
-                              {!task.oneDriveUrl && (
-                                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                                  {isAr
-                                    ? '💡 تأكد من مشاركة الملف مع "الأشخاص في شركة الكابلات السعودية" قبل إضافة الرابط'
-                                    : '💡 Make sure to share the file with "People in Saudi Cables Company" before adding the link'}
-                                </p>
                               )}
                             </div>
                           </div>
