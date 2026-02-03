@@ -311,6 +311,9 @@ model TreatmentTask {
   dueDate           DateTime? // تاريخ الاستحقاق
   completionDate    DateTime?
   order             Int       @default(0)
+  // مرفقات OneDrive
+  oneDriveUrl       String?   // رابط الملف في OneDrive/SharePoint
+  oneDriveFileName  String?   // اسم الملف المرفق
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

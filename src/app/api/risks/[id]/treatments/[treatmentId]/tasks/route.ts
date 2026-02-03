@@ -49,6 +49,9 @@ export async function POST(
         successIndicatorEn: body.successIndicatorEn || null,
         dueDate: body.dueDate ? new Date(body.dueDate) : null,
         order: body.order || 0,
+        // مرفقات OneDrive
+        oneDriveUrl: body.oneDriveUrl || null,
+        oneDriveFileName: body.oneDriveFileName || null,
       },
       include: {
         assignedTo: {
