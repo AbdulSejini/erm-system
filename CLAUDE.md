@@ -355,5 +355,11 @@ Located in `/src/components/ui/`:
 1. Always run `npx prisma db push` after schema changes
 2. Run `npm run build` before deploying to check for TypeScript errors
 3. Translations must be added to both `ar.json` and `en.json`
-4. Use `isAr` from `useTranslation()` to conditionally render content
+4. Use `isAr` from `useTranslation()` to contextually render content
 5. Residual risk changes MUST go through treatment plans - direct editing is disabled
+
+## Deployment
+- **GitHub Repository**: https://github.com/AbdulSejini/erm-system
+- **Vercel URL**: https://erm-system-jet.vercel.app
+- **Auto-deploy**: Enabled on push to main branch
+- After pushing schema changes, run `npx prisma db push` locally (uses production DATABASE_URL from .env)
