@@ -345,6 +345,9 @@ export default function TreatmentPage() {
     priority: 'medium' as 'high' | 'medium' | 'low',
     startDate: new Date().toISOString().split('T')[0],
     dueDate: '',
+    // تعليق/تبرير خطة المعالجة
+    justificationAr: '',
+    justificationEn: '',
     // إعادة تقييم الخطر المتبقي (Residual Risk)
     residualLikelihood: null as number | null,
     residualImpact: null as number | null,
@@ -513,6 +516,8 @@ export default function TreatmentPage() {
       priority: 'medium',
       startDate: new Date().toISOString().split('T')[0],
       dueDate: '',
+      justificationAr: '',
+      justificationEn: '',
       residualLikelihood: null,
       residualImpact: null,
       updateResidualRisk: false,
@@ -566,8 +571,8 @@ export default function TreatmentPage() {
         body: JSON.stringify({
           titleAr: formData.titleAr || `خطة معالجة`,
           titleEn: formData.titleEn || `Treatment Plan`,
-          descriptionAr: '',
-          descriptionEn: '',
+          descriptionAr: formData.justificationAr || '',
+          descriptionEn: formData.justificationEn || '',
           strategy: formData.strategy,
           status: 'notStarted',
           priority: formData.priority,
@@ -575,6 +580,9 @@ export default function TreatmentPage() {
           startDate: formData.startDate,
           dueDate: formData.dueDate,
           progress: 0,
+          // تعليق/تبرير خطة المعالجة
+          justificationAr: formData.justificationAr || null,
+          justificationEn: formData.justificationEn || null,
           // إعادة تقييم الخطر المتبقي
           expectedResidualLikelihood: formData.updateResidualRisk ? formData.residualLikelihood : null,
           expectedResidualImpact: formData.updateResidualRisk ? formData.residualImpact : null,
@@ -941,6 +949,8 @@ export default function TreatmentPage() {
                           priority: treatment.priority as 'high' | 'medium' | 'low',
                           startDate: treatment.startDate.split('T')[0],
                           dueDate: treatment.dueDate.split('T')[0],
+                          justificationAr: '',
+                          justificationEn: '',
                           residualLikelihood: null,
                           residualImpact: null,
                           updateResidualRisk: false,
@@ -1228,6 +1238,51 @@ export default function TreatmentPage() {
                         value={formData.dueDate}
                         onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
                       />
+                    </div>
+                  </div>
+
+                  {/* تعليق/تبرير خطة المعالجة - Justification */}
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      <label className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        {isAr ? 'تعليق / مسببات التعديل' : 'Justification / Reason for Change'}
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">
+                      {isAr
+                        ? 'اشرح أسباب إنشاء خطة المعالجة هذه وما هي الأهداف المرجوة منها'
+                        : 'Explain the reasons for creating this treatment plan and the expected outcomes'}
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <label htmlFor="justification-ar" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                          {isAr ? 'التعليق (عربي)' : 'Justification (Arabic)'}
+                        </label>
+                        <textarea
+                          id="justification-ar"
+                          value={formData.justificationAr}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, justificationAr: e.target.value }))}
+                          dir="rtl"
+                          rows={3}
+                          placeholder={isAr ? 'أدخل تبرير/تعليق خطة المعالجة...' : 'Enter treatment plan justification...'}
+                          className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="justification-en" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                          {isAr ? 'التعليق (إنجليزي)' : 'Justification (English)'}
+                        </label>
+                        <textarea
+                          id="justification-en"
+                          value={formData.justificationEn}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, justificationEn: e.target.value }))}
+                          dir="ltr"
+                          rows={3}
+                          placeholder="Enter treatment plan justification..."
+                          className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
+                        />
+                      </div>
                     </div>
                   </div>
 

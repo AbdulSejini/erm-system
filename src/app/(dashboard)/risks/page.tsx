@@ -674,20 +674,7 @@ export default function RisksPage() {
   const [modalIncidentsLoading, setModalIncidentsLoading] = useState(false);
   const [riskOwners, setRiskOwners] = useState<{ id: string; fullName: string; fullNameEn: string | null }[]>([]);
 
-  // Residual risk change request state
-  const [originalResidualValues, setOriginalResidualValues] = useState<{
-    likelihood: number;
-    impact: number;
-    score: number;
-    rating: string;
-  } | null>(null);
-  const [showResidualJustificationModal, setShowResidualJustificationModal] = useState(false);
-  const [residualJustificationAr, setResidualJustificationAr] = useState('');
-  const [residualJustificationEn, setResidualJustificationEn] = useState('');
-  const [selectedTreatmentPlanId, setSelectedTreatmentPlanId] = useState<string | null>(null);
-  const [isSubmittingResidualChange, setIsSubmittingResidualChange] = useState(false);
-  const [pendingRiskSave, setPendingRiskSave] = useState<typeof selectedRisk>(null);
-  const [availableTreatmentPlans, setAvailableTreatmentPlans] = useState<TreatmentPlan[]>([]);
+  // Residual risk values reference (للعرض فقط - الخطر المتبقي لا يمكن تعديله من هنا)
 
   // Normalize rating to valid values
   const normalizeRating = (rating: string | null | undefined): RiskRating => {
@@ -1325,32 +1312,8 @@ export default function RisksPage() {
   };
 
   // Handle Edit Risk
-  const handleEditRisk = async (risk: typeof mockRisks[0]) => {
+  const handleEditRisk = (risk: typeof mockRisks[0]) => {
     setSelectedRisk(risk);
-    // Capture original residual values to detect changes
-    setOriginalResidualValues({
-      likelihood: risk.residualLikelihood,
-      impact: risk.residualImpact,
-      score: risk.residualScore,
-      rating: risk.residualRating,
-    });
-    // Reset justification state
-    setResidualJustificationAr('');
-    setResidualJustificationEn('');
-    setSelectedTreatmentPlanId(null);
-
-    // Fetch available treatment plans for this risk
-    try {
-      const response = await fetch(`/api/risks/${risk.id}/treatments`);
-      const result = await response.json();
-      if (result.success) {
-        setAvailableTreatmentPlans(result.data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching treatment plans:', error);
-      setAvailableTreatmentPlans([]);
-    }
-
     setShowEditModal(true);
   };
 
@@ -3249,88 +3212,55 @@ export default function RisksPage() {
               </div>
             </div>
 
-            {/* Residual Risk Assessment */}
-            <div className={cn(
-              "rounded-lg border p-4",
-              originalResidualValues && (
-                selectedRisk.residualLikelihood !== originalResidualValues.likelihood ||
-                selectedRisk.residualImpact !== originalResidualValues.impact
-              )
-                ? "border-amber-400 bg-amber-50/50 dark:bg-amber-900/10"
-                : "border-[var(--border)] bg-[var(--background-secondary)]"
-            )}>
+            {/* Residual Risk Assessment - للقراءة فقط */}
+            <div className="rounded-lg border border-[var(--border)] p-4 bg-[var(--background-secondary)]">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-medium text-[var(--foreground)]">
                   {t('risks.residualRisk')}
                 </h4>
-                {/* Show indicator if residual risk has changed */}
-                {originalResidualValues && (
-                  selectedRisk.residualLikelihood !== originalResidualValues.likelihood ||
-                  selectedRisk.residualImpact !== originalResidualValues.impact
-                ) && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="warning" size="sm">
-                      {currentUser?.role === 'riskManager' || currentUser?.role === 'admin'
-                        ? (isAr ? 'موافقة تلقائية' : 'Auto-approved')
-                        : (isAr ? 'يتطلب موافقة' : 'Requires approval')}
-                    </Badge>
-                  </div>
-                )}
+                <Badge variant="secondary" size="sm">
+                  {isAr ? 'للقراءة فقط' : 'Read Only'}
+                </Badge>
               </div>
-              {/* Warning message for non-riskManager users */}
-              {!(currentUser?.role === 'riskManager' || currentUser?.role === 'admin') && (
-                <div className="mb-3 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  <span>
+              {/* Info message about updating via treatment plans */}
+              <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50">
+                <Shield className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-700 dark:text-blue-300">
+                  <p className="font-medium">
                     {isAr
-                      ? 'تعديلات الخطر المتبقي تتطلب موافقة مدير إدارة المخاطر'
-                      : 'Residual risk changes require Risk Manager approval'}
-                  </span>
+                      ? 'لا يمكن تعديل الخطر المتبقي مباشرة من هنا'
+                      : 'Residual risk cannot be modified directly from here'}
+                  </p>
+                  <p className="mt-1 text-blue-600 dark:text-blue-400">
+                    {isAr
+                      ? 'لتعديل الخطر المتبقي، يرجى إنشاء خطة معالجة جديدة من صفحة "المعالجة" مع تحديد القيم المتوقعة للخطر المتبقي.'
+                      : 'To modify residual risk, please create a new treatment plan from the "Treatment" page with expected residual risk values.'}
+                  </p>
                 </div>
-              )}
+              </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground-muted)]">
                     {t('risks.likelihood')}
                   </label>
-                  <Select
-                    options={[1,2,3,4,5].map(n => ({ value: String(n), label: `${n} - ${t(`assessment.likelihood.${n}`)}` }))}
-                    value={String(selectedRisk.residualLikelihood)}
-                    onChange={(value) => {
-                      const likelihood = parseInt(value);
-                      const score = likelihood * selectedRisk.residualImpact;
-                      const rating = getRiskRating(score);
-                      setSelectedRisk({
-                        ...selectedRisk,
-                        residualLikelihood: likelihood,
-                        residualScore: score,
-                        residualRating: rating
-                      });
-                    }}
-                  />
+                  <div className="h-10 flex items-center px-3 rounded-lg bg-[var(--background)] border border-[var(--border)] opacity-70">
+                    <span className="text-sm font-medium">
+                      {selectedRisk.residualLikelihood} - {t(`assessment.likelihood.${selectedRisk.residualLikelihood}`)}
+                    </span>
+                  </div>
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground-muted)]">
                     {t('risks.impact')}
                   </label>
-                  <Select
-                    options={[1,2,3,4,5].map(n => ({ value: String(n), label: `${n} - ${t(`assessment.impact.${n}`)}` }))}
-                    value={String(selectedRisk.residualImpact)}
-                    onChange={(value) => {
-                      const impact = parseInt(value);
-                      const score = selectedRisk.residualLikelihood * impact;
-                      const rating = getRiskRating(score);
-                      setSelectedRisk({
-                        ...selectedRisk,
-                        residualImpact: impact,
-                        residualScore: score,
-                        residualRating: rating
-                      });
-                    }}
-                  />
+                  <div className="h-10 flex items-center px-3 rounded-lg bg-[var(--background)] border border-[var(--border)] opacity-70">
+                    <span className="text-sm font-medium">
+                      {selectedRisk.residualImpact} - {t(`assessment.impact.${selectedRisk.residualImpact}`)}
+                    </span>
+                  </div>
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
+                  <label className="mb-2 block text-sm font-medium text-[var(--foreground-muted)]">
                     {t('risks.riskScore')} / {t('risks.riskRating')}
                   </label>
                   <div className="flex items-center gap-2 h-10">
@@ -3548,24 +3478,6 @@ export default function RisksPage() {
           </Button>
           <Button onClick={async () => {
             if (selectedRisk) {
-              // Check if residual risk has changed
-              const residualHasChanged = originalResidualValues && (
-                selectedRisk.residualLikelihood !== originalResidualValues.likelihood ||
-                selectedRisk.residualImpact !== originalResidualValues.impact
-              );
-
-              // Check if user is riskManager or admin (can auto-approve)
-              const isRiskManagerOrAdmin = currentUser?.role === 'riskManager' || currentUser?.role === 'admin';
-
-              // If residual risk changed and user is NOT riskManager/admin, require justification
-              if (residualHasChanged && !isRiskManagerOrAdmin) {
-                // Store the risk for later save and show justification modal
-                setPendingRiskSave(selectedRisk);
-                setShowResidualJustificationModal(true);
-                return;
-              }
-
-              // Proceed with save (riskManager/admin gets auto-approval for residual changes)
               try {
                 // Check if this is a mock/fallback risk (HR risks or other mock data)
                 // Note: Prisma IDs start with 'cm' and are 25+ chars, mock IDs are simple like '1', '2', 'hr-1', 'mock-1'
@@ -3690,243 +3602,6 @@ export default function RisksPage() {
             }
           }}>
             {t('common.save')}
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Residual Risk Change Justification Modal */}
-      <Modal
-        isOpen={showResidualJustificationModal}
-        onClose={() => {
-          setShowResidualJustificationModal(false);
-          setPendingRiskSave(null);
-          setResidualJustificationAr('');
-          setResidualJustificationEn('');
-          setSelectedTreatmentPlanId(null);
-        }}
-        title={isAr ? 'تبرير تعديل الخطر المتبقي' : 'Residual Risk Change Justification'}
-        size="lg"
-      >
-        <div className="space-y-4">
-          {/* Info Banner */}
-          <div className="flex items-start gap-3 rounded-lg bg-amber-50 p-4 dark:bg-amber-900/20">
-            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-[var(--foreground)]">
-                {isAr ? 'يتطلب تعديل الخطر المتبقي موافقة مدير إدارة المخاطر' : 'Residual risk changes require Risk Manager approval'}
-              </p>
-              <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
-                {isAr
-                  ? 'يرجى تقديم تبرير للتغيير. سيتم إرسال طلب الموافقة تلقائياً بعد الحفظ.'
-                  : 'Please provide justification for this change. An approval request will be sent automatically after saving.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Change Summary */}
-          {originalResidualValues && pendingRiskSave && (
-            <div className="rounded-lg border border-[var(--border)] p-4 bg-[var(--background-secondary)]">
-              <h4 className="font-medium text-[var(--foreground)] mb-3">
-                {isAr ? 'ملخص التغييرات' : 'Change Summary'}
-              </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-[var(--foreground-muted)]">{isAr ? 'القيمة الحالية:' : 'Current:'}</span>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span>{isAr ? 'الاحتمالية:' : 'L:'} {originalResidualValues.likelihood}</span>
-                    <span>×</span>
-                    <span>{isAr ? 'الأثر:' : 'I:'} {originalResidualValues.impact}</span>
-                    <span>=</span>
-                    <Badge variant={getRatingBadgeVariant(originalResidualValues.rating as RiskRating)}>
-                      {originalResidualValues.score}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[var(--foreground-muted)]">{isAr ? 'القيمة الجديدة:' : 'New:'}</span>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span>{isAr ? 'الاحتمالية:' : 'L:'} {pendingRiskSave.residualLikelihood}</span>
-                    <span>×</span>
-                    <span>{isAr ? 'الأثر:' : 'I:'} {pendingRiskSave.residualImpact}</span>
-                    <span>=</span>
-                    <Badge variant={getRatingBadgeVariant(pendingRiskSave.residualRating)}>
-                      {pendingRiskSave.residualScore}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Link to Treatment Plan */}
-          {availableTreatmentPlans.length > 0 && (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
-                {isAr ? 'ربط بخطة معالجة (اختياري)' : 'Link to Treatment Plan (Optional)'}
-              </label>
-              <Select
-                options={[
-                  { value: '', label: isAr ? 'بدون ربط' : 'No Link' },
-                  ...availableTreatmentPlans.map(tp => ({
-                    value: tp.id,
-                    label: isAr ? tp.titleAr : tp.titleEn
-                  }))
-                ]}
-                value={selectedTreatmentPlanId || ''}
-                onChange={(value) => setSelectedTreatmentPlanId(value || null)}
-              />
-            </div>
-          )}
-
-          {/* Justification Arabic */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
-              {isAr ? 'التبرير (عربي) *' : 'Justification (Arabic) *'}
-            </label>
-            <textarea
-              value={residualJustificationAr}
-              onChange={(e) => setResidualJustificationAr(e.target.value)}
-              dir="rtl"
-              rows={3}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              placeholder={isAr ? 'اشرح سبب تعديل الخطر المتبقي...' : 'Explain why the residual risk is being modified...'}
-            />
-          </div>
-
-          {/* Justification English */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--foreground)]">
-              {isAr ? 'التبرير (إنجليزي)' : 'Justification (English)'}
-            </label>
-            <textarea
-              value={residualJustificationEn}
-              onChange={(e) => setResidualJustificationEn(e.target.value)}
-              dir="ltr"
-              rows={3}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              placeholder="Explain why the residual risk is being modified..."
-            />
-          </div>
-        </div>
-        <ModalFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setShowResidualJustificationModal(false);
-              setPendingRiskSave(null);
-              setResidualJustificationAr('');
-              setResidualJustificationEn('');
-              setSelectedTreatmentPlanId(null);
-            }}
-          >
-            {t('common.cancel')}
-          </Button>
-          <Button
-            onClick={async () => {
-              if (!residualJustificationAr.trim()) {
-                alert(isAr ? 'يرجى إدخال تبرير للتعديل' : 'Please provide justification for the change');
-                return;
-              }
-
-              if (!pendingRiskSave || !originalResidualValues) return;
-
-              setIsSubmittingResidualChange(true);
-              try {
-                // Submit the residual risk change request
-                const requestResponse = await fetch('/api/residual-risk-requests', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    riskId: pendingRiskSave.id,
-                    treatmentPlanId: selectedTreatmentPlanId,
-                    currentLikelihood: originalResidualValues.likelihood,
-                    currentImpact: originalResidualValues.impact,
-                    currentScore: originalResidualValues.score,
-                    currentRating: originalResidualValues.rating,
-                    proposedLikelihood: pendingRiskSave.residualLikelihood,
-                    proposedImpact: pendingRiskSave.residualImpact,
-                    proposedScore: pendingRiskSave.residualScore,
-                    proposedRating: pendingRiskSave.residualRating,
-                    justificationAr: residualJustificationAr,
-                    justificationEn: residualJustificationEn || null,
-                    requestType: 'manual',
-                  }),
-                });
-
-                const requestResult = await requestResponse.json();
-
-                if (requestResult.success) {
-                  // Now save the risk WITHOUT the residual changes (keep original values)
-                  const riskToSave = {
-                    ...pendingRiskSave,
-                    residualLikelihood: originalResidualValues.likelihood,
-                    residualImpact: originalResidualValues.impact,
-                    residualScore: originalResidualValues.score,
-                    residualRating: originalResidualValues.rating as RiskRating,
-                  };
-
-                  const response = await fetch(`/api/risks/${riskToSave.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      riskNumber: riskToSave.riskNumber,
-                      departmentId: riskToSave.departmentId,
-                      riskOwnerId: riskToSave.ownerId || null,
-                      titleAr: riskToSave.titleAr,
-                      titleEn: riskToSave.titleEn,
-                      descriptionAr: riskToSave.descriptionAr,
-                      descriptionEn: riskToSave.descriptionEn,
-                      status: riskToSave.status,
-                      inherentLikelihood: riskToSave.inherentLikelihood,
-                      inherentImpact: riskToSave.inherentImpact,
-                      inherentScore: riskToSave.inherentScore,
-                      inherentRating: riskToSave.inherentRating,
-                      potentialCauseAr: riskToSave.potentialCauseAr,
-                      potentialCauseEn: riskToSave.potentialCauseEn,
-                      potentialImpactAr: riskToSave.potentialImpactAr,
-                      potentialImpactEn: riskToSave.potentialImpactEn,
-                      layersOfProtectionAr: riskToSave.layersOfProtectionAr,
-                      layersOfProtectionEn: riskToSave.layersOfProtectionEn,
-                      krisAr: riskToSave.krisAr,
-                      krisEn: riskToSave.krisEn,
-                      mitigationActionsAr: riskToSave.mitigationActionsAr,
-                      mitigationActionsEn: riskToSave.mitigationActionsEn,
-                      processText: riskToSave.processText,
-                      subProcessText: riskToSave.subProcessText,
-                      followUpDate: riskToSave.followUpDate || null,
-                      nextReviewDate: riskToSave.nextReviewDate || null,
-                    }),
-                  });
-
-                  if (response.ok) {
-                    // Update local state with original residual values
-                    setRisks(prev => prev.map(r => r.id === riskToSave.id ? riskToSave : r));
-                    setShowResidualJustificationModal(false);
-                    setShowEditModal(false);
-                    setSelectedRisk(null);
-                    setPendingRiskSave(null);
-                    setResidualJustificationAr('');
-                    setResidualJustificationEn('');
-                    setSelectedTreatmentPlanId(null);
-                    // Refresh from API
-                    fetchRisks(false);
-                    alert(isAr
-                      ? 'تم حفظ التعديلات وإرسال طلب الموافقة على تغيير الخطر المتبقي إلى مدير إدارة المخاطر'
-                      : 'Changes saved and approval request for residual risk change has been sent to the Risk Manager');
-                  }
-                } else {
-                  alert(requestResult.error || (isAr ? 'حدث خطأ في إرسال طلب الموافقة' : 'Error submitting approval request'));
-                }
-              } catch (error) {
-                console.error('Error submitting residual change request:', error);
-                alert(isAr ? 'حدث خطأ في إرسال طلب الموافقة' : 'Error submitting approval request');
-              } finally {
-                setIsSubmittingResidualChange(false);
-              }
-            }}
-            isLoading={isSubmittingResidualChange}
-          >
-            {isAr ? 'إرسال طلب الموافقة' : 'Submit Approval Request'}
           </Button>
         </ModalFooter>
       </Modal>

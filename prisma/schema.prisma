@@ -269,6 +269,10 @@ model TreatmentPlan {
   progress        Int       @default(0)
   cost            Float?
 
+  // تعليق/تبرير خطة المعالجة
+  justificationAr   String?   // تبرير/مسببات التعديل (عربي)
+  justificationEn   String?   // تبرير/مسببات التعديل (إنجليزي)
+
   // قياس الأثر بعد المعالجة (Residual Risk المتوقع)
   expectedResidualLikelihood  Int?    // احتمالية الخطر المتبقي المتوقعة
   expectedResidualImpact      Int?    // تأثير الخطر المتبقي المتوقع

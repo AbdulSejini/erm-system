@@ -62,6 +62,9 @@ export async function POST(
         dueDate: new Date(body.dueDate),
         progress: body.progress || 0,
         cost: body.cost || null,
+        // تعليق/تبرير خطة المعالجة
+        justificationAr: body.justificationAr || null,
+        justificationEn: body.justificationEn || null,
         // قياس الأثر بعد المعالجة (Residual Risk المتوقع)
         expectedResidualLikelihood: body.expectedResidualLikelihood || null,
         expectedResidualImpact: body.expectedResidualImpact || null,
