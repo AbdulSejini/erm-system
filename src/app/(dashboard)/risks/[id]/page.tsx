@@ -45,9 +45,24 @@ interface TreatmentTask {
   id: string;
   titleAr: string;
   titleEn: string;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
   status: string;
-  dueDate: string;
-  completedDate: string | null;
+  priority: string;
+  dueDate: string | null;
+  completionDate: string | null;
+  actionOwner?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+    email: string | null;
+  } | null;
+  monitorOwner?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+    email: string | null;
+  } | null;
 }
 
 interface TreatmentPlan {
@@ -58,12 +73,20 @@ interface TreatmentPlan {
   descriptionEn: string;
   strategy: string;
   status: string;
+  priority: string;
   startDate: string;
   dueDate: string;
   completionDate: string | null;
   progress: number;
   cost: number | null;
+  justificationAr: string | null;
+  justificationEn: string | null;
   responsible?: {
+    id: string;
+    fullName: string;
+    fullNameEn: string | null;
+  };
+  createdBy?: {
     id: string;
     fullName: string;
     fullNameEn: string | null;
@@ -1122,26 +1145,35 @@ function PrintRiskModal({
                 </span>
               </h3>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {risk.treatments.map((plan, index) => (
-                  <div key={plan.id} className="border rounded-lg overflow-hidden" style={{ borderColor: brandColors.dark + '30' }}>
+                  <div key={plan.id} className="border-2 rounded-xl overflow-hidden print:break-inside-avoid" style={{ borderColor: brandColors.primary + '40' }}>
                     {/* Plan Header */}
-                    <div className="p-3 flex items-center justify-between" style={{ backgroundColor: brandColors.darkLight }}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: brandColors.primary, color: 'white' }}>
-                          {index + 1}
+                    <div className="p-4 flex items-center justify-between" style={{ backgroundColor: brandColors.primary + '15' }}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold px-3 py-1 rounded-lg" style={{ backgroundColor: brandColors.primary, color: 'white' }}>
+                          {isAr ? `خطة ${index + 1}` : `Plan ${index + 1}`}
                         </span>
-                        <span className="font-medium" style={{ color: brandColors.dark }}>
+                        <span className="font-semibold text-base" style={{ color: brandColors.dark }}>
                           {isAr ? plan.titleAr : plan.titleEn}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-white">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          plan.priority === 'high' ? 'bg-red-100 text-red-700' :
+                          plan.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          {plan.priority === 'high' ? (isAr ? 'عالية' : 'High') :
+                           plan.priority === 'medium' ? (isAr ? 'متوسطة' : 'Medium') :
+                           (isAr ? 'منخفضة' : 'Low')}
+                        </span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-white font-medium" style={{ color: brandColors.primary }}>
                           {getStrategyName(plan.strategy)}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                           plan.status === 'completed' ? 'bg-green-100 text-green-700' :
-                          plan.status === 'inProgress' ? 'bg-yellow-100 text-yellow-700' :
+                          plan.status === 'inProgress' ? 'bg-blue-100 text-blue-700' :
                           plan.status === 'overdue' ? 'bg-red-100 text-red-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>
@@ -1151,69 +1183,186 @@ function PrintRiskModal({
                     </div>
 
                     {/* Plan Content */}
-                    <div className="p-3">
-                      <p className="text-sm text-gray-600 mb-3">
-                        {isAr ? plan.descriptionAr : plan.descriptionEn}
-                      </p>
+                    <div className="p-4">
+                      {/* Justification / التبرير */}
+                      {(plan.justificationAr || plan.justificationEn) && (
+                        <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                          <h4 className="text-xs font-bold mb-2 flex items-center gap-1 text-blue-700">
+                            <FileText className="h-3 w-3" />
+                            {isAr ? 'تعليق / مسببات التعديل' : 'Justification / Reason for Change'}
+                          </h4>
+                          <p className="text-sm text-blue-800 whitespace-pre-wrap">
+                            {isAr ? plan.justificationAr : plan.justificationEn}
+                          </p>
+                        </div>
+                      )}
 
-                      {/* Plan Details */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3">
-                        <div className="p-2 rounded bg-gray-50">
-                          <p className="text-gray-500">{isAr ? 'المسؤول' : 'Responsible'}</p>
-                          <p className="font-medium">
+                      {/* Description */}
+                      {(plan.descriptionAr || plan.descriptionEn) && (
+                        <div className="mb-4">
+                          <h4 className="text-xs font-bold mb-2 text-gray-600">
+                            {isAr ? 'الوصف' : 'Description'}
+                          </h4>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                            {isAr ? plan.descriptionAr : plan.descriptionEn}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Plan Details Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs mb-4">
+                        <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                          <p className="text-gray-500 mb-1">{isAr ? 'المسؤول' : 'Responsible'}</p>
+                          <p className="font-semibold" style={{ color: brandColors.dark }}>
                             {plan.responsible ? (isAr ? plan.responsible.fullName : plan.responsible.fullNameEn || plan.responsible.fullName) : '-'}
                           </p>
                         </div>
-                        <div className="p-2 rounded bg-gray-50">
-                          <p className="text-gray-500">{isAr ? 'تاريخ البدء' : 'Start Date'}</p>
-                          <p className="font-medium">
+                        <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                          <p className="text-gray-500 mb-1">{isAr ? 'تاريخ البدء' : 'Start Date'}</p>
+                          <p className="font-semibold" style={{ color: brandColors.dark }}>
                             {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
                           </p>
                         </div>
-                        <div className="p-2 rounded bg-gray-50">
-                          <p className="text-gray-500">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
-                          <p className="font-medium">
+                        <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                          <p className="text-gray-500 mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
+                          <p className="font-semibold" style={{ color: brandColors.dark }}>
                             {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
                           </p>
                         </div>
-                        <div className="p-2 rounded bg-gray-50">
-                          <p className="text-gray-500">{isAr ? 'التقدم' : 'Progress'}</p>
-                          <p className="font-medium">{plan.progress}%</p>
+                        <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                          <p className="text-gray-500 mb-1">{isAr ? 'التقدم' : 'Progress'}</p>
+                          <p className="font-semibold" style={{ color: plan.progress === 100 ? '#22c55e' : brandColors.primary }}>
+                            {plan.progress}%
+                          </p>
                         </div>
+                        {plan.createdBy && (
+                          <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                            <p className="text-gray-500 mb-1">{isAr ? 'أنشأها' : 'Created By'}</p>
+                            <p className="font-semibold" style={{ color: brandColors.dark }}>
+                              {isAr ? plan.createdBy.fullName : plan.createdBy.fullNameEn || plan.createdBy.fullName}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Progress Bar */}
-                      <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${plan.progress}%`,
-                            backgroundColor: plan.progress === 100 ? '#22c55e' : brandColors.primary
-                          }}
-                        />
+                      <div className="mb-4">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-500">{isAr ? 'نسبة الإنجاز' : 'Completion'}</span>
+                          <span className="font-semibold" style={{ color: plan.progress === 100 ? '#22c55e' : brandColors.primary }}>
+                            {plan.progress}%
+                          </span>
+                        </div>
+                        <div className="h-3 rounded-full bg-gray-200 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${plan.progress}%`,
+                              backgroundColor: plan.progress === 100 ? '#22c55e' : brandColors.primary
+                            }}
+                          />
+                        </div>
                       </div>
 
-                      {/* Tasks */}
+                      {/* Tasks Section */}
                       {plan.tasks && plan.tasks.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <h4 className="text-xs font-bold mb-2 flex items-center gap-1" style={{ color: brandColors.dark }}>
-                            <ListChecks className="h-3 w-3" />
-                            {isAr ? 'المهام' : 'Tasks'} ({plan.tasks.length})
+                        <div className="mt-4 pt-4 border-t-2 border-gray-200">
+                          <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: brandColors.dark }}>
+                            <ListChecks className="h-4 w-4" style={{ color: brandColors.primary }} />
+                            {isAr ? 'المهام التنفيذية' : 'Action Tasks'}
+                            <span className="text-xs font-normal px-2 py-0.5 rounded-full" style={{ backgroundColor: brandColors.primary + '20', color: brandColors.primary }}>
+                              {plan.tasks.length}
+                            </span>
                           </h4>
-                          <div className="space-y-1">
-                            {plan.tasks.map((task) => (
-                              <div key={task.id} className="flex items-center gap-2 text-xs p-2 rounded bg-gray-50">
-                                {task.status === 'completed' ? (
-                                  <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
-                                ) : (
-                                  <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                          <div className="space-y-3">
+                            {plan.tasks.map((task, taskIndex) => (
+                              <div key={task.id} className="p-3 rounded-lg border border-gray-200 bg-white print:break-inside-avoid">
+                                {/* Task Header */}
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold" style={{ backgroundColor: brandColors.primary + '20', color: brandColors.primary }}>
+                                      {taskIndex + 1}
+                                    </span>
+                                    <div>
+                                      <p className="font-semibold text-sm" style={{ color: brandColors.dark }}>
+                                        {isAr ? task.titleAr : task.titleEn}
+                                      </p>
+                                      {task.titleEn && task.titleAr && (
+                                        <p className="text-xs text-gray-500">
+                                          {isAr ? task.titleEn : task.titleAr}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                      task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-green-100 text-green-700'
+                                    }`}>
+                                      {task.priority === 'high' ? (isAr ? 'عالية' : 'High') :
+                                       task.priority === 'medium' ? (isAr ? 'متوسطة' : 'Medium') :
+                                       (isAr ? 'منخفضة' : 'Low')}
+                                    </span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                      task.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                      task.status === 'inProgress' ? 'bg-blue-100 text-blue-700' :
+                                      task.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {getTaskStatusName(task.status)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Task Description */}
+                                {(task.descriptionAr || task.descriptionEn) && (
+                                  <p className="text-xs text-gray-600 mb-2 ps-8 whitespace-pre-wrap">
+                                    {isAr ? task.descriptionAr : task.descriptionEn}
+                                  </p>
                                 )}
-                                <span className={task.status === 'completed' ? 'line-through text-gray-400' : ''}>
-                                  {isAr ? task.titleAr : task.titleEn}
-                                </span>
-                                <span className="ms-auto text-gray-400">
-                                  {getTaskStatusName(task.status)}
-                                </span>
+
+                                {/* Task Details */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs ps-8">
+                                  {task.actionOwner && (
+                                    <div className="p-2 rounded bg-orange-50">
+                                      <p className="text-orange-600">{isAr ? 'المكلف' : 'Assigned To'}</p>
+                                      <p className="font-medium text-orange-800">
+                                        {isAr ? task.actionOwner.fullName : task.actionOwner.fullNameEn || task.actionOwner.fullName}
+                                      </p>
+                                      {task.actionOwner.email && (
+                                        <p className="text-orange-500 text-[10px]">{task.actionOwner.email}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                  {task.monitorOwner && (
+                                    <div className="p-2 rounded bg-purple-50">
+                                      <p className="text-purple-600">{isAr ? 'المتابع' : 'Monitor'}</p>
+                                      <p className="font-medium text-purple-800">
+                                        {isAr ? task.monitorOwner.fullName : task.monitorOwner.fullNameEn || task.monitorOwner.fullName}
+                                      </p>
+                                      {task.monitorOwner.email && (
+                                        <p className="text-purple-500 text-[10px]">{task.monitorOwner.email}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                  {task.dueDate && (
+                                    <div className="p-2 rounded bg-gray-50">
+                                      <p className="text-gray-500">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
+                                      <p className="font-medium">
+                                        {new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {task.completionDate && (
+                                    <div className="p-2 rounded bg-green-50">
+                                      <p className="text-green-600">{isAr ? 'تاريخ الإنجاز' : 'Completed'}</p>
+                                      <p className="font-medium text-green-700">
+                                        {new Date(task.completionDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>

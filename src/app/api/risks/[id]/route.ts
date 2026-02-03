@@ -137,8 +137,33 @@ export async function GET(
                 fullNameEn: true,
               },
             },
+            createdBy: {
+              select: {
+                id: true,
+                fullName: true,
+                fullNameEn: true,
+              },
+            },
             tasks: {
-              orderBy: { createdAt: 'asc' },
+              include: {
+                actionOwner: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    fullNameEn: true,
+                    email: true,
+                  },
+                },
+                monitorOwner: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    fullNameEn: true,
+                    email: true,
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
             },
           },
           orderBy: { createdAt: 'desc' },
