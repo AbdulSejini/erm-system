@@ -188,7 +188,20 @@ NEXTAUTH_URL=http://localhost:3000
 
 ## Recent Updates
 
-### Residual Risk Governance (Latest)
+### Treatment Plan Wizard Validation (Latest)
+1. **Step 1 - Required Fields**:
+   - Risk selection (required)
+   - Responsible person (required) - moved from Step 2
+2. **Step 3 - Task Required Fields**:
+   - Assigned To / المكلف (required)
+   - Title in Arabic OR English (at least one required)
+   - Task Description (required)
+3. **OneDrive Attachments for Tasks**:
+   - Upload files from OneDrive/SharePoint
+   - Validates sharing with Saudi Cables Company (sceco.com.sa)
+   - Shows error message with solution if not shared properly
+
+### Residual Risk Governance
 1. **Treatment Plan Justification**: Added `justificationAr`/`justificationEn` fields to treatment plans for documenting reasons
 2. **Read-Only Residual Risk**: Residual risk section in risk edit modal is now read-only with info message
 3. **Approval Workflow**:

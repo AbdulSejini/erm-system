@@ -1195,58 +1195,92 @@ export default function TreatmentPage() {
 
             {/* Step Content */}
             <div className="min-h-[300px]">
-              {/* Step 1: Select Risk */}
+              {/* Step 1: Select Risk & Responsible */}
               {wizardStep === 1 && (
                 <div className="space-y-4">
-                  <Input
-                    placeholder={isAr ? 'ابحث عن الخطر...' : 'Search for risk...'}
-                    leftIcon={<Search className="h-4 w-4" />}
-                    value={riskSearchQuery}
-                    onChange={(e) => setRiskSearchQuery(e.target.value)}
-                  />
-                  <div className="max-h-[250px] overflow-y-auto space-y-2">
-                    {availableRisks.length === 0 ? (
-                      <div className="text-center py-8 text-[var(--foreground-secondary)]">
-                        <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">{isAr ? 'لا توجد مخاطر متاحة' : 'No available risks'}</p>
-                      </div>
-                    ) : (
-                      availableRisks.map((risk) => (
-                        <div
-                          key={risk.id}
-                          onClick={() => {
-                            startTransition(() => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                riskId: risk.id,
-                                strategy: determineStrategy(risk.status, risk.inherentScore),
-                                titleAr: `خطة معالجة ${risk.riskNumber}`,
-                                titleEn: `Treatment Plan for ${risk.riskNumber}`,
-                              }));
-                            });
-                          }}
-                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                            formData.riskId === risk.id
-                              ? 'border-[var(--primary)] bg-[var(--primary)]/5'
-                              : 'border-[var(--border)] hover:border-[var(--primary)]/50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-3 h-3 rounded-full ${ratingColors[normalizeRating(risk.inherentRating)]}`} />
-                              <div>
-                                <p className="font-medium text-sm">{risk.riskNumber}</p>
-                                <p className="text-xs text-[var(--foreground-secondary)] line-clamp-1">
-                                  {isAr ? risk.titleAr : risk.titleEn}
-                                </p>
-                              </div>
-                            </div>
-                            {formData.riskId === risk.id && (
-                              <Check className="h-5 w-5 text-[var(--primary)]" />
-                            )}
-                          </div>
+                  {/* Risk Search */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      {isAr ? 'اختر الخطر' : 'Select Risk'} <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      placeholder={isAr ? 'ابحث عن الخطر...' : 'Search for risk...'}
+                      leftIcon={<Search className="h-4 w-4" />}
+                      value={riskSearchQuery}
+                      onChange={(e) => setRiskSearchQuery(e.target.value)}
+                    />
+                    <div className="max-h-[180px] overflow-y-auto space-y-2 mt-2">
+                      {availableRisks.length === 0 ? (
+                        <div className="text-center py-6 text-[var(--foreground-secondary)]">
+                          <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">{isAr ? 'لا توجد مخاطر متاحة' : 'No available risks'}</p>
                         </div>
-                      ))
+                      ) : (
+                        availableRisks.map((risk) => (
+                          <div
+                            key={risk.id}
+                            onClick={() => {
+                              startTransition(() => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  riskId: risk.id,
+                                  strategy: determineStrategy(risk.status, risk.inherentScore),
+                                  titleAr: `خطة معالجة ${risk.riskNumber}`,
+                                  titleEn: `Treatment Plan for ${risk.riskNumber}`,
+                                }));
+                              });
+                            }}
+                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                              formData.riskId === risk.id
+                                ? 'border-[var(--primary)] bg-[var(--primary)]/5'
+                                : 'border-[var(--border)] hover:border-[var(--primary)]/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full ${ratingColors[normalizeRating(risk.inherentRating)]}`} />
+                                <div>
+                                  <p className="font-medium text-sm">{risk.riskNumber}</p>
+                                  <p className="text-xs text-[var(--foreground-secondary)] line-clamp-1">
+                                    {isAr ? risk.titleAr : risk.titleEn}
+                                  </p>
+                                </div>
+                              </div>
+                              {formData.riskId === risk.id && (
+                                <Check className="h-5 w-5 text-[var(--primary)]" />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Responsible - Required in Step 1 */}
+                  <div className="pt-3 border-t border-[var(--border)]">
+                    <label htmlFor="treatment-responsible-step1" className="block text-sm font-medium mb-2">
+                      {isAr ? 'المسؤول عن خطة المعالجة' : 'Responsible for Treatment Plan'} <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="treatment-responsible-step1"
+                      name="responsibleId"
+                      value={formData.responsibleId}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, responsibleId: e.target.value }))}
+                      className={`w-full px-3 py-2 rounded-lg border bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
+                        !formData.responsibleId ? 'border-red-300' : 'border-[var(--border)]'
+                      }`}
+                    >
+                      <option value="">{isAr ? 'اختر المسؤول' : 'Select Responsible'}</option>
+                      {responsibleOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {isAr ? opt.name : opt.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                    {!formData.responsibleId && formData.riskId && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {isAr ? 'يرجى اختيار المسؤول للمتابعة' : 'Please select responsible to continue'}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -1282,25 +1316,6 @@ export default function TreatmentPage() {
                         );
                       })}
                     </div>
-                  </div>
-
-                  {/* Responsible */}
-                  <div>
-                    <label htmlFor="treatment-responsible" className="block text-sm font-medium mb-2">{isAr ? 'المسؤول' : 'Responsible'}</label>
-                    <select
-                      id="treatment-responsible"
-                      name="responsibleId"
-                      value={formData.responsibleId}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, responsibleId: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                    >
-                      <option value="">{isAr ? 'اختر المسؤول' : 'Select Responsible'}</option>
-                      {responsibleOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>
-                          {isAr ? opt.name : opt.nameEn}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   {/* Priority */}
@@ -1599,31 +1614,38 @@ export default function TreatmentPage() {
                             </button>
                           </div>
 
-                          {/* Task Title */}
+                          {/* Task Title - At least one required */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                             <div>
-                              <label htmlFor={`task-title-ar-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}</label>
+                              <label htmlFor={`task-title-ar-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                {isAr ? 'العنوان (عربي)' : 'Title (Arabic)'} {!task.titleEn && <span className="text-red-500">*</span>}
+                              </label>
                               <Input
                                 id={`task-title-ar-${index}`}
                                 name={`task-title-ar-${index}`}
                                 placeholder={isAr ? 'مثال: مراجعة السياسات الداخلية' : 'e.g., Review internal policies'}
                                 value={task.titleAr}
                                 onChange={(e) => updateTask(index, 'titleAr', e.target.value)}
-                                className="text-sm"
+                                className={`text-sm ${!task.titleAr && !task.titleEn ? 'border-red-300' : ''}`}
                               />
                             </div>
                             <div>
-                              <label htmlFor={`task-title-en-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'العنوان (إنجليزي)' : 'Title (English)'}</label>
+                              <label htmlFor={`task-title-en-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                {isAr ? 'العنوان (إنجليزي)' : 'Title (English)'} {!task.titleAr && <span className="text-red-500">*</span>}
+                              </label>
                               <Input
                                 id={`task-title-en-${index}`}
                                 name={`task-title-en-${index}`}
                                 placeholder={isAr ? 'مثال: Review internal policies' : 'e.g., Review internal policies'}
                                 value={task.titleEn}
                                 onChange={(e) => updateTask(index, 'titleEn', e.target.value)}
-                                className="text-sm"
+                                className={`text-sm ${!task.titleAr && !task.titleEn ? 'border-red-300' : ''}`}
                               />
                             </div>
                           </div>
+                          {!task.titleAr && !task.titleEn && (
+                            <p className="text-xs text-red-500 mb-2">{isAr ? 'يرجى إدخال العنوان بالعربي أو الإنجليزي على الأقل' : 'Please enter title in Arabic or English at least'}</p>
+                          )}
 
                           {/* Task Details Row 1: Priority, Due Date, Status */}
                           <div className="grid grid-cols-3 gap-3 mb-3">
@@ -1675,9 +1697,11 @@ export default function TreatmentPage() {
 
                           {/* Task Details Row 2: Assigned To & Followed By with Autocomplete */}
                           <div className="grid grid-cols-2 gap-3">
-                            {/* Assigned To - المكلف */}
+                            {/* Assigned To - المكلف (إجباري) */}
                             <div className="relative">
-                              <label htmlFor={`task-assigned-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المكلف' : 'Assigned To'}</label>
+                              <label htmlFor={`task-assigned-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                {isAr ? 'المكلف' : 'Assigned To'} <span className="text-red-500">*</span>
+                              </label>
                               <input
                                 id={`task-assigned-${index}`}
                                 name={`task-assigned-${index}`}
@@ -1689,7 +1713,7 @@ export default function TreatmentPage() {
                                 }}
                                 onFocus={() => setShowAssignedDropdown({ ...showAssignedDropdown, [index]: true })}
                                 placeholder={isAr ? 'ابدأ بكتابة الاسم...' : 'Start typing name...'}
-                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200] focus:border-[#F39200]"
+                                className={`w-full px-2 py-1.5 text-sm rounded-lg border bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200] focus:border-[#F39200] ${!task.assignedTo ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                               />
                               {showAssignedDropdown[index] && (
                                 <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
@@ -1774,16 +1798,21 @@ export default function TreatmentPage() {
                             </div>
                           </div>
 
-                          {/* Description */}
+                          {/* Description - Required */}
                           <div className="mt-3">
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'وصف المهمة (اختياري)' : 'Task Description (Optional)'}</label>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              {isAr ? 'وصف المهمة' : 'Task Description'} <span className="text-red-500">*</span>
+                            </label>
                             <textarea
                               value={task.description || ''}
                               onChange={(e) => updateTask(index, 'description', e.target.value)}
-                              placeholder={isAr ? 'أضف تفاصيل إضافية عن المهمة...' : 'Add additional details about the task...'}
-                              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 resize-none"
+                              placeholder={isAr ? 'أضف تفاصيل المهمة...' : 'Add task details...'}
+                              className={`w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 resize-none ${!task.description ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                               rows={2}
                             />
+                            {!task.description && (
+                              <p className="text-xs text-red-500 mt-1">{isAr ? 'يرجى إدخال وصف المهمة' : 'Please enter task description'}</p>
+                            )}
                           </div>
 
                           {/* OneDrive Attachment */}
@@ -1903,7 +1932,14 @@ export default function TreatmentPage() {
               {wizardStep < 3 ? (
                 <Button
                   onClick={() => startTransition(() => setWizardStep(wizardStep + 1))}
-                  disabled={wizardStep === 1 && !formData.riskId}
+                  disabled={
+                    (wizardStep === 1 && (!formData.riskId || !formData.responsibleId)) ||
+                    (wizardStep === 2 && formData.tasks.length > 0 && formData.tasks.some(t =>
+                      !t.assignedTo ||
+                      (!t.titleAr && !t.titleEn) ||
+                      !t.description
+                    ))
+                  }
                 >
                   {isAr ? 'التالي' : 'Next'}
                   <ArrowRight className="h-4 w-4 ms-1" />
