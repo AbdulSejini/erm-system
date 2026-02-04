@@ -1330,8 +1330,10 @@ export default function RisksPage() {
         complianceNoteAr: string;
       };
 
-      // توليد رقم خطر تلقائي
-      const riskNumber = `${riskData.categoryId}-R-${String(Date.now()).slice(-4)}`;
+      // توليد رقم خطر تلقائي - الحصول على كود الفئة من categoryId
+      const selectedCategory = categories.find(c => c.id === riskData.categoryId);
+      const categoryCode = selectedCategory?.code || 'RISK';
+      const riskNumber = `${categoryCode}-R-${String(Date.now()).slice(-3)}`;
 
       const response = await fetch('/api/risks', {
         method: 'POST',

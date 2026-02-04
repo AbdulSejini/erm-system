@@ -302,6 +302,21 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     const clientInfo = getClientInfo(request);
 
+    // التحقق من البيانات المطلوبة
+    if (!body.titleAr && !body.titleEn) {
+      return NextResponse.json(
+        { success: false, error: 'عنوان الخطر مطلوب (عربي أو إنجليزي)' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.departmentId) {
+      return NextResponse.json(
+        { success: false, error: 'الإدارة مطلوبة' },
+        { status: 400 }
+      );
+    }
+
     // التحقق من عدم تكرار رقم الخطر
     if (body.riskNumber) {
       const existingRisk = await prisma.risk.findUnique({
@@ -407,8 +422,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating risk:', error);
+    // تسجيل تفاصيل الخطأ للتصحيح
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error details:', errorMessage);
+
     return NextResponse.json(
-      { success: false, error: 'فشل في إنشاء الخطر' },
+      { success: false, error: `فشل في إنشاء الخطر: ${errorMessage}` },
       { status: 500 }
     );
   }
