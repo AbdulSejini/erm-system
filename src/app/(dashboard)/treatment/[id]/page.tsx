@@ -58,6 +58,8 @@ import {
   ChevronUp,
   History,
   Paperclip,
+  ListOrdered,
+  MoreVertical,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 
@@ -182,6 +184,28 @@ interface TaskUpdate {
   author: TaskUpdateAuthor;
 }
 
+interface TaskStep {
+  id: string;
+  taskId: string;
+  createdById: string;
+  title: string;
+  description?: string;
+  status: 'pending' | 'inProgress' | 'completed' | 'cancelled';
+  order: number;
+  dueDate?: string;
+  completedAt?: string;
+  completedById?: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  createdAt: string;
+  createdBy: TaskUpdateAuthor;
+  completedBy?: {
+    id: string;
+    fullName: string;
+    fullNameEn?: string;
+  };
+}
+
 interface Task {
   id: string;
   titleAr: string;
@@ -273,6 +297,13 @@ export default function TreatmentDetailPage() {
   const [newUpdateContent, setNewUpdateContent] = useState<Record<string, string>>({});
   const [submittingUpdate, setSubmittingUpdate] = useState<string | null>(null);
   const [loadingUpdates, setLoadingUpdates] = useState<Record<string, boolean>>({});
+
+  // Task steps state (خطوات سير العمل)
+  const [taskSteps, setTaskSteps] = useState<Record<string, TaskStep[]>>({});
+  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
+  const [newStepTitle, setNewStepTitle] = useState<Record<string, string>>({});
+  const [submittingStep, setSubmittingStep] = useState<string | null>(null);
+  const [loadingSteps, setLoadingSteps] = useState<Record<string, boolean>>({});
 
   // Editable form state
   const [formData, setFormData] = useState({
@@ -576,6 +607,128 @@ export default function TreatmentDetailPage() {
     if (hours < 24) return isAr ? `منذ ${hours} ساعة` : `${hours}h ago`;
     if (days < 7) return isAr ? `منذ ${days} يوم` : `${days}d ago`;
     return date.toLocaleDateString(isAr ? 'ar-SA' : 'en-US');
+  };
+
+  // دوال إدارة خطوات سير العمل
+  const fetchTaskSteps = async (taskId: string) => {
+    setLoadingSteps(prev => ({ ...prev, [taskId]: true }));
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/steps`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTaskSteps(prev => ({ ...prev, [taskId]: data.data }));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching task steps:', error);
+    } finally {
+      setLoadingSteps(prev => ({ ...prev, [taskId]: false }));
+    }
+  };
+
+  const toggleStepsExpanded = (taskId: string) => {
+    const isExpanded = !expandedSteps[taskId];
+    setExpandedSteps(prev => ({ ...prev, [taskId]: isExpanded }));
+    if (isExpanded && !taskSteps[taskId]) {
+      fetchTaskSteps(taskId);
+    }
+  };
+
+  const submitTaskStep = async (taskId: string) => {
+    const title = newStepTitle[taskId]?.trim();
+    if (!title) return;
+
+    setSubmittingStep(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/steps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTaskSteps(prev => ({
+            ...prev,
+            [taskId]: [...(prev[taskId] || []), data.data],
+          }));
+          setNewStepTitle(prev => ({ ...prev, [taskId]: '' }));
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting task step:', error);
+    } finally {
+      setSubmittingStep(null);
+    }
+  };
+
+  const updateStepStatus = async (taskId: string, stepId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/steps`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stepId, status: newStatus }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTaskSteps(prev => ({
+            ...prev,
+            [taskId]: prev[taskId]?.map(s => s.id === stepId ? data.data : s) || [],
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error updating step status:', error);
+    }
+  };
+
+  const deleteTaskStep = async (taskId: string, stepId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/steps?stepId=${stepId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setTaskSteps(prev => ({
+          ...prev,
+          [taskId]: prev[taskId]?.filter(s => s.id !== stepId) || [],
+        }));
+      }
+    } catch (error) {
+      console.error('Error deleting task step:', error);
+    }
+  };
+
+  // Step status config
+  const stepStatusConfig = {
+    pending: {
+      label: isAr ? 'قيد الانتظار' : 'Pending',
+      color: 'text-gray-500',
+      bg: 'bg-gray-100 dark:bg-gray-700',
+      icon: CircleDot,
+    },
+    inProgress: {
+      label: isAr ? 'جاري التنفيذ' : 'In Progress',
+      color: 'text-sky-500',
+      bg: 'bg-sky-100 dark:bg-sky-900/30',
+      icon: Play,
+    },
+    completed: {
+      label: isAr ? 'مكتمل' : 'Completed',
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      icon: CheckCircle2,
+    },
+    cancelled: {
+      label: isAr ? 'ملغي' : 'Cancelled',
+      color: 'text-rose-500',
+      bg: 'bg-rose-100 dark:bg-rose-900/30',
+      icon: XCircle,
+    },
   };
 
   if (loading) {
@@ -1203,8 +1356,199 @@ export default function TreatmentDetailPage() {
                           </div>
                         )}
 
-                        {/* قسم التحديثات */}
+                        {/* قسم خطوات سير العمل */}
                         <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                          <button
+                            onClick={() => toggleStepsExpanded(task.id)}
+                            className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 hover:from-emerald-100 hover:to-green-100 dark:hover:from-emerald-800/30 dark:hover:to-green-800/30 transition-all border border-emerald-200 dark:border-emerald-800/50"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-emerald-500/20">
+                                <ListOrdered className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                              </div>
+                              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                                {isAr ? 'خطوات سير العمل' : 'Workflow Steps'}
+                              </span>
+                              {taskSteps[task.id]?.length > 0 && (
+                                <Badge className="bg-emerald-500 text-white text-xs">
+                                  {taskSteps[task.id].filter(s => s.status === 'completed').length}/{taskSteps[task.id].length}
+                                </Badge>
+                              )}
+                            </div>
+                            {expandedSteps[task.id] ? (
+                              <ChevronUp className="h-5 w-5 text-emerald-500" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-emerald-500" />
+                            )}
+                          </button>
+
+                          {/* محتوى الخطوات */}
+                          {expandedSteps[task.id] && (
+                            <div className="mt-4 space-y-4 animate-fadeIn">
+                              {/* حقل إضافة خطوة جديدة */}
+                              <div className="flex gap-3">
+                                <div className="flex-1">
+                                  <input
+                                    type="text"
+                                    placeholder={isAr ? 'أضف خطوة جديدة في سير العمل...' : 'Add a new workflow step...'}
+                                    value={newStepTitle[task.id] || ''}
+                                    onChange={(e) => setNewStepTitle(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                    onKeyPress={(e) => e.key === 'Enter' && submitTaskStep(task.id)}
+                                    className="w-full px-4 py-3 rounded-xl border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                                  />
+                                </div>
+                                <Button
+                                  onClick={() => submitTaskStep(task.id)}
+                                  disabled={!newStepTitle[task.id]?.trim() || submittingStep === task.id}
+                                  className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {submittingStep === task.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Plus className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+
+                              {/* قائمة الخطوات */}
+                              {loadingSteps[task.id] ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                                </div>
+                              ) : taskSteps[task.id]?.length > 0 ? (
+                                <div className="space-y-2">
+                                  {taskSteps[task.id].map((step, stepIndex) => {
+                                    const StepIcon = stepStatusConfig[step.status]?.icon || CircleDot;
+                                    return (
+                                      <div
+                                        key={step.id}
+                                        className={`p-4 rounded-xl border transition-all ${
+                                          step.status === 'completed'
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+                                            : step.status === 'inProgress'
+                                            ? 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800'
+                                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                        }`}
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          {/* رقم الخطوة */}
+                                          <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                            step.status === 'completed'
+                                              ? 'bg-emerald-500 text-white'
+                                              : step.status === 'inProgress'
+                                              ? 'bg-sky-500 text-white'
+                                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                          }`}>
+                                            {step.status === 'completed' ? (
+                                              <CheckCircle2 className="h-4 w-4" />
+                                            ) : (
+                                              stepIndex + 1
+                                            )}
+                                          </div>
+
+                                          {/* محتوى الخطوة */}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <h5 className={`font-semibold text-sm ${
+                                                step.status === 'completed' ? 'text-emerald-700 dark:text-emerald-300 line-through' : 'text-gray-800 dark:text-gray-100'
+                                              }`}>
+                                                {step.title}
+                                              </h5>
+                                              <div className="flex items-center gap-2">
+                                                <Badge className={`text-xs ${stepStatusConfig[step.status]?.bg} ${stepStatusConfig[step.status]?.color}`}>
+                                                  {stepStatusConfig[step.status]?.label}
+                                                </Badge>
+                                              </div>
+                                            </div>
+
+                                            {step.description && (
+                                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                {step.description}
+                                              </p>
+                                            )}
+
+                                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                              <span className="flex items-center gap-1">
+                                                <User className="h-3 w-3" />
+                                                {isAr ? step.createdBy.fullName : step.createdBy.fullNameEn || step.createdBy.fullName}
+                                              </span>
+                                              {step.completedAt && step.completedBy && (
+                                                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                                  <CheckCircle2 className="h-3 w-3" />
+                                                  {isAr ? step.completedBy.fullName : step.completedBy.fullNameEn || step.completedBy.fullName}
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            {/* أزرار تغيير الحالة */}
+                                            <div className="flex items-center gap-2 mt-3">
+                                              {step.status !== 'completed' && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  onClick={() => updateStepStatus(task.id, step.id, 'completed')}
+                                                  className="text-xs h-7 text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                                                >
+                                                  <CheckCircle2 className="h-3 w-3 me-1" />
+                                                  {isAr ? 'إنجاز' : 'Complete'}
+                                                </Button>
+                                              )}
+                                              {step.status === 'pending' && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  onClick={() => updateStepStatus(task.id, step.id, 'inProgress')}
+                                                  className="text-xs h-7 text-sky-600 border-sky-300 hover:bg-sky-50"
+                                                >
+                                                  <Play className="h-3 w-3 me-1" />
+                                                  {isAr ? 'بدء' : 'Start'}
+                                                </Button>
+                                              )}
+                                              {step.status === 'completed' && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  onClick={() => updateStepStatus(task.id, step.id, 'pending')}
+                                                  className="text-xs h-7 text-gray-600 border-gray-300 hover:bg-gray-50"
+                                                >
+                                                  <XCircle className="h-3 w-3 me-1" />
+                                                  {isAr ? 'إلغاء الإنجاز' : 'Undo'}
+                                                </Button>
+                                              )}
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => deleteTaskStep(task.id, step.id)}
+                                                className="text-xs h-7 text-rose-500 hover:bg-rose-50"
+                                              >
+                                                <Trash2 className="h-3 w-3" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="text-center py-8">
+                                  <div className="mx-auto w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-3">
+                                    <ListOrdered className="h-6 w-6 text-emerald-500" />
+                                  </div>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {isAr ? 'لا توجد خطوات بعد' : 'No steps yet'}
+                                  </p>
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                    {isAr ? 'أضف خطوات لتتبع سير العمل' : 'Add steps to track the workflow'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* قسم التحديثات */}
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
                           <button
                             onClick={() => toggleTaskExpanded(task.id)}
                             className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 hover:from-gray-100 hover:to-gray-150 dark:hover:from-gray-700/50 dark:hover:to-gray-600/50 transition-all"

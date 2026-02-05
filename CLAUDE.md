@@ -560,3 +560,42 @@ Located in `/src/components/ui/`:
 - **Translations Added**:
   - Arabic: `treatment.taskUpdates.*`
   - English: `treatment.taskUpdates.*`
+
+### Task Workflow Steps Feature (Latest)
+- **Feature**: Users can add workflow steps (sub-tasks) to treatment plan tasks
+- **Use Case**: When a task starts with one approach but the solution changes during execution
+- **Database Model** (`TaskStep`):
+  ```prisma
+  model TaskStep {
+    id          String    @id
+    taskId      String
+    createdById String    // Who created the step
+    title       String    // Step title
+    description String?   // Optional description
+    status      String    // pending, inProgress, completed, cancelled
+    order       Int       // Step order
+    dueDate     DateTime? // Optional due date
+    completedAt DateTime? // Completion date
+    completedById String? // Who completed it
+    attachmentUrl   String?   // OneDrive/SharePoint link
+    attachmentName  String?   // Attachment name
+    createdAt   DateTime
+  }
+  ```
+- **API Endpoint**: `/api/tasks/[taskId]/steps`
+  - `GET` - Fetch all steps for a task (ordered)
+  - `POST` - Add new step (title, description, dueDate, attachmentUrl)
+  - `PATCH` - Update step (status, title, description)
+  - `DELETE` - Delete step (creator or admin/riskManager only)
+- **UI Features** (`/treatment/[id]`):
+  - Green-themed collapsible "Workflow Steps" section
+  - Input field to add new steps quickly
+  - Step cards with numbered badges
+  - Status indicators: pending (gray), in progress (blue), completed (green)
+  - Quick action buttons: Start, Complete, Undo, Delete
+  - Progress badge showing completed/total steps (e.g., 3/5)
+  - Creator and completer attribution
+  - Strikethrough text for completed steps
+- **Translations Added**:
+  - Arabic: `treatment.taskSteps.*`
+  - English: `treatment.taskSteps.*`

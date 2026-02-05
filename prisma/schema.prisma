@@ -53,6 +53,8 @@ model User {
   riskApprovalRequests       RiskApprovalRequest[] @relation("RiskApprovalRequester")
   reviewedRiskApprovals      RiskApprovalRequest[] @relation("RiskApprovalReviewer")
   taskUpdates                TaskUpdate[]          @relation("TaskUpdateAuthor")
+  createdTaskSteps           TaskStep[]            @relation("TaskStepCreator")
+  completedTaskSteps         TaskStep[]            @relation("TaskStepCompleter")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -334,6 +336,35 @@ model TreatmentTask {
   monitor       User?         @relation("TaskMonitor", fields: [monitorId], references: [id])
   monitorOwner  RiskOwner?    @relation("TaskMonitorOwner", fields: [monitorOwnerId], references: [id])
   updates       TaskUpdate[]  // تحديثات المهمة
+  steps         TaskStep[]    // خطوات سير العمل
+}
+
+// خطوات سير العمل (Task Steps / Sub-tasks)
+model TaskStep {
+  id          String    @id @default(cuid())
+  taskId      String
+  createdById String    // من أنشأ الخطوة
+  title       String    // عنوان الخطوة
+  description String?   // وصف الخطوة (اختياري)
+  status      String    @default("pending") // pending, inProgress, completed, cancelled
+  order       Int       @default(0) // ترتيب الخطوة
+  dueDate     DateTime? // تاريخ الاستحقاق (اختياري)
+  completedAt DateTime? // تاريخ الإنجاز
+  completedById String? // من أنجز الخطوة
+  attachmentUrl   String?   // رابط المرفق (OneDrive/SharePoint)
+  attachmentName  String?   // اسم المرفق
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // العلاقات
+  task        TreatmentTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy   User          @relation("TaskStepCreator", fields: [createdById], references: [id])
+  completedBy User?         @relation("TaskStepCompleter", fields: [completedById], references: [id])
+
+  @@index([taskId])
+  @@index([createdById])
+  @@index([status])
+  @@index([order])
 }
 
 // تحديثات المهام (Task Updates)

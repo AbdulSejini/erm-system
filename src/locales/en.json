@@ -378,6 +378,22 @@
       "assignee": "Assignee",
       "priority": "Priority",
       "dueDate": "Due Date"
+    },
+    "taskSteps": {
+      "title": "Workflow Steps",
+      "addStep": "Add a new workflow step...",
+      "noSteps": "No steps yet",
+      "addFirstStep": "Add steps to track the workflow",
+      "pending": "Pending",
+      "inProgress": "In Progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "complete": "Complete",
+      "start": "Start",
+      "undo": "Undo",
+      "delete": "Delete",
+      "createdBy": "Created by",
+      "completedBy": "Completed by"
     }
   },
   "incidents": {

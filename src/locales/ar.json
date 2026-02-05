@@ -378,6 +378,22 @@
       "assignee": "المكلف",
       "priority": "الأولوية",
       "dueDate": "الاستحقاق"
+    },
+    "taskSteps": {
+      "title": "خطوات سير العمل",
+      "addStep": "أضف خطوة جديدة في سير العمل...",
+      "noSteps": "لا توجد خطوات بعد",
+      "addFirstStep": "أضف خطوات لتتبع سير العمل",
+      "pending": "قيد الانتظار",
+      "inProgress": "جاري التنفيذ",
+      "completed": "مكتمل",
+      "cancelled": "ملغي",
+      "complete": "إنجاز",
+      "start": "بدء",
+      "undo": "إلغاء الإنجاز",
+      "delete": "حذف",
+      "createdBy": "أنشئ بواسطة",
+      "completedBy": "أنجز بواسطة"
     }
   },
   "incidents": {
