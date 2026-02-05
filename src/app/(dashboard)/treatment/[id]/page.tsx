@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -322,6 +323,7 @@ export default function TreatmentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { language } = useTranslation();
+  const { isImpersonating, impersonatedUser } = useImpersonation();
   const isAr = language === 'ar';
   const treatmentId = params.id as string;
 
@@ -389,11 +391,16 @@ export default function TreatmentDetailPage() {
         setLoading(true);
 
         // Check user permissions
+        // إذا كان المدير ينتحل شخصية مستخدم آخر، نستخدم دور المستخدم المنتحل
         const userRes = await fetch('/api/auth/session');
         if (userRes.ok) {
           const sessionData = await userRes.json();
-          if (sessionData?.user?.role) {
-            setCanDelete(['admin', 'riskManager', 'riskAnalyst'].includes(sessionData.user.role));
+          // استخدم دور المستخدم المنتحل إذا كان الانتحال فعالاً
+          const effectiveRole = (isImpersonating && impersonatedUser?.role)
+            ? impersonatedUser.role
+            : sessionData?.user?.role;
+          if (effectiveRole) {
+            setCanDelete(['admin', 'riskManager', 'riskAnalyst'].includes(effectiveRole));
           }
         }
 

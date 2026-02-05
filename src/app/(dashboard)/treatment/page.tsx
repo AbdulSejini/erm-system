@@ -435,12 +435,17 @@ export default function TreatmentPage() {
         const headers = getHeaders();
 
         // جلب بيانات الجلسة للتحقق من صلاحية التعديل والحذف
+        // إذا كان المدير ينتحل شخصية مستخدم آخر، نستخدم دور المستخدم المنتحل
         const sessionRes = await fetch('/api/auth/session', { headers });
         if (sessionRes.ok) {
           const sessionData = await sessionRes.json();
-          if (sessionData?.user?.role) {
+          // استخدم دور المستخدم المنتحل إذا كان الانتحال فعالاً
+          const effectiveRole = (isImpersonating && impersonatedUser?.role)
+            ? impersonatedUser.role
+            : sessionData?.user?.role;
+          if (effectiveRole) {
             // فقط admin و riskManager و riskAnalyst يمكنهم التعديل والحذف
-            setCanEditDelete(['admin', 'riskManager', 'riskAnalyst'].includes(sessionData.user.role));
+            setCanEditDelete(['admin', 'riskManager', 'riskAnalyst'].includes(effectiveRole));
           }
         }
 

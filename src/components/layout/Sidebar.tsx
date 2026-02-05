@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -120,11 +121,17 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
   const pathname = usePathname();
   const { t, isRTL } = useTranslation();
   const { data: session } = useSession();
+  const { isImpersonating, impersonatedUser } = useImpersonation();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [showOnlineUsers, setShowOnlineUsers] = useState(true);
 
-  // Check if user has permission to see online users
-  const canSeeOnlineUsers = session?.user?.role && ['admin', 'riskManager'].includes(session.user.role);
+  // Get effective user role (impersonated user's role if impersonating)
+  const effectiveRole = (isImpersonating && impersonatedUser?.role)
+    ? impersonatedUser.role
+    : session?.user?.role;
+
+  // Check if user has permission to see online users (based on effective role)
+  const canSeeOnlineUsers = effectiveRole && ['admin', 'riskManager'].includes(effectiveRole);
 
   // Fetch online users
   useEffect(() => {
