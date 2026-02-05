@@ -26,7 +26,7 @@ const fieldNamesAr: Record<string, string> = {
   expectedResidualRating: 'تصنيف الخطر المتبقي المتوقع',
 };
 
-// PATCH - تحديث خطة معالجة
+// PATCH - تحديث خطة معالجة (مدير النظام أو مدير المخاطر فقط)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; treatmentId: string }> }
@@ -39,6 +39,19 @@ export async function PATCH(
       return NextResponse.json(
         { success: false, error: 'غير مصرح' },
         { status: 401 }
+      );
+    }
+
+    // التحقق من صلاحيات المستخدم - فقط مدير المخاطر أو مدير النظام يمكنهم التعديل
+    const currentUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (!currentUser || !['admin', 'riskManager'].includes(currentUser.role)) {
+      return NextResponse.json(
+        { success: false, error: 'ليس لديك صلاحية تعديل خطط المعالجة. هذا الإجراء متاح فقط لمدير المخاطر أو مدير النظام.' },
+        { status: 403 }
       );
     }
 

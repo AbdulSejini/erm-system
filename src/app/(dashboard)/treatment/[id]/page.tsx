@@ -888,18 +888,19 @@ export default function TreatmentDetailPage() {
                 <Mail className="h-4 w-4 me-1" />
                 {isAr ? 'بريد' : 'Email'}
               </Button>
+              {/* أزرار التعديل والحذف - متاحة فقط لمدير النظام ومدير المخاطر */}
               {!isEditing ? (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="text-[#F39200] border-[#F39200]/50">
-                    <Pencil className="h-4 w-4 me-1" />
-                    {isAr ? 'تعديل' : 'Edit'}
-                  </Button>
-                  {canDelete && (
+                canDelete && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="text-[#F39200] border-[#F39200]/50">
+                      <Pencil className="h-4 w-4 me-1" />
+                      {isAr ? 'تعديل' : 'Edit'}
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowDeleteModal(true)} className="text-rose-600 border-rose-300">
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  )}
-                </>
+                  </>
+                )
               ) : (
                 <>
                   <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>

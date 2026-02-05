@@ -349,6 +349,7 @@ export default function TreatmentPage() {
   const [responsibleOptions, setResponsibleOptions] = useState<ResponsibleOption[]>([]);
   const [riskOwnersList, setRiskOwnersList] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
+  const [canEditDelete, setCanEditDelete] = useState(false); // صلاحية التعديل والحذف (admin و riskManager فقط)
 
   // UI states
   const [searchQuery, setSearchQuery] = useState('');
@@ -432,6 +433,17 @@ export default function TreatmentPage() {
       try {
         setLoading(true);
         const headers = getHeaders();
+
+        // جلب بيانات الجلسة للتحقق من صلاحية التعديل والحذف
+        const sessionRes = await fetch('/api/auth/session', { headers });
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData?.user?.role) {
+            // فقط admin و riskManager يمكنهم التعديل والحذف
+            setCanEditDelete(['admin', 'riskManager'].includes(sessionData.user.role));
+          }
+        }
+
         const [risksRes, usersRes, ownersRes] = await Promise.all([
           fetch('/api/risks?includeTreatments=true', { headers }),
           fetch('/api/users', { headers }),
@@ -1221,49 +1233,52 @@ Risk Management Team`;
                       <Eye className="h-3.5 w-3.5 me-1" />
                       {isAr ? 'عرض' : 'View'}
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs border-[#F39200]/30 text-[#F39200] hover:bg-[#F39200]/5"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // فتح مودال التعديل
-                        setSelectedTreatment(treatment);
-                        setFormData({
-                          riskId: treatment.riskId,
-                          strategy: treatment.strategy,
-                          titleAr: treatment.titleAr,
-                          titleEn: treatment.titleEn,
-                          responsibleId: treatment.responsibleId || '',
-                          priority: treatment.priority as 'high' | 'medium' | 'low',
-                          startDate: treatment.startDate.split('T')[0],
-                          dueDate: treatment.dueDate.split('T')[0],
-                          justificationAr: treatment.justificationAr || '',
-                          justificationEn: treatment.justificationEn || '',
-                          residualLikelihood: treatment.expectedResidualLikelihood || null,
-                          residualImpact: treatment.expectedResidualImpact || null,
-                          updateResidualRisk: !!(treatment.expectedResidualLikelihood && treatment.expectedResidualImpact),
-                          tasks: treatment.tasks.map(t => ({
-                            id: t.id,
-                            titleAr: t.titleAr,
-                            titleEn: t.titleEn,
-                            dueDate: t.dueDate ? t.dueDate.split('T')[0] : '',
-                            priority: (t.priority || 'medium') as 'high' | 'medium' | 'low',
-                            assignedTo: t.actionOwnerId || '',
-                            followedBy: t.monitorOwnerId || '',
-                            description: t.descriptionAr || t.descriptionEn || '',
-                            status: t.status,
-                            oneDriveUrl: t.oneDriveUrl || '',
-                            oneDriveFileName: t.oneDriveFileName || '',
-                          })),
-                        });
-                        setWizardStep(2);
-                        setShowAddModal(true);
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5 me-1" />
-                      {isAr ? 'تعديل' : 'Edit'}
-                    </Button>
+                    {/* زر التعديل - متاح فقط لمدير النظام ومدير المخاطر */}
+                    {canEditDelete && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs border-[#F39200]/30 text-[#F39200] hover:bg-[#F39200]/5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // فتح مودال التعديل
+                          setSelectedTreatment(treatment);
+                          setFormData({
+                            riskId: treatment.riskId,
+                            strategy: treatment.strategy,
+                            titleAr: treatment.titleAr,
+                            titleEn: treatment.titleEn,
+                            responsibleId: treatment.responsibleId || '',
+                            priority: treatment.priority as 'high' | 'medium' | 'low',
+                            startDate: treatment.startDate.split('T')[0],
+                            dueDate: treatment.dueDate.split('T')[0],
+                            justificationAr: treatment.justificationAr || '',
+                            justificationEn: treatment.justificationEn || '',
+                            residualLikelihood: treatment.expectedResidualLikelihood || null,
+                            residualImpact: treatment.expectedResidualImpact || null,
+                            updateResidualRisk: !!(treatment.expectedResidualLikelihood && treatment.expectedResidualImpact),
+                            tasks: treatment.tasks.map(t => ({
+                              id: t.id,
+                              titleAr: t.titleAr,
+                              titleEn: t.titleEn,
+                              dueDate: t.dueDate ? t.dueDate.split('T')[0] : '',
+                              priority: (t.priority || 'medium') as 'high' | 'medium' | 'low',
+                              assignedTo: t.actionOwnerId || '',
+                              followedBy: t.monitorOwnerId || '',
+                              description: t.descriptionAr || t.descriptionEn || '',
+                              status: t.status,
+                              oneDriveUrl: t.oneDriveUrl || '',
+                              oneDriveFileName: t.oneDriveFileName || '',
+                            })),
+                          });
+                          setWizardStep(2);
+                          setShowAddModal(true);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5 me-1" />
+                        {isAr ? 'تعديل' : 'Edit'}
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

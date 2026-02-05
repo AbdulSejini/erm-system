@@ -57,6 +57,7 @@ model User {
   completedTaskSteps         TaskStep[]            @relation("TaskStepCompleter")
   treatmentChangeLogs        TreatmentPlanChangeLog[] @relation("TreatmentChangeLogUser")
   treatmentDiscussions       TreatmentDiscussion[]    @relation("TreatmentDiscussionAuthor")
+  createdBackups             SystemBackup[]           @relation("BackupCreator")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -804,5 +805,26 @@ model TreatmentDiscussion {
   @@index([treatmentPlanId])
   @@index([authorId])
   @@index([parentId])
+  @@index([createdAt])
+}
+
+// سجل النسخ الاحتياطية (System Backups)
+model SystemBackup {
+  id          String    @id @default(cuid())
+  fileName    String    // اسم ملف النسخة الاحتياطية
+  fileSize    Int       // حجم الملف بالبايت
+  backupType  String    @default("automatic") // automatic, manual
+  status      String    @default("completed") // pending, completed, failed
+  createdById String?   // المستخدم الذي أنشأ النسخة (null للنسخ التلقائية)
+  errorMessage String?  // رسالة الخطأ في حالة الفشل
+  stats       String?   // إحصائيات النسخة (JSON)
+  filePath    String?   // مسار الملف (للنسخ المحلية)
+  createdAt   DateTime  @default(now())
+
+  // العلاقات
+  createdBy   User?     @relation("BackupCreator", fields: [createdById], references: [id])
+
+  @@index([backupType])
+  @@index([status])
   @@index([createdAt])
 }

@@ -709,3 +709,54 @@ Located in `/src/components/ui/`:
   - Timeline view
   - Change type icons and badges
   - Field change diffs
+
+### Treatment Plan Edit/Delete Permissions (Latest)
+- **Who can Edit/Delete treatment plans**:
+  - `admin` - System Administrator
+  - `riskManager` - Risk Manager
+- **All other roles** can only view treatment plans (no edit/delete)
+- **API Protection**: `/api/risks/[id]/treatments/[treatmentId]/route.ts`
+  - PATCH and DELETE methods check user role
+  - Returns 403 if user is not admin/riskManager
+- **UI Protection**:
+  - Edit/Delete buttons hidden for non-admin/riskManager
+  - `treatment/page.tsx` - checks session role
+  - `treatment/[id]/page.tsx` - checks canDelete state
+
+### Automatic Backup System (Latest)
+- **Database Model** (`SystemBackup`):
+  ```prisma
+  model SystemBackup {
+    id          String    @id
+    fileName    String    // Backup filename
+    fileSize    Int       // File size in bytes
+    backupType  String    // automatic, manual
+    status      String    // pending, completed, failed
+    createdById String?   // User who created (null for auto)
+    errorMessage String?  // Error message if failed
+    stats       String?   // Backup statistics (JSON)
+    filePath    String?   // Local file path
+    createdAt   DateTime
+  }
+  ```
+- **Backup Rotation**: Keeps only last 3 backups
+  - `MAX_BACKUPS = 3` constant
+  - `cleanupOldBackups()` function deletes oldest backups
+  - Runs after each backup creation
+- **API Endpoint**: `/api/backup`
+  - `GET` - Create and download backup
+  - `POST` - Restore from backup file
+- **Backup Contents**:
+  - Users (without passwords)
+  - Departments
+  - Risks (full details)
+  - Treatment Plans
+  - Treatment Tasks
+  - Risk Owners
+  - Risk Change Logs
+  - Other system data
+- **Features**:
+  - Automatic backup registration in database
+  - File size tracking
+  - Statistics per backup (record counts)
+  - Error handling with status tracking

@@ -1,11 +1,112 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { auth } from '@/lib/auth';
 
-// GET - تصدير نسخة احتياطية من قاعدة البيانات
-export async function GET() {
+// الحد الأقصى للنسخ الاحتياطية المحتفظ بها
+const MAX_BACKUPS = 3;
+
+// دالة لحذف النسخ القديمة والاحتفاظ بآخر 3 نسخ فقط
+async function cleanupOldBackups() {
   try {
-    // جلب جميع البيانات من قاعدة البيانات
-    const [
+    // جلب كل النسخ الاحتياطية مرتبة من الأحدث للأقدم
+    const allBackups = await prisma.systemBackup.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // إذا كان عدد النسخ أكثر من الحد الأقصى، حذف القديمة
+    if (allBackups.length > MAX_BACKUPS) {
+      const backupsToDelete = allBackups.slice(MAX_BACKUPS);
+      const idsToDelete = backupsToDelete.map(b => b.id);
+
+      await prisma.systemBackup.deleteMany({
+        where: { id: { in: idsToDelete } },
+      });
+
+      console.log(`Deleted ${idsToDelete.length} old backups. Keeping last ${MAX_BACKUPS}.`);
+    }
+  } catch (error) {
+    console.error('Error cleaning up old backups:', error);
+  }
+}
+
+// دالة لإنشاء بيانات النسخة الاحتياطية
+async function createBackupData() {
+  const [
+    users,
+    departments,
+    categories,
+    risks,
+    riskStatuses,
+    sources,
+    comments,
+    userDepartmentAccess,
+    treatmentPlans,
+    treatmentTasks,
+    riskOwners,
+    riskChangeLogs,
+    residualRiskRequests,
+    riskApprovalRequests,
+    notifications,
+  ] = await Promise.all([
+    prisma.user.findMany({
+      select: {
+        id: true,
+        fullName: true,
+        fullNameEn: true,
+        email: true,
+        role: true,
+        status: true,
+        phone: true,
+        departmentId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.department.findMany(),
+    prisma.riskCategory.findMany(),
+    prisma.risk.findMany(),
+    prisma.riskStatus.findMany(),
+    prisma.riskSource.findMany(),
+    prisma.riskComment.findMany(),
+    prisma.userDepartmentAccess.findMany(),
+    prisma.treatmentPlan.findMany(),
+    prisma.treatmentTask.findMany(),
+    prisma.riskOwner.findMany(),
+    prisma.riskChangeLog.findMany({
+      take: 5000,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.residualRiskChangeRequest.findMany(),
+    prisma.riskApprovalRequest.findMany(),
+    prisma.notification.findMany({
+      take: 1000,
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+
+  const stats = {
+    users: users.length,
+    departments: departments.length,
+    categories: categories.length,
+    risks: risks.length,
+    riskStatuses: riskStatuses.length,
+    sources: sources.length,
+    comments: comments.length,
+    userDepartmentAccess: userDepartmentAccess.length,
+    treatmentPlans: treatmentPlans.length,
+    treatmentTasks: treatmentTasks.length,
+    riskOwners: riskOwners.length,
+    riskChangeLogs: riskChangeLogs.length,
+    residualRiskRequests: residualRiskRequests.length,
+    riskApprovalRequests: riskApprovalRequests.length,
+    notifications: notifications.length,
+  };
+
+  const backup = {
+    version: '2.0',
+    createdAt: new Date().toISOString(),
+    system: 'ERM System',
+    data: {
       users,
       departments,
       categories,
@@ -14,75 +115,47 @@ export async function GET() {
       sources,
       comments,
       userDepartmentAccess,
-      auditLogs,
+      treatmentPlans,
+      treatmentTasks,
+      riskOwners,
+      riskChangeLogs,
+      residualRiskRequests,
+      riskApprovalRequests,
       notifications,
-    ] = await Promise.all([
-      prisma.user.findMany({
-        select: {
-          id: true,
-          fullName: true,
-          fullNameEn: true,
-          email: true,
-          role: true,
-          status: true,
-          phone: true,
-          departmentId: true,
-          createdAt: true,
-          updatedAt: true,
-          // لا نصدر كلمات المرور لأسباب أمنية
-        },
-      }),
-      prisma.department.findMany(),
-      prisma.riskCategory.findMany(),
-      prisma.risk.findMany(),
-      prisma.riskStatus.findMany(),
-      prisma.riskSource.findMany(),
-      prisma.riskComment.findMany(),
-      prisma.userDepartmentAccess.findMany(),
-      prisma.auditLog.findMany({
-        take: 1000, // آخر 1000 سجل فقط
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.notification.findMany({
-        take: 500, // آخر 500 إشعار فقط
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+    },
+    stats,
+  };
 
-    const backup = {
-      version: '1.0',
-      createdAt: new Date().toISOString(),
-      system: 'ERM System',
+  return { backup, stats };
+}
+
+// GET - تصدير نسخة احتياطية من قاعدة البيانات
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth();
+    const isAutomatic = request.nextUrl.searchParams.get('automatic') === 'true';
+
+    // إنشاء بيانات النسخة الاحتياطية
+    const { backup, stats } = await createBackupData();
+    const jsonString = JSON.stringify(backup, null, 2);
+    const fileName = `erm-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+
+    // تسجيل النسخة الاحتياطية في قاعدة البيانات
+    await prisma.systemBackup.create({
       data: {
-        users,
-        departments,
-        categories,
-        risks,
-        riskStatuses,
-        sources,
-        comments,
-        userDepartmentAccess,
-        auditLogs,
-        notifications,
+        fileName,
+        fileSize: Buffer.byteLength(jsonString, 'utf8'),
+        backupType: isAutomatic ? 'automatic' : 'manual',
+        status: 'completed',
+        createdById: session?.user?.id || null,
+        stats: JSON.stringify(stats),
       },
-      stats: {
-        users: users.length,
-        departments: departments.length,
-        categories: categories.length,
-        risks: risks.length,
-        riskStatuses: riskStatuses.length,
-        sources: sources.length,
-        comments: comments.length,
-        userDepartmentAccess: userDepartmentAccess.length,
-        auditLogs: auditLogs.length,
-        notifications: notifications.length,
-      },
-    };
+    });
+
+    // تنظيف النسخ القديمة والاحتفاظ بآخر 3 فقط
+    await cleanupOldBackups();
 
     // إرجاع الملف كـ JSON للتحميل
-    const jsonString = JSON.stringify(backup, null, 2);
-    const fileName = `erm-backup-${new Date().toISOString().split('T')[0]}.json`;
-
     return new NextResponse(jsonString, {
       status: 200,
       headers: {
@@ -92,6 +165,22 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Error creating backup:', error);
+
+    // تسجيل الفشل
+    try {
+      await prisma.systemBackup.create({
+        data: {
+          fileName: `erm-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+          fileSize: 0,
+          backupType: 'manual',
+          status: 'failed',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        },
+      });
+    } catch (logError) {
+      console.error('Error logging backup failure:', logError);
+    }
+
     return NextResponse.json(
       { success: false, error: 'فشل في إنشاء النسخة الاحتياطية' },
       { status: 500 }
@@ -99,9 +188,67 @@ export async function GET() {
   }
 }
 
-// POST - استعادة نسخة احتياطية
+// POST - استعادة نسخة احتياطية أو إنشاء نسخة تلقائية
 export async function POST(request: NextRequest) {
   try {
+    const contentType = request.headers.get('content-type');
+
+    // إذا كان الطلب لإنشاء نسخة تلقائية
+    if (contentType === 'application/x-www-form-urlencoded' || request.nextUrl.searchParams.get('action') === 'create-auto') {
+      const session = await auth();
+
+      // التحقق من الصلاحيات - فقط admin
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { success: false, error: 'غير مصرح' },
+          { status: 401 }
+        );
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true },
+      });
+
+      if (!user || user.role !== 'admin') {
+        return NextResponse.json(
+          { success: false, error: 'هذا الإجراء متاح فقط لمدير النظام' },
+          { status: 403 }
+        );
+      }
+
+      // إنشاء النسخة الاحتياطية
+      const { backup, stats } = await createBackupData();
+      const jsonString = JSON.stringify(backup, null, 2);
+      const fileName = `erm-backup-auto-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+
+      // تسجيل النسخة
+      await prisma.systemBackup.create({
+        data: {
+          fileName,
+          fileSize: Buffer.byteLength(jsonString, 'utf8'),
+          backupType: 'automatic',
+          status: 'completed',
+          createdById: session.user.id,
+          stats: JSON.stringify(stats),
+        },
+      });
+
+      // تنظيف النسخ القديمة
+      await cleanupOldBackups();
+
+      return NextResponse.json({
+        success: true,
+        message: 'تم إنشاء النسخة الاحتياطية بنجاح',
+        data: {
+          fileName,
+          fileSize: Buffer.byteLength(jsonString, 'utf8'),
+          stats,
+        },
+      });
+    }
+
+    // استعادة نسخة احتياطية
     const backup = await request.json();
 
     // التحقق من صحة ملف النسخة الاحتياطية
@@ -128,6 +275,9 @@ export async function POST(request: NextRequest) {
       sources: 0,
       comments: 0,
       userDepartmentAccess: 0,
+      treatmentPlans: 0,
+      treatmentTasks: 0,
+      riskOwners: 0,
       errors: [] as string[],
     };
 
@@ -222,6 +372,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // استعادة ملاك المخاطر
+    if (backup.data.riskOwners && Array.isArray(backup.data.riskOwners)) {
+      for (const owner of backup.data.riskOwners) {
+        try {
+          await prisma.riskOwner.upsert({
+            where: { id: owner.id },
+            update: {
+              fullName: owner.fullName,
+              fullNameEn: owner.fullNameEn,
+              email: owner.email,
+              phone: owner.phone,
+              departmentId: owner.departmentId,
+            },
+            create: owner,
+          });
+          results.riskOwners++;
+        } catch (e) {
+          results.errors.push(`RiskOwner ${owner.fullName}: ${e}`);
+        }
+      }
+    }
+
     // استعادة المخاطر
     if (backup.data.risks && Array.isArray(backup.data.risks)) {
       for (const risk of backup.data.risks) {
@@ -260,16 +432,16 @@ export async function POST(request: NextRequest) {
               mitigationActionsEn: risk.mitigationActionsEn,
               krisAr: risk.krisAr,
               krisEn: risk.krisEn,
-              followUpDate: risk.followUpDate ? new Date(risk.followUpDate) : null,
-              lastReviewDate: risk.lastReviewDate ? new Date(risk.lastReviewDate) : null,
-              nextReviewDate: risk.nextReviewDate ? new Date(risk.nextReviewDate) : null,
+              followUpDate: risk.followUpDate ? new Date(risk.followUpDate) : undefined,
+              lastReviewDate: risk.lastReviewDate ? new Date(risk.lastReviewDate) : undefined,
+              nextReviewDate: risk.nextReviewDate ? new Date(risk.nextReviewDate) : undefined,
             },
             create: {
               ...risk,
               identifiedDate: risk.identifiedDate ? new Date(risk.identifiedDate) : new Date(),
-              followUpDate: risk.followUpDate ? new Date(risk.followUpDate) : null,
-              lastReviewDate: risk.lastReviewDate ? new Date(risk.lastReviewDate) : null,
-              nextReviewDate: risk.nextReviewDate ? new Date(risk.nextReviewDate) : null,
+              followUpDate: risk.followUpDate ? new Date(risk.followUpDate) : undefined,
+              lastReviewDate: risk.lastReviewDate ? new Date(risk.lastReviewDate) : undefined,
+              nextReviewDate: risk.nextReviewDate ? new Date(risk.nextReviewDate) : undefined,
               createdAt: risk.createdAt ? new Date(risk.createdAt) : new Date(),
               updatedAt: risk.updatedAt ? new Date(risk.updatedAt) : new Date(),
             },
@@ -277,6 +449,65 @@ export async function POST(request: NextRequest) {
           results.risks++;
         } catch (e) {
           results.errors.push(`Risk ${risk.riskNumber}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة خطط المعالجة
+    if (backup.data.treatmentPlans && Array.isArray(backup.data.treatmentPlans)) {
+      for (const plan of backup.data.treatmentPlans) {
+        try {
+          await prisma.treatmentPlan.upsert({
+            where: { id: plan.id },
+            update: {
+              titleAr: plan.titleAr,
+              titleEn: plan.titleEn,
+              strategy: plan.strategy,
+              status: plan.status,
+              priority: plan.priority,
+              progress: plan.progress,
+              responsibleId: plan.responsibleId,
+              startDate: plan.startDate ? new Date(plan.startDate) : undefined,
+              dueDate: plan.dueDate ? new Date(plan.dueDate) : undefined,
+            },
+            create: {
+              ...plan,
+              startDate: plan.startDate ? new Date(plan.startDate) : undefined,
+              dueDate: plan.dueDate ? new Date(plan.dueDate) : undefined,
+              createdAt: plan.createdAt ? new Date(plan.createdAt) : new Date(),
+              updatedAt: plan.updatedAt ? new Date(plan.updatedAt) : new Date(),
+            },
+          });
+          results.treatmentPlans++;
+        } catch (e) {
+          results.errors.push(`TreatmentPlan ${plan.id}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة مهام المعالجة
+    if (backup.data.treatmentTasks && Array.isArray(backup.data.treatmentTasks)) {
+      for (const task of backup.data.treatmentTasks) {
+        try {
+          await prisma.treatmentTask.upsert({
+            where: { id: task.id },
+            update: {
+              titleAr: task.titleAr,
+              titleEn: task.titleEn,
+              status: task.status,
+              priority: task.priority,
+              dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+            },
+            create: {
+              ...task,
+              dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+              createdAt: task.createdAt ? new Date(task.createdAt) : new Date(),
+              updatedAt: task.updatedAt ? new Date(task.updatedAt) : new Date(),
+            },
+          });
+          results.treatmentTasks++;
+        } catch (e) {
+          results.errors.push(`TreatmentTask ${task.id}: ${e}`);
         }
       }
     }
