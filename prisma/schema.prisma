@@ -55,6 +55,8 @@ model User {
   taskUpdates                TaskUpdate[]          @relation("TaskUpdateAuthor")
   createdTaskSteps           TaskStep[]            @relation("TaskStepCreator")
   completedTaskSteps         TaskStep[]            @relation("TaskStepCompleter")
+  treatmentChangeLogs        TreatmentPlanChangeLog[] @relation("TreatmentChangeLogUser")
+  treatmentDiscussions       TreatmentDiscussion[]    @relation("TreatmentDiscussionAuthor")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -302,6 +304,8 @@ model TreatmentPlan {
   createdBy   User            @relation("TreatmentCreator", fields: [createdById], references: [id])
   tasks       TreatmentTask[]
   residualRiskChangeRequests ResidualRiskChangeRequest[] // طلبات تغيير الخطر المتبقي المرتبطة
+  changeLogs  TreatmentPlanChangeLog[] // سجل التعديلات
+  discussions TreatmentDiscussion[]    // المناقشات
 }
 
 // مهام المعالجة
@@ -746,5 +750,59 @@ model RiskApprovalRequest {
   @@index([requesterId])
   @@index([reviewerId])
   @@index([status])
+  @@index([createdAt])
+}
+
+// سجل تعديلات خطة المعالجة (Treatment Plan Change Log)
+model TreatmentPlanChangeLog {
+  id                String    @id @default(cuid())
+  treatmentPlanId   String
+  userId            String
+  changeType        String    // create, update, delete, task_add, task_update, task_delete, status_change, progress_change
+  fieldName         String?   // اسم الحقل المتغير
+  fieldNameAr       String?   // اسم الحقل بالعربي
+  oldValue          String?   // القيمة القديمة (JSON للقيم المعقدة)
+  newValue          String?   // القيمة الجديدة (JSON للقيم المعقدة)
+  description       String?   // وصف التغيير
+  descriptionAr     String?   // وصف التغيير بالعربي
+  relatedTaskId     String?   // معرف المهمة المرتبطة (إن وجدت)
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime  @default(now())
+
+  // العلاقات
+  treatmentPlan TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+  user          User          @relation("TreatmentChangeLogUser", fields: [userId], references: [id])
+
+  @@index([treatmentPlanId])
+  @@index([userId])
+  @@index([changeType])
+  @@index([createdAt])
+}
+
+// مناقشات خطة المعالجة (Treatment Plan Discussions)
+model TreatmentDiscussion {
+  id                String    @id @default(cuid())
+  treatmentPlanId   String
+  authorId          String
+  content           String    // محتوى الرسالة/التعليق
+  type              String    @default("comment") // comment, question, reply, mention, decision
+  parentId          String?   // للرد على تعليق آخر
+  isResolved        Boolean   @default(false) // للأسئلة والقرارات
+  attachmentUrl     String?   // رابط المرفق
+  attachmentName    String?   // اسم المرفق
+  mentionedUserIds  String?   // قائمة المستخدمين المذكورين (JSON array)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // العلاقات
+  treatmentPlan TreatmentPlan       @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+  author        User                @relation("TreatmentDiscussionAuthor", fields: [authorId], references: [id])
+  parent        TreatmentDiscussion?  @relation("DiscussionReplies", fields: [parentId], references: [id])
+  replies       TreatmentDiscussion[] @relation("DiscussionReplies")
+
+  @@index([treatmentPlanId])
+  @@index([authorId])
+  @@index([parentId])
   @@index([createdAt])
 }

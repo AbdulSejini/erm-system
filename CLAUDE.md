@@ -599,3 +599,113 @@ Located in `/src/components/ui/`:
 - **Translations Added**:
   - Arabic: `treatment.taskSteps.*`
   - English: `treatment.taskSteps.*`
+
+### Treatment Plan Redesign (Latest)
+- **Complete redesign of `/treatment/[id]` page**
+- **Single Page Layout**: All sections in one scrollable page (no tabs)
+  - Overview Section (Hero with progress, scores)
+  - Tasks Section (with workflow steps and updates)
+  - Risk Details Section
+  - Discussions Section (NEW)
+  - Change Log Section (NEW)
+- **New Features Added**:
+  1. **Treatment Plan Change Log** - Track all modifications
+  2. **Treatment Plan Discussions** - Comment and reply system
+  3. **Quick Navigation** - Sticky header with section shortcuts
+  4. **Wider Layout** - max-width 1800px for better visibility
+  5. **Smooth Animations** - fadeIn, slideUp, slideDown effects
+  6. **Modern UI** - Gradient backgrounds, rounded cards, shadows
+
+### Treatment Plan Change Log (`TreatmentPlanChangeLog`)
+- **Database Model**:
+  ```prisma
+  model TreatmentPlanChangeLog {
+    id                String    @id
+    treatmentPlanId   String
+    userId            String
+    changeType        String    // create, update, delete, task_add, task_update, status_change, progress_change
+    fieldName         String?   // Field that was changed
+    fieldNameAr       String?   // Arabic field name
+    oldValue          String?   // Old value (JSON)
+    newValue          String?   // New value (JSON)
+    description       String?   // Change description
+    descriptionAr     String?   // Arabic description
+    relatedTaskId     String?   // Related task ID if applicable
+    ipAddress         String?
+    userAgent         String?
+    createdAt         DateTime
+  }
+  ```
+- **API Endpoint**: `/api/treatments/[treatmentId]/changelog`
+  - `GET` - Fetch all change logs for a treatment plan
+  - `POST` - Add new change log entry
+- **UI Features**:
+  - Timeline-style display with icons
+  - Color-coded change types
+  - Shows old vs new values for field changes
+  - Time-ago formatting
+
+### Treatment Plan Discussions (`TreatmentDiscussion`)
+- **Database Model**:
+  ```prisma
+  model TreatmentDiscussion {
+    id                String    @id
+    treatmentPlanId   String
+    authorId          String
+    content           String    // Comment content
+    type              String    // comment, question, reply, mention, decision
+    parentId          String?   // For replies
+    isResolved        Boolean   // For questions/decisions
+    attachmentUrl     String?   // OneDrive/SharePoint link
+    attachmentName    String?
+    mentionedUserIds  String?   // JSON array of mentioned user IDs
+    createdAt         DateTime
+    updatedAt         DateTime
+  }
+  ```
+- **API Endpoint**: `/api/treatments/[treatmentId]/discussions`
+  - `GET` - Fetch all discussions (with replies)
+  - `POST` - Add new comment/reply
+  - `PATCH` - Update comment, mark as resolved
+  - `DELETE` - Delete comment (author or admin only)
+- **UI Features**:
+  - Threaded replies
+  - Avatar with user initials
+  - Question/Decision badges
+  - Reply input inline
+  - Time-ago formatting
+  - @mention support (notifications sent)
+
+### Treatment Detail Page Layout
+- **Sticky Navigation Header**:
+  - Back button
+  - Risk number badge
+  - Quick section navigation buttons (Overview, Tasks, Risk, Discussions, Log)
+  - Action buttons (PDF, Email, Edit, Delete)
+- **Hero Section**:
+  - Strategy icon with color gradient
+  - Rating badges and status indicators
+  - Meta info cards (Department, Responsible, Dates)
+  - Justification display
+  - Progress bar with percentage
+  - Risk scores summary (Inherent/Residual)
+  - Tasks completion counter
+- **Tasks Section**:
+  - Large task cards with numbered badges
+  - Task status indicators
+  - Assignee and due date info
+  - Attachment links
+  - Two columns: Workflow Steps | Updates
+- **Risk Details Section**:
+  - Risk description
+  - Potential cause and impact
+  - Existing controls
+  - Risk matrix (Inherent vs Residual)
+- **Discussions Section**:
+  - New discussion input
+  - Threaded comments
+  - Reply functionality
+- **Change Log Section**:
+  - Timeline view
+  - Change type icons and badges
+  - Field change diffs
