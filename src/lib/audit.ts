@@ -9,7 +9,9 @@ export type AuditAction =
   | 'logout'
   | 'export'
   | 'import'
-  | 'view';
+  | 'view'
+  | 'impersonate_start'
+  | 'impersonate_end';
 
 export type AuditEntity =
   | 'risk'

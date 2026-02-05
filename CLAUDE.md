@@ -485,3 +485,39 @@ Located in `/src/components/ui/`:
   - Copy body
   - Copy all
   - Open in email client
+
+### User Impersonation (Admin Only) - Latest
+- **Feature**: System Admin can view the system as another user to verify their permissions
+- **Location**: Header → UserCog icon button (visible only for admin role)
+- **Components**:
+  - `/src/app/api/admin/impersonate/route.ts` - API for starting/ending impersonation
+  - `/src/contexts/ImpersonationContext.tsx` - State management for impersonation
+  - `/src/hooks/useImpersonatedFetch.ts` - Helper hook for API calls with impersonation
+- **How It Works**:
+  1. Admin clicks UserCog icon in header
+  2. Modal shows list of all users with search
+  3. Admin selects a user to view as
+  4. Orange banner appears showing impersonation status
+  5. All API calls use the impersonated user's permissions
+  6. Click "Exit View" to return to admin account
+- **Security**:
+  - Only `admin` role can use this feature
+  - All impersonation actions are logged in audit trail
+  - Uses `X-Impersonate-User-Id` header for API calls
+  - State persists in localStorage (cleared on exit)
+- **UI Elements**:
+  - UserCog button in header (admin only)
+  - User selection modal with search
+  - Orange impersonation banner with user info
+  - "Exit View" button to end impersonation
+- **Audit Actions** (in `/src/lib/audit.ts`):
+  - `impersonate_start` - When admin starts viewing as another user
+  - `impersonate_end` - When admin exits impersonation mode
+
+### Risk Access Permissions (riskChampion)
+- **riskChampion users** can only see risks in:
+  - Departments assigned to them (`allowedDepartmentIds`)
+  - Risks where they are the champion (`championId`)
+  - Risks where they are the owner (`ownerId`)
+- **Important**: If a riskChampion has no departments assigned, they will only see risks directly assigned to them
+- **API Location**: `/api/risks/route.ts` lines 112-133

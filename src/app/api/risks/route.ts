@@ -39,6 +39,15 @@ export async function GET(request: NextRequest) {
     // الحصول على الجلسة للتحقق من صلاحيات المستخدم
     const session = await auth();
 
+    // دعم انتحال الصلاحيات (Impersonation) - للمدير فقط
+    const impersonateUserId = request.headers.get('X-Impersonate-User-Id');
+    let effectiveUserId = session?.user?.id;
+
+    // التحقق من صلاحية الانتحال
+    if (impersonateUserId && session?.user?.role === 'admin') {
+      effectiveUserId = impersonateUserId;
+    }
+
     // بناء شروط البحث الأساسية
     const baseWhere: Record<string, unknown> = {};
 
@@ -62,9 +71,9 @@ export async function GET(request: NextRequest) {
     // تطبيق فلترة الصلاحيات حسب دور المستخدم
     let where = baseWhere;
 
-    if (filterByAccess && session?.user?.id) {
+    if (filterByAccess && effectiveUserId) {
       const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: effectiveUserId },
         include: {
           accessibleDepartments: {
             select: { departmentId: true },

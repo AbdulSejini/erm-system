@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useTransition, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -325,10 +326,22 @@ export default function TreatmentPage() {
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
   const [isPending, startTransition] = useTransition();
+  const { isImpersonating, impersonatedUser } = useImpersonation();
 
   // URL params for pre-selecting risk
   const preselectedRiskId = searchParams.get('riskId');
   const autoOpen = searchParams.get('action') === 'add';
+
+  // Helper function to get fetch headers with impersonation support
+  const getHeaders = useCallback(() => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (isImpersonating && impersonatedUser) {
+      headers['X-Impersonate-User-Id'] = impersonatedUser.id;
+    }
+    return headers;
+  }, [isImpersonating, impersonatedUser]);
 
   // Core data states
   const [risks, setRisks] = useState<APIRisk[]>([]);
@@ -418,10 +431,11 @@ export default function TreatmentPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
+        const headers = getHeaders();
         const [risksRes, usersRes, ownersRes] = await Promise.all([
-          fetch('/api/risks?includeTreatments=true'),
-          fetch('/api/users'),
-          fetch('/api/risk-owners'),
+          fetch('/api/risks?includeTreatments=true', { headers }),
+          fetch('/api/users', { headers }),
+          fetch('/api/risk-owners', { headers }),
         ]);
 
         if (risksRes.ok) {
@@ -455,7 +469,7 @@ export default function TreatmentPage() {
         }
 
         // Fetch departments للفرز
-        const deptRes = await fetch('/api/departments');
+        const deptRes = await fetch('/api/departments', { headers });
         if (deptRes.ok) {
           const deptData = await deptRes.json();
           if (deptData.success && deptData.data) {
@@ -474,7 +488,7 @@ export default function TreatmentPage() {
     };
 
     fetchData();
-  }, []);
+  }, [getHeaders, isImpersonating, impersonatedUser]);
 
   // ============================================
   // Computed Data

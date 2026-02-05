@@ -4,6 +4,7 @@ import React from 'react';
 import { ThemeProvider } from 'next-themes';
 import { SessionProvider } from 'next-auth/react';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { ImpersonationProvider } from '@/contexts/ImpersonationContext';
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -19,7 +20,9 @@ export function Providers({ children }: ProvidersProps) {
         disableTransitionOnChange={false}
       >
         <LanguageProvider>
-          {children}
+          <ImpersonationProvider>
+            {children}
+          </ImpersonationProvider>
         </LanguageProvider>
       </ThemeProvider>
     </SessionProvider>

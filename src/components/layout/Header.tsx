@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useTranslation, useLanguage } from '@/contexts/LanguageContext';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +19,12 @@ import {
   Check,
   Loader2,
   Key,
+  Users,
+  UserCog,
+  X,
+  Search,
+  Shield,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { MobileMenuButton } from './Sidebar';
@@ -81,10 +88,32 @@ const bellAnimationStyles = `
 .notification-glow {
   animation: notification-glow 2s ease-in-out infinite;
 }
+
+@keyframes impersonation-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.impersonation-indicator {
+  animation: impersonation-pulse 2s ease-in-out infinite;
+}
 `;
 
 interface HeaderProps {
   onMobileMenuClick: () => void;
+}
+
+// Interface for user list
+interface UserOption {
+  id: string;
+  fullName: string;
+  fullNameEn: string | null;
+  email: string;
+  role: string;
+  department: {
+    nameAr: string;
+    nameEn: string;
+  } | null;
 }
 
 export function Header({ onMobileMenuClick }: HeaderProps) {
@@ -93,6 +122,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   const { t, isRTL } = useTranslation();
   const { language, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
+  const { isImpersonating, impersonatedUser, originalAdmin, startImpersonation, stopImpersonation } = useImpersonation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -101,6 +131,13 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [bellAnimating, setBellAnimating] = useState(false);
   const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
+
+  // Impersonation states
+  const [showImpersonateModal, setShowImpersonateModal] = useState(false);
+  const [usersList, setUsersList] = useState<UserOption[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [impersonating, setImpersonating] = useState(false);
 
   // Inject animation styles
   useEffect(() => {
@@ -198,6 +235,63 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     return language === 'ar' ? `منذ ${diffDays} يوم` : `${diffDays} days ago`;
   };
 
+  // Fetch users for impersonation
+  const fetchUsersForImpersonation = useCallback(async () => {
+    try {
+      setLoadingUsers(true);
+      const response = await fetch('/api/users');
+      const result = await response.json();
+      if (result.success || result.data) {
+        // Filter out current admin
+        const users = (result.data || []).filter(
+          (u: UserOption) => u.id !== session?.user?.id
+        );
+        setUsersList(users);
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [session?.user?.id]);
+
+  // Handle impersonation
+  const handleStartImpersonation = async (userId: string) => {
+    setImpersonating(true);
+    const success = await startImpersonation(userId);
+    setImpersonating(false);
+    if (success) {
+      setShowImpersonateModal(false);
+      // Reload to apply new permissions
+      window.location.reload();
+    }
+  };
+
+  // Filter users based on search
+  const filteredUsers = usersList.filter((user) => {
+    const query = userSearchQuery.toLowerCase();
+    return (
+      user.fullName.toLowerCase().includes(query) ||
+      (user.fullNameEn && user.fullNameEn.toLowerCase().includes(query)) ||
+      user.email.toLowerCase().includes(query) ||
+      user.role.toLowerCase().includes(query)
+    );
+  });
+
+  // Get role label for display
+  const getRoleLabelForUser = (role: string) => {
+    const roleNames: Record<string, { ar: string; en: string }> = {
+      admin: { ar: 'مدير النظام', en: 'System Admin' },
+      riskManager: { ar: 'مدير المخاطر', en: 'Risk Manager' },
+      riskAnalyst: { ar: 'محلل المخاطر', en: 'Risk Analyst' },
+      riskChampion: { ar: 'رائد المخاطر', en: 'Risk Champion' },
+      executive: { ar: 'تنفيذي', en: 'Executive' },
+      employee: { ar: 'موظف', en: 'Employee' },
+    };
+    const roleInfo = roleNames[role] || { ar: role, en: role };
+    return language === 'ar' ? roleInfo.ar : roleInfo.en;
+  };
+
   const toggleLanguage = () => {
     setLanguage(language === 'ar' ? 'en' : 'ar');
   };
@@ -212,7 +306,14 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   };
 
   // User data from session - استخدام الاسم حسب اللغة
+  // إذا كان في وضع الانتحال، استخدم بيانات المستخدم المنتحل
   const getUserName = () => {
+    if (isImpersonating && impersonatedUser) {
+      if (language === 'en' && impersonatedUser.nameEn) {
+        return impersonatedUser.nameEn;
+      }
+      return impersonatedUser.name;
+    }
     if (language === 'en' && session?.user?.nameEn) {
       return session.user.nameEn;
     }
@@ -220,7 +321,9 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   };
 
   const getRoleName = () => {
-    const role = session?.user?.role;
+    const role = isImpersonating && impersonatedUser
+      ? impersonatedUser.role
+      : session?.user?.role;
     const roleNames: Record<string, { ar: string; en: string }> = {
       admin: { ar: 'مدير النظام', en: 'System Admin' },
       riskManager: { ar: 'مدير المخاطر', en: 'Risk Manager' },
@@ -236,12 +339,46 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   const user = {
     name: getUserName(),
     role: getRoleName(),
-    email: session?.user?.email || '',
+    email: isImpersonating && impersonatedUser ? impersonatedUser.email : (session?.user?.email || ''),
     avatar: null,
   };
 
+  // Check if current user is admin (original session, not impersonated)
+  const isAdmin = session?.user?.role === 'admin';
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 lg:px-6 shadow-sm">
+    <>
+      {/* Impersonation Banner */}
+      {isImpersonating && impersonatedUser && (
+        <div className="sticky top-0 z-50 flex items-center justify-between bg-amber-500 px-4 py-2 text-white shadow-md impersonation-indicator">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            <span className="text-sm font-medium">
+              {language === 'ar' ? (
+                <>
+                  أنت تشاهد النظام كـ <strong>{impersonatedUser.name}</strong> ({getRoleLabelForUser(impersonatedUser.role)})
+                </>
+              ) : (
+                <>
+                  Viewing as <strong>{impersonatedUser.nameEn || impersonatedUser.name}</strong> ({getRoleLabelForUser(impersonatedUser.role)})
+                </>
+              )}
+            </span>
+          </div>
+          <button
+            onClick={stopImpersonation}
+            className="flex items-center gap-1.5 rounded-lg bg-white/20 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white/30"
+          >
+            <X className="h-4 w-4" />
+            {language === 'ar' ? 'إنهاء المعاينة' : 'Exit View'}
+          </button>
+        </div>
+      )}
+
+      <header className={cn(
+        "sticky z-30 flex h-16 items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 lg:px-6 shadow-sm",
+        isImpersonating ? "top-[44px]" : "top-0"
+      )}>
       {/* Left Section */}
       <div className="flex items-center gap-4">
         <MobileMenuButton onClick={onMobileMenuClick} />
@@ -254,6 +391,22 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
 
       {/* Right Section */}
       <div className="flex items-center gap-1.5">
+        {/* Impersonate User Button - Only for Admin */}
+        {isAdmin && !isImpersonating && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setShowImpersonateModal(true);
+              fetchUsersForImpersonation();
+            }}
+            title={language === 'ar' ? 'عرض كمستخدم آخر' : 'View as another user'}
+            className="rounded-xl text-[var(--foreground-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)]"
+          >
+            <UserCog className="h-5 w-5" />
+          </Button>
+        )}
+
         {/* Language Toggle */}
         <Button
           variant="ghost"
@@ -494,5 +647,122 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
         </div>
       </div>
     </header>
+
+      {/* Impersonation Modal */}
+      {showImpersonateModal && (
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowImpersonateModal(false)}
+          />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-[var(--card)] shadow-2xl">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-[var(--border)] p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    <Eye className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-[var(--foreground)]">
+                      {language === 'ar' ? 'عرض كمستخدم آخر' : 'View as Another User'}
+                    </h2>
+                    <p className="text-xs text-[var(--foreground-secondary)]">
+                      {language === 'ar'
+                        ? 'اختر مستخدماً لمعاينة صلاحياته'
+                        : 'Select a user to view their permissions'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowImpersonateModal(false)}
+                  className="rounded-lg p-2 text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)] hover:text-[var(--foreground)]"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="border-b border-[var(--border)] p-4">
+                <div className="relative">
+                  <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--foreground-muted)]" />
+                  <input
+                    type="text"
+                    placeholder={language === 'ar' ? 'البحث عن مستخدم...' : 'Search users...'}
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] py-2.5 pe-4 ps-10 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                  />
+                </div>
+              </div>
+
+              {/* Users List */}
+              <div className="max-h-80 overflow-y-auto p-2">
+                {loadingUsers ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-[var(--primary)]" />
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Users className="mx-auto h-10 w-10 text-[var(--foreground-muted)]" />
+                    <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
+                      {language === 'ar' ? 'لا يوجد مستخدمين' : 'No users found'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredUsers.map((targetUser) => (
+                      <button
+                        key={targetUser.id}
+                        onClick={() => handleStartImpersonation(targetUser.id)}
+                        disabled={impersonating}
+                        className="flex w-full items-center gap-3 rounded-xl p-3 text-start transition-colors hover:bg-[var(--background-tertiary)] disabled:opacity-50"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] text-sm font-semibold text-white">
+                          {targetUser.fullName.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                            {language === 'ar'
+                              ? targetUser.fullName
+                              : (targetUser.fullNameEn || targetUser.fullName)}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
+                            <span className="flex items-center gap-1">
+                              <Shield className="h-3 w-3" />
+                              {getRoleLabelForUser(targetUser.role)}
+                            </span>
+                            {targetUser.department && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate">
+                                  {language === 'ar'
+                                    ? targetUser.department.nameAr
+                                    : targetUser.department.nameEn}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <Eye className="h-4 w-4 text-[var(--foreground-muted)]" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-[var(--border)] p-4">
+                <p className="text-xs text-[var(--foreground-muted)] text-center">
+                  {language === 'ar'
+                    ? 'ملاحظة: ستتمكن من رؤية النظام بصلاحيات المستخدم المختار دون التأثير على بياناته'
+                    : 'Note: You will view the system with the selected user\'s permissions without affecting their data'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }
