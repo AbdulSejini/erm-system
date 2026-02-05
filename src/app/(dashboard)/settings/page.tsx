@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -276,11 +277,14 @@ const statusIcons = [
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { t, language } = useTranslation();
+  const { isImpersonating, impersonatedUser } = useImpersonation();
   const searchParams = useSearchParams();
   const isAr = language === 'ar';
 
-  // Get user role from session, default to 'employee' if not found
-  const userRole = (session?.user as { role?: string })?.role || 'employee';
+  // Get user role - use impersonated user's role if impersonating, otherwise use session user's role
+  const userRole = (isImpersonating && impersonatedUser?.role)
+    ? impersonatedUser.role
+    : ((session?.user as { role?: string })?.role || 'employee');
 
   // Get accessible tabs based on user role
   const accessibleTabs = useMemo(() => {
