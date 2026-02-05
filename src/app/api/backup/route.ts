@@ -29,25 +29,40 @@ async function cleanupOldBackups() {
   }
 }
 
-// دالة لإنشاء بيانات النسخة الاحتياطية
+// دالة لإنشاء بيانات النسخة الاحتياطية الشاملة
 async function createBackupData() {
+  // جلب جميع البيانات من قاعدة البيانات
   const [
     users,
     departments,
+    processes,
     categories,
     risks,
     riskStatuses,
     sources,
+    riskAssessments,
     comments,
     userDepartmentAccess,
     treatmentPlans,
     treatmentTasks,
+    taskSteps,
+    taskUpdates,
     riskOwners,
     riskChangeLogs,
     residualRiskRequests,
     riskApprovalRequests,
     notifications,
+    auditLogs,
+    systemSettings,
+    likelihoodCriteria,
+    impactCriteria,
+    riskRatingCriteria,
+    directMessages,
+    incidents,
+    treatmentPlanChangeLogs,
+    treatmentDiscussions,
   ] = await Promise.all([
+    // المستخدمين (بدون كلمات المرور)
     prisma.user.findMany({
       select: {
         id: true,
@@ -56,72 +71,158 @@ async function createBackupData() {
         email: true,
         role: true,
         status: true,
+        avatar: true,
         phone: true,
         departmentId: true,
+        authProvider: true,
+        lastLogin: true,
         createdAt: true,
         updatedAt: true,
       },
     }),
+    // الأقسام
     prisma.department.findMany(),
+    // العمليات
+    prisma.process.findMany(),
+    // فئات المخاطر
     prisma.riskCategory.findMany(),
+    // المخاطر
     prisma.risk.findMany(),
+    // حالات المخاطر
     prisma.riskStatus.findMany(),
+    // مصادر المخاطر
     prisma.riskSource.findMany(),
+    // تقييمات المخاطر
+    prisma.riskAssessment.findMany(),
+    // تعليقات المخاطر
     prisma.riskComment.findMany(),
+    // صلاحيات الأقسام للمستخدمين
     prisma.userDepartmentAccess.findMany(),
+    // خطط المعالجة
     prisma.treatmentPlan.findMany(),
+    // مهام المعالجة
     prisma.treatmentTask.findMany(),
+    // خطوات المهام
+    prisma.taskStep.findMany(),
+    // تحديثات المهام
+    prisma.taskUpdate.findMany(),
+    // ملاك المخاطر
     prisma.riskOwner.findMany(),
+    // سجل تغييرات المخاطر
     prisma.riskChangeLog.findMany({
+      take: 10000,
+      orderBy: { createdAt: 'desc' },
+    }),
+    // طلبات تغيير الخطر المتبقي
+    prisma.residualRiskChangeRequest.findMany(),
+    // طلبات اعتماد المخاطر
+    prisma.riskApprovalRequest.findMany(),
+    // الإشعارات
+    prisma.notification.findMany({
       take: 5000,
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.residualRiskChangeRequest.findMany(),
-    prisma.riskApprovalRequest.findMany(),
-    prisma.notification.findMany({
-      take: 1000,
+    // سجل التدقيق
+    prisma.auditLog.findMany({
+      take: 10000,
       orderBy: { createdAt: 'desc' },
     }),
+    // إعدادات النظام
+    prisma.systemSettings.findMany(),
+    // معايير الاحتمالية
+    prisma.likelihoodCriteria.findMany(),
+    // معايير التأثير
+    prisma.impactCriteria.findMany(),
+    // معايير تصنيف الخطر
+    prisma.riskRatingCriteria.findMany(),
+    // الرسائل المباشرة
+    prisma.directMessage.findMany({
+      take: 5000,
+      orderBy: { createdAt: 'desc' },
+    }),
+    // الحوادث
+    prisma.incident.findMany(),
+    // سجل تغييرات خطط المعالجة
+    prisma.treatmentPlanChangeLog.findMany({
+      take: 10000,
+      orderBy: { createdAt: 'desc' },
+    }),
+    // مناقشات خطط المعالجة
+    prisma.treatmentDiscussion.findMany(),
   ]);
 
   const stats = {
     users: users.length,
     departments: departments.length,
+    processes: processes.length,
     categories: categories.length,
     risks: risks.length,
     riskStatuses: riskStatuses.length,
     sources: sources.length,
+    riskAssessments: riskAssessments.length,
     comments: comments.length,
     userDepartmentAccess: userDepartmentAccess.length,
     treatmentPlans: treatmentPlans.length,
     treatmentTasks: treatmentTasks.length,
+    taskSteps: taskSteps.length,
+    taskUpdates: taskUpdates.length,
     riskOwners: riskOwners.length,
     riskChangeLogs: riskChangeLogs.length,
     residualRiskRequests: residualRiskRequests.length,
     riskApprovalRequests: riskApprovalRequests.length,
     notifications: notifications.length,
+    auditLogs: auditLogs.length,
+    systemSettings: systemSettings.length,
+    likelihoodCriteria: likelihoodCriteria.length,
+    impactCriteria: impactCriteria.length,
+    riskRatingCriteria: riskRatingCriteria.length,
+    directMessages: directMessages.length,
+    incidents: incidents.length,
+    treatmentPlanChangeLogs: treatmentPlanChangeLogs.length,
+    treatmentDiscussions: treatmentDiscussions.length,
   };
 
   const backup = {
-    version: '2.0',
+    version: '3.0', // النسخة الشاملة
     createdAt: new Date().toISOString(),
-    system: 'ERM System',
+    system: 'ERM System - Full Backup',
     data: {
+      // البيانات الأساسية
       users,
       departments,
+      processes,
       categories,
-      risks,
       riskStatuses,
       sources,
-      comments,
-      userDepartmentAccess,
-      treatmentPlans,
-      treatmentTasks,
       riskOwners,
+      // معايير التقييم
+      likelihoodCriteria,
+      impactCriteria,
+      riskRatingCriteria,
+      // المخاطر
+      risks,
+      riskAssessments,
+      comments,
       riskChangeLogs,
       residualRiskRequests,
       riskApprovalRequests,
+      // خطط المعالجة
+      treatmentPlans,
+      treatmentTasks,
+      taskSteps,
+      taskUpdates,
+      treatmentPlanChangeLogs,
+      treatmentDiscussions,
+      // الحوادث
+      incidents,
+      // الصلاحيات والإعدادات
+      userDepartmentAccess,
+      systemSettings,
+      // الرسائل والإشعارات
+      directMessages,
       notifications,
+      // سجل التدقيق
+      auditLogs,
     },
     stats,
   };
@@ -259,7 +360,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (backup.system !== 'ERM System') {
+    if (!backup.system.includes('ERM System')) {
       return NextResponse.json(
         { success: false, error: 'ملف النسخة الاحتياطية ليس من نظام ERM' },
         { status: 400 }
@@ -268,16 +369,28 @@ export async function POST(request: NextRequest) {
 
     const results = {
       departments: 0,
+      processes: 0,
       categories: 0,
       users: 0,
       risks: 0,
+      riskAssessments: 0,
       riskStatuses: 0,
       sources: 0,
       comments: 0,
       userDepartmentAccess: 0,
       treatmentPlans: 0,
       treatmentTasks: 0,
+      taskSteps: 0,
+      taskUpdates: 0,
       riskOwners: 0,
+      likelihoodCriteria: 0,
+      impactCriteria: 0,
+      riskRatingCriteria: 0,
+      incidents: 0,
+      directMessages: 0,
+      systemSettings: 0,
+      treatmentPlanChangeLogs: 0,
+      treatmentDiscussions: 0,
       errors: [] as string[],
     };
 
@@ -555,6 +668,271 @@ export async function POST(request: NextRequest) {
           results.userDepartmentAccess++;
         } catch (e) {
           results.errors.push(`UserDepartmentAccess: ${e}`);
+        }
+      }
+    }
+
+    // استعادة العمليات (Processes)
+    if (backup.data.processes && Array.isArray(backup.data.processes)) {
+      for (const process of backup.data.processes) {
+        try {
+          await prisma.process.upsert({
+            where: { id: process.id },
+            update: {
+              nameAr: process.nameAr,
+              nameEn: process.nameEn,
+              code: process.code,
+              departmentId: process.departmentId,
+              parentId: process.parentId,
+              isActive: process.isActive,
+              order: process.order,
+            },
+            create: process,
+          });
+          results.processes++;
+        } catch (e) {
+          results.errors.push(`Process ${process.code}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة تقييمات المخاطر
+    if (backup.data.riskAssessments && Array.isArray(backup.data.riskAssessments)) {
+      for (const assessment of backup.data.riskAssessments) {
+        try {
+          const exists = await prisma.riskAssessment.findUnique({ where: { id: assessment.id } });
+          if (!exists) {
+            await prisma.riskAssessment.create({
+              data: {
+                ...assessment,
+                assessmentDate: assessment.assessmentDate ? new Date(assessment.assessmentDate) : new Date(),
+                createdAt: assessment.createdAt ? new Date(assessment.createdAt) : new Date(),
+              },
+            });
+            results.riskAssessments++;
+          }
+        } catch (e) {
+          results.errors.push(`RiskAssessment ${assessment.id}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة خطوات المهام (Task Steps)
+    if (backup.data.taskSteps && Array.isArray(backup.data.taskSteps)) {
+      for (const step of backup.data.taskSteps) {
+        try {
+          const exists = await prisma.taskStep.findUnique({ where: { id: step.id } });
+          if (!exists) {
+            await prisma.taskStep.create({
+              data: {
+                ...step,
+                dueDate: step.dueDate ? new Date(step.dueDate) : undefined,
+                completedAt: step.completedAt ? new Date(step.completedAt) : undefined,
+                createdAt: step.createdAt ? new Date(step.createdAt) : new Date(),
+                updatedAt: step.updatedAt ? new Date(step.updatedAt) : new Date(),
+              },
+            });
+            results.taskSteps++;
+          }
+        } catch (e) {
+          results.errors.push(`TaskStep ${step.id}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة تحديثات المهام (Task Updates)
+    if (backup.data.taskUpdates && Array.isArray(backup.data.taskUpdates)) {
+      for (const update of backup.data.taskUpdates) {
+        try {
+          const exists = await prisma.taskUpdate.findUnique({ where: { id: update.id } });
+          if (!exists) {
+            await prisma.taskUpdate.create({
+              data: {
+                ...update,
+                createdAt: update.createdAt ? new Date(update.createdAt) : new Date(),
+              },
+            });
+            results.taskUpdates++;
+          }
+        } catch (e) {
+          results.errors.push(`TaskUpdate ${update.id}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة معايير الاحتمالية
+    if (backup.data.likelihoodCriteria && Array.isArray(backup.data.likelihoodCriteria)) {
+      for (const criteria of backup.data.likelihoodCriteria) {
+        try {
+          await prisma.likelihoodCriteria.upsert({
+            where: { id: criteria.id },
+            update: {
+              level: criteria.level,
+              nameAr: criteria.nameAr,
+              nameEn: criteria.nameEn,
+              descriptionAr: criteria.descriptionAr,
+              descriptionEn: criteria.descriptionEn,
+              percentage: criteria.percentage,
+            },
+            create: criteria,
+          });
+          results.likelihoodCriteria++;
+        } catch (e) {
+          results.errors.push(`LikelihoodCriteria ${criteria.level}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة معايير التأثير
+    if (backup.data.impactCriteria && Array.isArray(backup.data.impactCriteria)) {
+      for (const criteria of backup.data.impactCriteria) {
+        try {
+          await prisma.impactCriteria.upsert({
+            where: { id: criteria.id },
+            update: {
+              level: criteria.level,
+              nameAr: criteria.nameAr,
+              nameEn: criteria.nameEn,
+              descriptionAr: criteria.descriptionAr,
+              descriptionEn: criteria.descriptionEn,
+            },
+            create: criteria,
+          });
+          results.impactCriteria++;
+        } catch (e) {
+          results.errors.push(`ImpactCriteria ${criteria.level}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة معايير تصنيف الخطر
+    if (backup.data.riskRatingCriteria && Array.isArray(backup.data.riskRatingCriteria)) {
+      for (const criteria of backup.data.riskRatingCriteria) {
+        try {
+          await prisma.riskRatingCriteria.upsert({
+            where: { id: criteria.id },
+            update: {
+              minScore: criteria.minScore,
+              maxScore: criteria.maxScore,
+              nameAr: criteria.nameAr,
+              nameEn: criteria.nameEn,
+              descriptionAr: criteria.descriptionAr,
+              descriptionEn: criteria.descriptionEn,
+              color: criteria.color,
+            },
+            create: criteria,
+          });
+          results.riskRatingCriteria++;
+        } catch (e) {
+          results.errors.push(`RiskRatingCriteria ${criteria.id}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة الحوادث
+    if (backup.data.incidents && Array.isArray(backup.data.incidents)) {
+      for (const incident of backup.data.incidents) {
+        try {
+          await prisma.incident.upsert({
+            where: { id: incident.id },
+            update: {
+              titleAr: incident.titleAr,
+              titleEn: incident.titleEn,
+              descriptionAr: incident.descriptionAr,
+              descriptionEn: incident.descriptionEn,
+              severity: incident.severity,
+              status: incident.status,
+            },
+            create: {
+              ...incident,
+              incidentDate: incident.incidentDate ? new Date(incident.incidentDate) : new Date(),
+              reportedDate: incident.reportedDate ? new Date(incident.reportedDate) : new Date(),
+              resolvedDate: incident.resolvedDate ? new Date(incident.resolvedDate) : undefined,
+              createdAt: incident.createdAt ? new Date(incident.createdAt) : new Date(),
+              updatedAt: incident.updatedAt ? new Date(incident.updatedAt) : new Date(),
+            },
+          });
+          results.incidents++;
+        } catch (e) {
+          results.errors.push(`Incident ${incident.incidentNumber}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة الرسائل المباشرة
+    if (backup.data.directMessages && Array.isArray(backup.data.directMessages)) {
+      for (const message of backup.data.directMessages) {
+        try {
+          const exists = await prisma.directMessage.findUnique({ where: { id: message.id } });
+          if (!exists) {
+            await prisma.directMessage.create({
+              data: {
+                ...message,
+                createdAt: message.createdAt ? new Date(message.createdAt) : new Date(),
+                updatedAt: message.updatedAt ? new Date(message.updatedAt) : new Date(),
+              },
+            });
+            results.directMessages++;
+          }
+        } catch (e) {
+          results.errors.push(`DirectMessage ${message.id}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة إعدادات النظام
+    if (backup.data.systemSettings && Array.isArray(backup.data.systemSettings)) {
+      for (const setting of backup.data.systemSettings) {
+        try {
+          await prisma.systemSettings.upsert({
+            where: { id: setting.id },
+            update: { value: setting.value },
+            create: setting,
+          });
+          results.systemSettings++;
+        } catch (e) {
+          results.errors.push(`SystemSettings ${setting.key}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة سجل تغييرات خطط المعالجة
+    if (backup.data.treatmentPlanChangeLogs && Array.isArray(backup.data.treatmentPlanChangeLogs)) {
+      for (const log of backup.data.treatmentPlanChangeLogs) {
+        try {
+          const exists = await prisma.treatmentPlanChangeLog.findUnique({ where: { id: log.id } });
+          if (!exists) {
+            await prisma.treatmentPlanChangeLog.create({
+              data: {
+                ...log,
+                createdAt: log.createdAt ? new Date(log.createdAt) : new Date(),
+              },
+            });
+            results.treatmentPlanChangeLogs++;
+          }
+        } catch (e) {
+          results.errors.push(`TreatmentPlanChangeLog ${log.id}: ${e}`);
+        }
+      }
+    }
+
+    // استعادة مناقشات خطط المعالجة
+    if (backup.data.treatmentDiscussions && Array.isArray(backup.data.treatmentDiscussions)) {
+      for (const discussion of backup.data.treatmentDiscussions) {
+        try {
+          const exists = await prisma.treatmentDiscussion.findUnique({ where: { id: discussion.id } });
+          if (!exists) {
+            await prisma.treatmentDiscussion.create({
+              data: {
+                ...discussion,
+                createdAt: discussion.createdAt ? new Date(discussion.createdAt) : new Date(),
+                updatedAt: discussion.updatedAt ? new Date(discussion.updatedAt) : new Date(),
+              },
+            });
+            results.treatmentDiscussions++;
+          }
+        } catch (e) {
+          results.errors.push(`TreatmentDiscussion ${discussion.id}: ${e}`);
         }
       }
     }

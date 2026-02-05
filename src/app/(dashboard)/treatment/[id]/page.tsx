@@ -393,7 +393,7 @@ export default function TreatmentDetailPage() {
         if (userRes.ok) {
           const sessionData = await userRes.json();
           if (sessionData?.user?.role) {
-            setCanDelete(['admin', 'riskManager'].includes(sessionData.user.role));
+            setCanDelete(['admin', 'riskManager', 'riskAnalyst'].includes(sessionData.user.role));
           }
         }
 

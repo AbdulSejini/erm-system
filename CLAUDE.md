@@ -714,16 +714,17 @@ Located in `/src/components/ui/`:
 - **Who can Edit/Delete treatment plans**:
   - `admin` - System Administrator
   - `riskManager` - Risk Manager
+  - `riskAnalyst` - Risk Analyst
 - **All other roles** can only view treatment plans (no edit/delete)
 - **API Protection**: `/api/risks/[id]/treatments/[treatmentId]/route.ts`
   - PATCH and DELETE methods check user role
-  - Returns 403 if user is not admin/riskManager
+  - Returns 403 if user is not admin/riskManager/riskAnalyst
 - **UI Protection**:
-  - Edit/Delete buttons hidden for non-admin/riskManager
+  - Edit/Delete buttons hidden for non-authorized roles
   - `treatment/page.tsx` - checks session role
   - `treatment/[id]/page.tsx` - checks canDelete state
 
-### Automatic Backup System (Latest)
+### Comprehensive Backup System (Latest - v3.0)
 - **Database Model** (`SystemBackup`):
   ```prisma
   model SystemBackup {
@@ -745,18 +746,44 @@ Located in `/src/components/ui/`:
   - Runs after each backup creation
 - **API Endpoint**: `/api/backup`
   - `GET` - Create and download backup
-  - `POST` - Restore from backup file
-- **Backup Contents**:
-  - Users (without passwords)
-  - Departments
-  - Risks (full details)
-  - Treatment Plans
-  - Treatment Tasks
-  - Risk Owners
-  - Risk Change Logs
-  - Other system data
+  - `POST` - Restore from backup file or create auto backup
+- **Complete Backup Contents** (Full Site Restoration):
+  - **Core Data**:
+    - Users (without passwords)
+    - Departments
+    - Processes
+    - Risk Categories
+    - Risk Statuses
+    - Risk Sources
+    - Risk Owners
+  - **Assessment Criteria**:
+    - Likelihood Criteria
+    - Impact Criteria
+    - Risk Rating Criteria
+  - **Risk Data**:
+    - Risks (full details)
+    - Risk Assessments
+    - Risk Comments
+    - Risk Change Logs
+    - Residual Risk Change Requests
+    - Risk Approval Requests
+  - **Treatment Data**:
+    - Treatment Plans
+    - Treatment Tasks
+    - Task Steps (workflow sub-tasks)
+    - Task Updates
+    - Treatment Plan Change Logs
+    - Treatment Discussions
+  - **Other Data**:
+    - Incidents
+    - User Department Access
+    - System Settings
+    - Direct Messages
+    - Notifications
+    - Audit Logs
 - **Features**:
   - Automatic backup registration in database
   - File size tracking
-  - Statistics per backup (record counts)
+  - Statistics per backup (record counts for all 28 data types)
   - Error handling with status tracking
+  - Full restoration capability for complete site recovery

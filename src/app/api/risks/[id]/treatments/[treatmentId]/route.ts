@@ -42,15 +42,15 @@ export async function PATCH(
       );
     }
 
-    // التحقق من صلاحيات المستخدم - فقط مدير المخاطر أو مدير النظام يمكنهم التعديل
+    // التحقق من صلاحيات المستخدم - فقط مدير المخاطر أو مدير النظام أو محلل المخاطر يمكنهم التعديل
     const currentUser = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { role: true },
     });
 
-    if (!currentUser || !['admin', 'riskManager'].includes(currentUser.role)) {
+    if (!currentUser || !['admin', 'riskManager', 'riskAnalyst'].includes(currentUser.role)) {
       return NextResponse.json(
-        { success: false, error: 'ليس لديك صلاحية تعديل خطط المعالجة. هذا الإجراء متاح فقط لمدير المخاطر أو مدير النظام.' },
+        { success: false, error: 'ليس لديك صلاحية تعديل خطط المعالجة. هذا الإجراء متاح فقط لمدير المخاطر أو مدير النظام أو محلل المخاطر.' },
         { status: 403 }
       );
     }
@@ -382,9 +382,9 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (!user || !['admin', 'riskManager'].includes(user.role)) {
+    if (!user || !['admin', 'riskManager', 'riskAnalyst'].includes(user.role)) {
       return NextResponse.json(
-        { success: false, error: 'ليس لديك صلاحية حذف خطط المعالجة. هذا الإجراء متاح فقط لمدير المخاطر أو مدير النظام.' },
+        { success: false, error: 'ليس لديك صلاحية حذف خطط المعالجة. هذا الإجراء متاح فقط لمدير المخاطر أو مدير النظام أو محلل المخاطر.' },
         { status: 403 }
       );
     }

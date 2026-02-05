@@ -349,7 +349,7 @@ export default function TreatmentPage() {
   const [responsibleOptions, setResponsibleOptions] = useState<ResponsibleOption[]>([]);
   const [riskOwnersList, setRiskOwnersList] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
-  const [canEditDelete, setCanEditDelete] = useState(false); // صلاحية التعديل والحذف (admin و riskManager فقط)
+  const [canEditDelete, setCanEditDelete] = useState(false); // صلاحية التعديل والحذف (admin و riskManager و riskAnalyst فقط)
 
   // UI states
   const [searchQuery, setSearchQuery] = useState('');
@@ -439,8 +439,8 @@ export default function TreatmentPage() {
         if (sessionRes.ok) {
           const sessionData = await sessionRes.json();
           if (sessionData?.user?.role) {
-            // فقط admin و riskManager يمكنهم التعديل والحذف
-            setCanEditDelete(['admin', 'riskManager'].includes(sessionData.user.role));
+            // فقط admin و riskManager و riskAnalyst يمكنهم التعديل والحذف
+            setCanEditDelete(['admin', 'riskManager', 'riskAnalyst'].includes(sessionData.user.role));
           }
         }
 
