@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 
 // GET - جلب جميع بيانات المعالجة للمتابعة
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
 
@@ -14,8 +14,33 @@ export async function GET() {
       );
     }
 
+    // دعم انتحال الصلاحيات (Impersonation) - للمدير فقط
+    const impersonateUserId = request.headers.get('X-Impersonate-User-Id');
+    let effectiveUserId = session.user.id;
+    let effectiveUserRole = session.user.role || 'employee';
+    let effectiveUserEmail = session.user.email || '';
+
+    // التحقق من صلاحية الانتحال
+    if (impersonateUserId && session.user.role === 'admin') {
+      const impersonatedUser = await prisma.user.findUnique({
+        where: { id: impersonateUserId },
+        select: { id: true, role: true, email: true },
+      });
+      if (impersonatedUser) {
+        effectiveUserId = impersonatedUser.id;
+        effectiveUserRole = impersonatedUser.role;
+        effectiveUserEmail = impersonatedUser.email;
+      }
+    }
+
+    // البحث عن مالك الخطر المرتبط بهذا المستخدم عبر البريد
+    const userRiskOwner = await prisma.riskOwner.findFirst({
+      where: { email: effectiveUserEmail },
+      select: { id: true },
+    });
+
     // جلب جميع خطط المعالجة مع التفاصيل الكاملة
-    const treatmentPlans = await prisma.treatmentPlan.findMany({
+    const allTreatmentPlans = await prisma.treatmentPlan.findMany({
       include: {
         risk: {
           select: {
@@ -104,6 +129,7 @@ export async function GET() {
                 fullName: true,
                 fullNameEn: true,
                 avatar: true,
+                email: true,
               },
             },
             actionOwner: {
@@ -111,6 +137,7 @@ export async function GET() {
                 id: true,
                 fullName: true,
                 fullNameEn: true,
+                email: true,
               },
             },
             monitor: {
@@ -118,6 +145,15 @@ export async function GET() {
                 id: true,
                 fullName: true,
                 fullNameEn: true,
+                email: true,
+              },
+            },
+            monitorOwner: {
+              select: {
+                id: true,
+                fullName: true,
+                fullNameEn: true,
+                email: true,
               },
             },
           },
@@ -132,6 +168,42 @@ export async function GET() {
         { dueDate: 'asc' },
       ],
     });
+
+    // تصفية خطط المعالجة حسب صلاحيات المستخدم
+    // admin, riskManager, riskAnalyst يرون كل الخطط
+    // باقي المستخدمين يرون فقط الخطط المرتبطين بها
+    let treatmentPlans = allTreatmentPlans;
+
+    if (!['admin', 'riskManager', 'riskAnalyst'].includes(effectiveUserRole)) {
+      treatmentPlans = allTreatmentPlans.filter((plan) => {
+        // 1. المستخدم هو المسؤول عن خطة المعالجة
+        if (plan.responsibleId === effectiveUserId) return true;
+
+        // 2. المستخدم هو مالك الخطر المرتبط بالخطة (عبر البريد)
+        if (userRiskOwner && plan.riskOwnerId === userRiskOwner.id) return true;
+        if (plan.riskOwner?.email === effectiveUserEmail) return true;
+
+        // 3. المستخدم مكلف أو متابع لأي مهمة في الخطة
+        const isInvolvedInTask = (plan.tasks || []).some((task) => {
+          // مكلف بالمهمة (User)
+          if (task.assignedToId === effectiveUserId) return true;
+          // متابع للمهمة (User)
+          if (task.monitorId === effectiveUserId) return true;
+          // مكلف بالمهمة (RiskOwner عبر ID)
+          if (userRiskOwner && task.actionOwnerId === userRiskOwner.id) return true;
+          // مكلف بالمهمة (RiskOwner عبر البريد)
+          if (task.actionOwner?.email === effectiveUserEmail) return true;
+          // متابع للمهمة (RiskOwner عبر ID)
+          if (userRiskOwner && task.monitorOwnerId === userRiskOwner.id) return true;
+
+          return false;
+        });
+
+        if (isInvolvedInTask) return true;
+
+        return false;
+      });
+    }
 
     // حساب الإحصائيات
     const stats = {

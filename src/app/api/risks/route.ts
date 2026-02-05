@@ -261,14 +261,96 @@ export async function GET(request: NextRequest) {
     // Get total count for pagination (only if pagination is enabled)
     const total = limit > 0 ? await prisma.risk.count({ where }) : risks.length;
 
+    // تصفية خطط المعالجة حسب صلاحيات المستخدم
+    // المستخدم يرى خطة المعالجة إذا كان:
+    // 1. مسؤول عن خطة المعالجة (responsibleId)
+    // 2. مالك خطر (RiskOwner) بنفس الإيميل ومرتبط بالخطة
+    // 3. مكلف بمهمة (assignedToId أو actionOwnerId)
+    // 4. متابع لمهمة (monitorId أو monitorOwnerId)
+    // 5. admin أو riskManager أو riskAnalyst - يرون الكل
+
+    let userRiskOwner: { id: string } | null = null;
+    let effectiveUserRole = 'employee';
+    let effectiveUserEmail = '';
+
+    if (effectiveUserId && includeTreatments) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: effectiveUserId },
+        select: { id: true, role: true, email: true },
+      });
+
+      if (currentUser) {
+        effectiveUserRole = currentUser.role;
+        effectiveUserEmail = currentUser.email;
+
+        // البحث عن مالك الخطر المرتبط بهذا المستخدم عبر البريد
+        userRiskOwner = await prisma.riskOwner.findFirst({
+          where: { email: currentUser.email },
+          select: { id: true },
+        });
+      }
+    }
+
     // تحويل اسم treatments إلى treatmentPlans للتوافق مع الـ frontend
+    // مع تصفية خطط المعالجة حسب الصلاحيات
     const risksWithTreatmentPlans = includeTreatments
       ? risks.map((risk) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { treatments, ...restRisk } = risk as any;
+
+          // إذا كان المستخدم admin أو riskManager أو riskAnalyst - يرى كل خطط المعالجة
+          if (['admin', 'riskManager', 'riskAnalyst'].includes(effectiveUserRole)) {
+            return {
+              ...restRisk,
+              treatmentPlans: treatments || [],
+            };
+          }
+
+          // تصفية خطط المعالجة للمستخدمين الآخرين
+          const filteredTreatments = (treatments || []).filter((treatment: {
+            responsibleId?: string;
+            riskOwnerId?: string;
+            riskOwner?: { email?: string };
+            tasks?: Array<{
+              assignedToId?: string;
+              actionOwnerId?: string;
+              monitorId?: string;
+              monitorOwnerId?: string;
+              actionOwner?: { email?: string };
+              monitorOwner?: { email?: string };
+            }>;
+          }) => {
+            // 1. المستخدم هو المسؤول عن خطة المعالجة
+            if (treatment.responsibleId === effectiveUserId) return true;
+
+            // 2. المستخدم هو مالك الخطر المرتبط بالخطة (عبر البريد)
+            if (userRiskOwner && treatment.riskOwnerId === userRiskOwner.id) return true;
+            if (treatment.riskOwner?.email === effectiveUserEmail) return true;
+
+            // 3. المستخدم مكلف أو متابع لأي مهمة في الخطة
+            const isInvolvedInTask = (treatment.tasks || []).some((task) => {
+              // مكلف بالمهمة (User)
+              if (task.assignedToId === effectiveUserId) return true;
+              // متابع للمهمة (User)
+              if (task.monitorId === effectiveUserId) return true;
+              // مكلف بالمهمة (RiskOwner عبر البريد)
+              if (userRiskOwner && task.actionOwnerId === userRiskOwner.id) return true;
+              if (task.actionOwner?.email === effectiveUserEmail) return true;
+              // متابع للمهمة (RiskOwner عبر البريد)
+              if (userRiskOwner && task.monitorOwnerId === userRiskOwner.id) return true;
+              if (task.monitorOwner?.email === effectiveUserEmail) return true;
+
+              return false;
+            });
+
+            if (isInvolvedInTask) return true;
+
+            return false;
+          });
+
           return {
             ...restRisk,
-            treatmentPlans: treatments || [],
+            treatmentPlans: filteredTreatments,
           };
         })
       : risks;
