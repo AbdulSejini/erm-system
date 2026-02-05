@@ -38,6 +38,7 @@ import {
   Minus,
   PenLine,
   Wrench,
+  Eye,
 } from 'lucide-react';
 import type { RiskRating } from '@/types';
 
@@ -416,33 +417,30 @@ export default function RiskDetailPage() {
       <div className="flex gap-2 border-b border-[var(--border)]">
         <button
           onClick={() => setActiveTab('details')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'details'
-              ? 'border-[var(--primary)] text-[var(--primary)]'
-              : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
-          }`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'details'
+            ? 'border-[var(--primary)] text-[var(--primary)]'
+            : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+            }`}
         >
           <FileText className="h-4 w-4 inline-block me-2" />
           {isAr ? 'التفاصيل' : 'Details'}
         </button>
         <button
           onClick={() => setActiveTab('discussion')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'discussion'
-              ? 'border-[var(--primary)] text-[var(--primary)]'
-              : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
-          }`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'discussion'
+            ? 'border-[var(--primary)] text-[var(--primary)]'
+            : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+            }`}
         >
           <MessageSquare className="h-4 w-4 inline-block me-2" />
           {isAr ? 'المحادثات' : 'Discussion'}
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'history'
-              ? 'border-[var(--primary)] text-[var(--primary)]'
-              : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
-          }`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'history'
+            ? 'border-[var(--primary)] text-[var(--primary)]'
+            : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
+            }`}
         >
           <Activity className="h-4 w-4 inline-block me-2" />
           {isAr ? 'السجل' : 'History'}
@@ -567,6 +565,191 @@ export default function RiskDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Treatment Plans */}
+            {risk.treatments && risk.treatments.length > 0 && (
+              <Card className="rounded-2xl border border-[var(--border)] shadow-sm">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-[var(--primary)]" />
+                    {isAr ? 'خطط المعالجة' : 'Treatment Plans'}
+                    <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-[var(--background-secondary)] text-[var(--foreground-secondary)]">
+                      {risk.treatments.length}
+                    </span>
+                  </h3>
+
+                  <div className="space-y-6">
+                    {risk.treatments.map((plan, index) => (
+                      <div key={plan.id} className="border border-[var(--border)] rounded-xl overflow-hidden">
+                        {/* Plan Header */}
+                        <div className="p-4 bg-[var(--background-secondary)] flex flex-wrap gap-2 items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold px-3 py-1 rounded-lg bg-[var(--primary)] text-white">
+                              {isAr ? `خطة ${index + 1}` : `Plan ${index + 1}`}
+                            </span>
+                            <span className="font-semibold text-[var(--foreground)]">
+                              {isAr ? plan.titleAr : plan.titleEn}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${plan.priority === 'high' ? 'bg-red-100 text-red-700' :
+                              plan.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-green-100 text-green-700'
+                              }`}>
+                              {plan.priority === 'high' ? (isAr ? 'عالية' : 'High') :
+                                plan.priority === 'medium' ? (isAr ? 'متوسطة' : 'Medium') :
+                                  (isAr ? 'منخفضة' : 'Low')}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${plan.status === 'completed' ? 'bg-green-100 text-green-700' :
+                              plan.status === 'inProgress' ? 'bg-blue-100 text-blue-700' :
+                                plan.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-700'
+                              }`}>
+                              {plan.status === 'completed' ? (isAr ? 'مكتمل' : 'Completed') :
+                                plan.status === 'inProgress' ? (isAr ? 'قيد التنفيذ' : 'In Progress') :
+                                  plan.status === 'overdue' ? (isAr ? 'متأخر' : 'Overdue') :
+                                    (isAr ? 'لم يبدأ' : 'Not Started')}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs ms-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700"
+                              onClick={() => router.push(`/treatment/${plan.id}`)}
+                            >
+                              <Eye className="h-3 w-3 me-1" />
+                              {isAr ? 'التفاصيل' : 'Details'}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Plan Content */}
+                        <div className="p-4">
+                          {/* Description */}
+                          {(plan.descriptionAr || plan.descriptionEn) && (
+                            <div className="mb-4">
+                              <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap">
+                                {isAr ? plan.descriptionAr : plan.descriptionEn}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Justification */}
+                          {(plan.justificationAr || plan.justificationEn) && (
+                            <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                              <h4 className="text-xs font-bold mb-1 text-blue-700 dark:text-blue-300">
+                                {isAr ? 'مسببات التعديل' : 'Justification'}
+                              </h4>
+                              <p className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap">
+                                {isAr ? plan.justificationAr : plan.justificationEn}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Plan Details Grid */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-4">
+                            <div className="p-3 rounded-lg bg-[var(--background-tertiary)]">
+                              <p className="text-[var(--foreground-secondary)] mb-1">{isAr ? 'المسؤول' : 'Responsible'}</p>
+                              <p className="font-semibold text-[var(--foreground)]">
+                                {plan.responsible ? (isAr ? plan.responsible.fullName : plan.responsible.fullNameEn || plan.responsible.fullName) : '-'}
+                              </p>
+                            </div>
+                            <div className="p-3 rounded-lg bg-[var(--background-tertiary)]">
+                              <p className="text-[var(--foreground-secondary)] mb-1">{isAr ? 'تاريخ البدء' : 'Start Date'}</p>
+                              <p className="font-semibold text-[var(--foreground)]">
+                                {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                              </p>
+                            </div>
+                            <div className="p-3 rounded-lg bg-[var(--background-tertiary)]">
+                              <p className="text-[var(--foreground-secondary)] mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
+                              <p className="font-semibold text-[var(--foreground)]">
+                                {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                              </p>
+                            </div>
+                            <div className="p-3 rounded-lg bg-[var(--background-tertiary)]">
+                              <p className="text-[var(--foreground-secondary)] mb-1">{isAr ? 'التقدم' : 'Progress'}</p>
+                              <p className="font-semibold text-[var(--primary)]">
+                                {plan.progress}%
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="mb-4">
+                            <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all bg-[var(--primary)]"
+                                style={{
+                                  width: `${plan.progress}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Tasks Section */}
+                          {plan.tasks && plan.tasks.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                              <h4 className="text-sm font-bold mb-3 flex items-center gap-2 text-[var(--foreground)]">
+                                <ListChecks className="h-4 w-4 text-[var(--primary)]" />
+                                {isAr ? 'المهام التنفيذية' : 'Action Tasks'}
+                                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-[var(--background-secondary)] text-[var(--foreground-secondary)]">
+                                  {plan.tasks.length}
+                                </span>
+                              </h4>
+                              <div className="space-y-3">
+                                {plan.tasks.map((task, taskIndex) => (
+                                  <div key={task.id} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-[var(--background-secondary)] text-[var(--foreground)]">
+                                          {taskIndex + 1}
+                                        </span>
+                                        <div>
+                                          <p className="font-semibold text-sm text-[var(--foreground)]">
+                                            {isAr ? task.titleAr : task.titleEn}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${task.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                        task.status === 'inProgress' ? 'bg-blue-100 text-blue-700' :
+                                          'bg-gray-100 text-gray-700'
+                                        }`}>
+                                        {task.status === 'completed' ? (isAr ? 'مكتمل' : 'Completed') :
+                                          task.status === 'inProgress' ? (isAr ? 'قيد التنفيذ' : 'In Progress') :
+                                            (isAr ? 'معلق' : 'Pending')}
+                                      </span>
+                                    </div>
+
+                                    {(task.descriptionAr || task.descriptionEn) && (
+                                      <p className="text-xs text-[var(--foreground-secondary)] mb-2 ps-7">
+                                        {isAr ? task.descriptionAr : task.descriptionEn}
+                                      </p>
+                                    )}
+
+                                    <div className="flex gap-4 text-xs ps-7 text-[var(--foreground-muted)]">
+                                      {task.actionOwner && (
+                                        <span>
+                                          {isAr ? 'المكلف:' : 'Assigned:'} {isAr ? task.actionOwner.fullName : task.actionOwner.fullNameEn || task.actionOwner.fullName}
+                                        </span>
+                                      )}
+                                      {task.dueDate && (
+                                        <span>
+                                          {isAr ? 'الاستحقاق:' : 'Due:'} {new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
           </div>
 
           {/* Sidebar */}
@@ -742,20 +925,19 @@ export default function RiskDetailPage() {
                   {changeLogs.map((log, index) => (
                     <div key={log.id} className="relative flex gap-4">
                       {/* Timeline dot */}
-                      <div className={`relative z-10 flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-                        log.changeType === 'treatment_add' ? 'bg-green-100 text-green-600' :
+                      <div className={`relative z-10 flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${log.changeType === 'treatment_add' ? 'bg-green-100 text-green-600' :
                         log.changeType === 'treatment_delete' ? 'bg-red-100 text-red-600' :
-                        log.changeType === 'treatment_update' ? 'bg-blue-100 text-blue-600' :
-                        log.changeCategory === 'assessment' ? 'bg-purple-100 text-purple-600' :
-                        log.changeCategory === 'status' ? 'bg-yellow-100 text-yellow-600' :
-                        'bg-[var(--primary-light)] text-[var(--primary)]'
-                      }`}>
+                          log.changeType === 'treatment_update' ? 'bg-blue-100 text-blue-600' :
+                            log.changeCategory === 'assessment' ? 'bg-purple-100 text-purple-600' :
+                              log.changeCategory === 'status' ? 'bg-yellow-100 text-yellow-600' :
+                                'bg-[var(--primary-light)] text-[var(--primary)]'
+                        }`}>
                         {log.changeType === 'treatment_add' ? <Plus className="h-4 w-4" /> :
-                         log.changeType === 'treatment_delete' ? <Minus className="h-4 w-4" /> :
-                         log.changeType === 'treatment_update' ? <Wrench className="h-4 w-4" /> :
-                         log.changeCategory === 'assessment' ? <Target className="h-4 w-4" /> :
-                         log.changeCategory === 'status' ? <Activity className="h-4 w-4" /> :
-                         <PenLine className="h-4 w-4" />}
+                          log.changeType === 'treatment_delete' ? <Minus className="h-4 w-4" /> :
+                            log.changeType === 'treatment_update' ? <Wrench className="h-4 w-4" /> :
+                              log.changeCategory === 'assessment' ? <Target className="h-4 w-4" /> :
+                                log.changeCategory === 'status' ? <Activity className="h-4 w-4" /> :
+                                  <PenLine className="h-4 w-4" />}
                       </div>
 
                       {/* Content */}
@@ -1159,24 +1341,22 @@ function PrintRiskModal({
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          plan.priority === 'high' ? 'bg-red-100 text-red-700' :
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${plan.priority === 'high' ? 'bg-red-100 text-red-700' :
                           plan.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-green-100 text-green-700'
-                        }`}>
+                            'bg-green-100 text-green-700'
+                          }`}>
                           {plan.priority === 'high' ? (isAr ? 'عالية' : 'High') :
-                           plan.priority === 'medium' ? (isAr ? 'متوسطة' : 'Medium') :
-                           (isAr ? 'منخفضة' : 'Low')}
+                            plan.priority === 'medium' ? (isAr ? 'متوسطة' : 'Medium') :
+                              (isAr ? 'منخفضة' : 'Low')}
                         </span>
                         <span className="text-xs px-2 py-1 rounded-full bg-white font-medium" style={{ color: brandColors.primary }}>
                           {getStrategyName(plan.strategy)}
                         </span>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          plan.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${plan.status === 'completed' ? 'bg-green-100 text-green-700' :
                           plan.status === 'inProgress' ? 'bg-blue-100 text-blue-700' :
-                          plan.status === 'overdue' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
+                            plan.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                          }`}>
                           {getTreatmentStatusName(plan.status)}
                         </span>
                       </div>
@@ -1295,21 +1475,19 @@ function PrintRiskModal({
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                      task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${task.priority === 'high' ? 'bg-red-100 text-red-700' :
                                       task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                      'bg-green-100 text-green-700'
-                                    }`}>
+                                        'bg-green-100 text-green-700'
+                                      }`}>
                                       {task.priority === 'high' ? (isAr ? 'عالية' : 'High') :
-                                       task.priority === 'medium' ? (isAr ? 'متوسطة' : 'Medium') :
-                                       (isAr ? 'منخفضة' : 'Low')}
+                                        task.priority === 'medium' ? (isAr ? 'متوسطة' : 'Medium') :
+                                          (isAr ? 'منخفضة' : 'Low')}
                                     </span>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                      task.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${task.status === 'completed' ? 'bg-green-100 text-green-700' :
                                       task.status === 'inProgress' ? 'bg-blue-100 text-blue-700' :
-                                      task.status === 'overdue' ? 'bg-red-100 text-red-700' :
-                                      'bg-gray-100 text-gray-700'
-                                    }`}>
+                                        task.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                                          'bg-gray-100 text-gray-700'
+                                      }`}>
                                       {getTaskStatusName(task.status)}
                                     </span>
                                   </div>

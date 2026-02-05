@@ -52,6 +52,12 @@ import {
   FileCheck,
   FileDown,
   Printer,
+  MessageSquare,
+  Send,
+  ChevronDown,
+  ChevronUp,
+  History,
+  Paperclip,
 } from 'lucide-react';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 
@@ -153,6 +159,29 @@ interface TaskAssignee {
   email?: string;
 }
 
+interface TaskUpdateAuthor {
+  id: string;
+  fullName: string;
+  fullNameEn?: string;
+  email?: string;
+  avatar?: string;
+}
+
+interface TaskUpdate {
+  id: string;
+  taskId: string;
+  authorId: string;
+  content: string;
+  type: 'update' | 'statusChange' | 'comment' | 'progress';
+  oldStatus?: string;
+  newStatus?: string;
+  progress?: number;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  createdAt: string;
+  author: TaskUpdateAuthor;
+}
+
 interface Task {
   id: string;
   titleAr: string;
@@ -237,6 +266,13 @@ export default function TreatmentDetailPage() {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [responsiblePerson, setResponsiblePerson] = useState<{ name: string; nameEn: string; email?: string } | null>(null);
+
+  // Task updates state
+  const [taskUpdates, setTaskUpdates] = useState<Record<string, TaskUpdate[]>>({});
+  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
+  const [newUpdateContent, setNewUpdateContent] = useState<Record<string, string>>({});
+  const [submittingUpdate, setSubmittingUpdate] = useState<string | null>(null);
+  const [loadingUpdates, setLoadingUpdates] = useState<Record<string, boolean>>({});
 
   // Editable form state
   const [formData, setFormData] = useState({
@@ -470,6 +506,76 @@ export default function TreatmentDetailPage() {
   const removeTask = (index: number) => {
     const newTasks = formData.tasks.filter((_, i) => i !== index);
     setFormData({ ...formData, tasks: newTasks });
+  };
+
+  // دوال إدارة التحديثات
+  const fetchTaskUpdates = async (taskId: string) => {
+    setLoadingUpdates(prev => ({ ...prev, [taskId]: true }));
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/updates`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTaskUpdates(prev => ({ ...prev, [taskId]: data.data }));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching task updates:', error);
+    } finally {
+      setLoadingUpdates(prev => ({ ...prev, [taskId]: false }));
+    }
+  };
+
+  const toggleTaskExpanded = (taskId: string) => {
+    const isExpanded = !expandedTasks[taskId];
+    setExpandedTasks(prev => ({ ...prev, [taskId]: isExpanded }));
+    if (isExpanded && !taskUpdates[taskId]) {
+      fetchTaskUpdates(taskId);
+    }
+  };
+
+  const submitTaskUpdate = async (taskId: string) => {
+    const content = newUpdateContent[taskId]?.trim();
+    if (!content) return;
+
+    setSubmittingUpdate(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, type: 'update' }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTaskUpdates(prev => ({
+            ...prev,
+            [taskId]: [data.data, ...(prev[taskId] || [])],
+          }));
+          setNewUpdateContent(prev => ({ ...prev, [taskId]: '' }));
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting task update:', error);
+    } finally {
+      setSubmittingUpdate(null);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return isAr ? 'الآن' : 'Just now';
+    if (minutes < 60) return isAr ? `منذ ${minutes} دقيقة` : `${minutes}m ago`;
+    if (hours < 24) return isAr ? `منذ ${hours} ساعة` : `${hours}h ago`;
+    if (days < 7) return isAr ? `منذ ${days} يوم` : `${days}d ago`;
+    return date.toLocaleDateString(isAr ? 'ar-SA' : 'en-US');
   };
 
   if (loading) {
@@ -982,95 +1088,244 @@ export default function TreatmentDetailPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {/* العنوان والحالة */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-800 dark:text-gray-100">
-                              {isAr ? task.titleAr : task.titleEn}
-                            </h4>
-                            {(task.descriptionAr || task.descriptionEn) && (
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {isAr ? task.descriptionAr : task.descriptionEn}
-                              </p>
-                            )}
+                      <div className="space-y-4">
+                        {/* رأس المهمة مع رقم وحالة */}
+                        <div className="flex items-start justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+                          <div className="flex items-start gap-3">
+                            <div className="shrink-0 w-10 h-10 rounded-xl bg-[#F39200]/10 flex items-center justify-center">
+                              <span className="text-lg font-bold text-[#F39200]">{index + 1}</span>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                                {isAr ? task.titleAr : task.titleEn}
+                              </h4>
+                              {(task.descriptionAr || task.descriptionEn) && (
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
+                                  {isAr ? task.descriptionAr : task.descriptionEn}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <Badge className={`${statusConfig[task.status as TreatmentStatus]?.bgClass} ${statusConfig[task.status as TreatmentStatus]?.colorClass}`}>
+                          <Badge className={`shrink-0 px-3 py-1 ${statusConfig[task.status as TreatmentStatus]?.bgClass} ${statusConfig[task.status as TreatmentStatus]?.colorClass}`}>
                             {isAr ? statusConfig[task.status as TreatmentStatus]?.labelAr : statusConfig[task.status as TreatmentStatus]?.labelEn}
                           </Badge>
                         </div>
 
-                        {/* المكلف والمتابع */}
-                        <div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-gray-100 dark:bg-gray-700/50">
-                          <div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-                              {isAr ? 'المكلف (منفذ الإجراء)' : 'Assigned To'}
-                            </span>
-                            <div className="flex items-center gap-2">
+                        {/* معلومات المهمة الأساسية */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {/* المكلف */}
+                          <div className="p-3 rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-orange-200 dark:border-orange-800/50">
+                            <div className="flex items-center gap-2 mb-2">
                               <User className="h-4 w-4 text-[#F39200]" />
-                              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                                {task.actionOwner
-                                  ? (isAr ? task.actionOwner.fullName : task.actionOwner.fullNameEn || task.actionOwner.fullName)
-                                  : (isAr ? 'غير محدد' : 'Not assigned')}
+                              <span className="text-xs font-semibold text-[#F39200] uppercase tracking-wide">
+                                {isAr ? 'المكلف' : 'Assignee'}
                               </span>
                             </div>
+                            <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
+                              {task.actionOwner
+                                ? (isAr ? task.actionOwner.fullName : task.actionOwner.fullNameEn || task.actionOwner.fullName)
+                                : (isAr ? 'غير محدد' : 'Not assigned')}
+                            </p>
                             {task.actionOwner?.email && (
-                              <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
                                 {task.actionOwner.email}
-                              </span>
+                              </p>
                             )}
                           </div>
-                          <div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-                              {isAr ? 'المتابع' : 'Monitor'}
-                            </span>
-                            <div className="flex items-center gap-2">
+
+                          {/* المتابع */}
+                          <div className="p-3 rounded-xl bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-900/20 dark:to-blue-900/20 border border-sky-200 dark:border-sky-800/50">
+                            <div className="flex items-center gap-2 mb-2">
                               <Users className="h-4 w-4 text-sky-500" />
-                              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                                {task.monitorOwner
-                                  ? (isAr ? task.monitorOwner.fullName : task.monitorOwner.fullNameEn || task.monitorOwner.fullName)
-                                  : task.monitor
-                                    ? (isAr ? task.monitor.fullName : task.monitor.fullNameEn || task.monitor.fullName)
-                                    : (isAr ? 'غير محدد' : 'Not assigned')}
+                              <span className="text-xs font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wide">
+                                {isAr ? 'المتابع' : 'Monitor'}
                               </span>
                             </div>
+                            <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
+                              {task.monitorOwner
+                                ? (isAr ? task.monitorOwner.fullName : task.monitorOwner.fullNameEn || task.monitorOwner.fullName)
+                                : task.monitor
+                                  ? (isAr ? task.monitor.fullName : task.monitor.fullNameEn || task.monitor.fullName)
+                                  : (isAr ? 'غير محدد' : 'Not assigned')}
+                            </p>
                             {(task.monitorOwner?.email || task.monitor?.email) && (
-                              <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
                                 {task.monitorOwner?.email || task.monitor?.email}
-                              </span>
+                              </p>
                             )}
                           </div>
-                        </div>
 
-                        {/* التاريخ والأولوية */}
-                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {task.dueDate ? new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : '-'}
-                          </span>
-                          <Badge
-                            variant={task.priority === 'high' ? 'danger' : task.priority === 'medium' ? 'warning' : 'secondary'}
-                            className="text-xs"
-                          >
-                            {isAr ? (task.priority === 'high' ? 'عالية' : task.priority === 'medium' ? 'متوسطة' : 'منخفضة') : task.priority}
-                          </Badge>
+                          {/* تاريخ الاستحقاق */}
+                          <div className="p-3 rounded-xl bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border border-purple-200 dark:border-purple-800/50">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Calendar className="h-4 w-4 text-purple-500" />
+                              <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">
+                                {isAr ? 'الاستحقاق' : 'Due Date'}
+                              </span>
+                            </div>
+                            <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
+                              {task.dueDate ? new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                            </p>
+                          </div>
+
+                          {/* الأولوية */}
+                          <div className={`p-3 rounded-xl border ${task.priority === 'high' ? 'bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20 border-rose-200 dark:border-rose-800/50' : task.priority === 'medium' ? 'bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 border-amber-200 dark:border-amber-800/50' : 'bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border-emerald-200 dark:border-emerald-800/50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Zap className={`h-4 w-4 ${task.priority === 'high' ? 'text-rose-500' : task.priority === 'medium' ? 'text-amber-500' : 'text-emerald-500'}`} />
+                              <span className={`text-xs font-semibold uppercase tracking-wide ${task.priority === 'high' ? 'text-rose-600 dark:text-rose-400' : task.priority === 'medium' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {isAr ? 'الأولوية' : 'Priority'}
+                              </span>
+                            </div>
+                            <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
+                              {isAr ? (task.priority === 'high' ? 'عالية' : task.priority === 'medium' ? 'متوسطة' : 'منخفضة') : (task.priority === 'high' ? 'High' : task.priority === 'medium' ? 'Medium' : 'Low')}
+                            </p>
+                          </div>
                         </div>
 
                         {/* رابط OneDrive */}
                         {task.oneDriveUrl && (
-                          <div className="flex items-center gap-2 p-2 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
-                            <FileCheck className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                            <a
-                              href={task.oneDriveUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1"
-                            >
-                              {task.oneDriveFileName || (isAr ? 'عرض المرفق' : 'View Attachment')}
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
+                          <div className="flex items-center gap-3 p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
+                            <div className="p-2 rounded-lg bg-sky-500 text-white">
+                              <FileCheck className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">{isAr ? 'مرفق' : 'Attachment'}</p>
+                              <a
+                                href={task.oneDriveUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-semibold text-sky-700 dark:text-sky-300 hover:underline flex items-center gap-1"
+                              >
+                                {task.oneDriveFileName || (isAr ? 'عرض المرفق' : 'View Attachment')}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
                           </div>
                         )}
+
+                        {/* قسم التحديثات */}
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                          <button
+                            onClick={() => toggleTaskExpanded(task.id)}
+                            className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 hover:from-gray-100 hover:to-gray-150 dark:hover:from-gray-700/50 dark:hover:to-gray-600/50 transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-[#F39200]/10">
+                                <MessageSquare className="h-4 w-4 text-[#F39200]" />
+                              </div>
+                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                {isAr ? 'التحديثات والتعليقات' : 'Updates & Comments'}
+                              </span>
+                              {taskUpdates[task.id]?.length > 0 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {taskUpdates[task.id].length}
+                                </Badge>
+                              )}
+                            </div>
+                            {expandedTasks[task.id] ? (
+                              <ChevronUp className="h-5 w-5 text-gray-500" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-gray-500" />
+                            )}
+                          </button>
+
+                          {/* محتوى التحديثات */}
+                          {expandedTasks[task.id] && (
+                            <div className="mt-4 space-y-4 animate-fadeIn">
+                              {/* حقل إضافة تحديث جديد */}
+                              <div className="flex gap-3">
+                                <div className="flex-1 relative">
+                                  <textarea
+                                    placeholder={isAr ? 'أضف تحديثاً أو تعليقاً...' : 'Add an update or comment...'}
+                                    value={newUpdateContent[task.id] || ''}
+                                    onChange={(e) => setNewUpdateContent(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm resize-none min-h-[80px] focus:ring-2 focus:ring-[#F39200]/30 focus:border-[#F39200] transition-all"
+                                  />
+                                </div>
+                                <Button
+                                  onClick={() => submitTaskUpdate(task.id)}
+                                  disabled={!newUpdateContent[task.id]?.trim() || submittingUpdate === task.id}
+                                  className="h-fit bg-[#F39200] hover:bg-[#e08600] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {submittingUpdate === task.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Send className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+
+                              {/* قائمة التحديثات */}
+                              {loadingUpdates[task.id] ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <Loader2 className="h-6 w-6 animate-spin text-[#F39200]" />
+                                </div>
+                              ) : taskUpdates[task.id]?.length > 0 ? (
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                                  {taskUpdates[task.id].map((update) => (
+                                    <div
+                                      key={update.id}
+                                      className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
+                                    >
+                                      <div className="flex items-start gap-3">
+                                        <div className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-[#F39200] to-amber-500 flex items-center justify-center text-white font-bold text-sm">
+                                          {(isAr ? update.author.fullName : update.author.fullNameEn || update.author.fullName)?.charAt(0) || 'U'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center justify-between gap-2 mb-1">
+                                            <span className="font-semibold text-gray-800 dark:text-gray-100 text-sm">
+                                              {isAr ? update.author.fullName : update.author.fullNameEn || update.author.fullName}
+                                            </span>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                                              {formatTimeAgo(update.createdAt)}
+                                            </span>
+                                          </div>
+                                          <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+                                            {update.content}
+                                          </p>
+                                          {update.type === 'statusChange' && update.oldStatus && update.newStatus && (
+                                            <div className="mt-2 flex items-center gap-2 text-xs">
+                                              <Badge variant="secondary" className="opacity-60">
+                                                {statusConfig[update.oldStatus as TreatmentStatus]?.labelAr || update.oldStatus}
+                                              </Badge>
+                                              <ArrowRight className="h-3 w-3 text-gray-400" />
+                                              <Badge className={`${statusConfig[update.newStatus as TreatmentStatus]?.bgClass} ${statusConfig[update.newStatus as TreatmentStatus]?.colorClass}`}>
+                                                {statusConfig[update.newStatus as TreatmentStatus]?.labelAr || update.newStatus}
+                                              </Badge>
+                                            </div>
+                                          )}
+                                          {update.attachmentUrl && (
+                                            <a
+                                              href={update.attachmentUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="mt-2 inline-flex items-center gap-1 text-xs text-sky-600 hover:underline"
+                                            >
+                                              <Paperclip className="h-3 w-3" />
+                                              {update.attachmentName || (isAr ? 'مرفق' : 'Attachment')}
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-8">
+                                  <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
+                                    <History className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {isAr ? 'لا توجد تحديثات بعد' : 'No updates yet'}
+                                  </p>
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                    {isAr ? 'أضف أول تحديث لهذه المهمة' : 'Add the first update for this task'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

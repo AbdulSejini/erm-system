@@ -362,6 +362,22 @@
       "cost": "Cost",
       "description": "Description",
       "close": "Close"
+    },
+    "taskUpdates": {
+      "title": "Updates & Comments",
+      "addUpdate": "Add Update",
+      "placeholder": "Add an update or comment...",
+      "noUpdates": "No updates yet",
+      "addFirstUpdate": "Add the first update for this task",
+      "justNow": "Just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago",
+      "statusChanged": "Status changed",
+      "attachment": "Attachment",
+      "assignee": "Assignee",
+      "priority": "Priority",
+      "dueDate": "Due Date"
     }
   },
   "incidents": {

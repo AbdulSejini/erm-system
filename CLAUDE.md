@@ -521,3 +521,42 @@ Located in `/src/components/ui/`:
   - Risks where they are the owner (`ownerId`)
 - **Important**: If a riskChampion has no departments assigned, they will only see risks directly assigned to them
 - **API Location**: `/api/risks/route.ts` lines 112-133
+
+### Task Updates Feature (Latest)
+- **Feature**: Users can add updates/comments to treatment plan tasks
+- **Database Model** (`TaskUpdate`):
+  ```prisma
+  model TaskUpdate {
+    id          String    @id
+    taskId      String
+    authorId    String
+    content     String    // Update content
+    type        String    // update, statusChange, comment, progress
+    oldStatus   String?   // Old status (for status changes)
+    newStatus   String?   // New status (for status changes)
+    progress    Int?      // Progress percentage
+    attachmentUrl   String?   // OneDrive/SharePoint link
+    attachmentName  String?   // Attachment name
+    createdAt   DateTime
+  }
+  ```
+- **API Endpoint**: `/api/tasks/[taskId]/updates`
+  - `GET` - Fetch all updates for a task
+  - `POST` - Add new update (content, type, newStatus, progress, attachmentUrl)
+  - `DELETE` - Delete update (author or admin/riskManager only)
+- **UI Enhancements** (`/treatment/[id]`):
+  - Improved task cards with color-coded sections
+  - Task number badge with visual hierarchy
+  - Expandable updates section per task
+  - Real-time update submission
+  - Time-ago formatting for update timestamps
+  - Status change history display
+  - Support for attachments in updates
+- **Components Used**:
+  - MessageSquare, Send, ChevronDown, ChevronUp, History, Paperclip icons
+  - Collapsible updates section with animation
+  - Textarea for new updates
+  - Avatar with initial letter for authors
+- **Translations Added**:
+  - Arabic: `treatment.taskUpdates.*`
+  - English: `treatment.taskUpdates.*`

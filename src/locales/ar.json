@@ -362,6 +362,22 @@
       "cost": "التكلفة",
       "description": "الوصف",
       "close": "إغلاق"
+    },
+    "taskUpdates": {
+      "title": "التحديثات والتعليقات",
+      "addUpdate": "أضف تحديثاً",
+      "placeholder": "أضف تحديثاً أو تعليقاً...",
+      "noUpdates": "لا توجد تحديثات بعد",
+      "addFirstUpdate": "أضف أول تحديث لهذه المهمة",
+      "justNow": "الآن",
+      "minutesAgo": "منذ {count} دقيقة",
+      "hoursAgo": "منذ {count} ساعة",
+      "daysAgo": "منذ {count} يوم",
+      "statusChanged": "تم تغيير الحالة",
+      "attachment": "مرفق",
+      "assignee": "المكلف",
+      "priority": "الأولوية",
+      "dueDate": "الاستحقاق"
     }
   },
   "incidents": {

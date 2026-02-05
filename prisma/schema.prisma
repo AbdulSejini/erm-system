@@ -52,6 +52,7 @@ model User {
   reviewedResidualRiskChanges ResidualRiskChangeRequest[] @relation("ChangeReviewer")
   riskApprovalRequests       RiskApprovalRequest[] @relation("RiskApprovalRequester")
   reviewedRiskApprovals      RiskApprovalRequest[] @relation("RiskApprovalReviewer")
+  taskUpdates                TaskUpdate[]          @relation("TaskUpdateAuthor")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -332,6 +333,30 @@ model TreatmentTask {
   actionOwner   RiskOwner?    @relation("TaskActionOwner", fields: [actionOwnerId], references: [id])
   monitor       User?         @relation("TaskMonitor", fields: [monitorId], references: [id])
   monitorOwner  RiskOwner?    @relation("TaskMonitorOwner", fields: [monitorOwnerId], references: [id])
+  updates       TaskUpdate[]  // تحديثات المهمة
+}
+
+// تحديثات المهام (Task Updates)
+model TaskUpdate {
+  id          String    @id @default(cuid())
+  taskId      String
+  authorId    String
+  content     String    // محتوى التحديث
+  type        String    @default("update") // update, statusChange, comment, progress
+  oldStatus   String?   // الحالة القديمة (عند تغيير الحالة)
+  newStatus   String?   // الحالة الجديدة (عند تغيير الحالة)
+  progress    Int?      // نسبة الإنجاز (إن وجدت)
+  attachmentUrl   String?   // رابط المرفق (OneDrive/SharePoint)
+  attachmentName  String?   // اسم المرفق
+  createdAt   DateTime  @default(now())
+
+  // العلاقات
+  task    TreatmentTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author  User          @relation("TaskUpdateAuthor", fields: [authorId], references: [id])
+
+  @@index([taskId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 // الحوادث
