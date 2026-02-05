@@ -787,3 +787,24 @@ Located in `/src/components/ui/`:
   - Statistics per backup (record counts for all 28 data types)
   - Error handling with status tracking
   - Full restoration capability for complete site recovery
+
+### Role-Based Settings Access (Latest)
+- **Settings tabs access by role**:
+  ```typescript
+  const roleTabAccess = {
+    admin: ['profile', 'changePassword', 'users', 'departments', 'categories',
+            'sources', 'riskStatuses', 'riskOwners', 'notifications',
+            'dataManagement', 'backup', 'auditLog', 'riskEditor'],
+    riskManager: [same as admin],
+    riskAnalyst: ['profile', 'changePassword', 'sources', 'riskOwners', 'notifications'],
+    riskChampion: ['profile', 'changePassword', 'notifications'],
+    executive: ['profile', 'changePassword', 'notifications'],
+    employee: ['profile', 'changePassword', 'notifications'],
+  };
+  ```
+- **riskAnalyst restrictions**:
+  - Can only access: Sources, Risk Owners (+ profile, password, notifications)
+  - Cannot access: Users, Departments, Categories, Risk Statuses, Data Management, Backup, Activity Log, Risk Editor
+  - Cannot see online users list (restricted to admin/riskManager only)
+- **Online Users visibility**: Only `admin` and `riskManager` can see online users
+  - Location: `/src/components/layout/Sidebar.tsx` line 127

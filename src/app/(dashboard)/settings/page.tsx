@@ -70,14 +70,14 @@ const allSettingsTabs = [
 // Define which tabs each role can access
 // admin: full access to all tabs
 // riskManager: same as admin
-// riskAnalyst: only notifications (no users, departments, categories, dataManagement, auditLog, riskEditor)
+// riskAnalyst: only sources and riskOwners (no users, departments, categories, dataManagement, auditLog, riskEditor, backup, riskStatuses)
 // riskChampion: only notifications
 // executive: only notifications
 // employee: only notifications
 const roleTabAccess: Record<string, string[]> = {
   admin: ['profile', 'changePassword', 'users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
   riskManager: ['profile', 'changePassword', 'users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
-  riskAnalyst: ['profile', 'changePassword', 'notifications'],
+  riskAnalyst: ['profile', 'changePassword', 'sources', 'riskOwners', 'notifications'],
   riskChampion: ['profile', 'changePassword', 'notifications'],
   executive: ['profile', 'changePassword', 'notifications'],
   employee: ['profile', 'changePassword', 'notifications'],
