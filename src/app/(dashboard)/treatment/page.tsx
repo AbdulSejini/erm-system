@@ -204,11 +204,38 @@ const determineStrategy = (status: string, inherentScore: number): TreatmentStra
   return 'accept';
 };
 
-const determineStatus = (status: string, followUpDate: string | null): TreatmentStatus => {
-  if (status === 'closed' || status === 'mitigated') return 'completed';
-  if (status === 'accepted') return 'completed';
-  if (followUpDate && new Date(followUpDate) < new Date()) return 'overdue';
-  if (status === 'inProgress') return 'inProgress';
+const determineStatus = (
+  status: string,
+  dueDate: string | null,
+  tasks: { status: string }[]
+): TreatmentStatus => {
+  // إذا ملغاة يدويًا، نحافظ على الحالة
+  if (status === 'cancelled') return 'cancelled';
+
+  const totalTasks = tasks.length;
+
+  // إذا لم تكن هناك مهام، نعتمد على الحالة المخزنة
+  if (totalTasks === 0) {
+    if (status === 'completed' || status === 'closed' || status === 'mitigated' || status === 'accepted') return 'completed';
+    if (dueDate && new Date(dueDate) < new Date()) return 'overdue';
+    if (status === 'inProgress') return 'inProgress';
+    return 'notStarted';
+  }
+
+  // حساب الحالة بناءً على المهام
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'inProgress').length;
+
+  if (completedTasks === totalTasks) return 'completed';
+
+  if (completedTasks > 0 || inProgressTasks > 0) {
+    // بعض المهام بدأت - تحقق من التأخير
+    if (dueDate && new Date(dueDate) < new Date()) return 'overdue';
+    return 'inProgress';
+  }
+
+  // لم تبدأ أي مهمة
+  if (dueDate && new Date(dueDate) < new Date()) return 'overdue';
   return 'notStarted';
 };
 
@@ -525,12 +552,21 @@ export default function TreatmentPage() {
           titleAr: plan.titleAr || `خطة معالجة ${risk.riskNumber}`,
           titleEn: plan.titleEn || `Treatment Plan for ${risk.riskNumber}`,
           strategy: plan.strategy as TreatmentStrategy,
-          status: plan.status as TreatmentStatus,
+          status: (() => {
+            const planTasks = (plan.tasks || []).map((t: Record<string, unknown>) => ({ status: t.status as string }));
+            const planDueDate = plan.dueDate || risk.followUpDate || null;
+            return determineStatus(plan.status, planDueDate, planTasks);
+          })(),
           inherentRating: normalizeRating(risk.inherentRating),
           inherentScore: risk.inherentScore,
           residualRating: normalizeRating(risk.residualRating),
           currentResidualScore: risk.residualScore || risk.inherentScore,
-          progress: plan.progress || 0,
+          progress: (() => {
+            const planTasks = plan.tasks || [];
+            if (planTasks.length === 0) return plan.progress || 0;
+            const completed = planTasks.filter((t: Record<string, unknown>) => t.status === 'completed').length;
+            return Math.round((completed / planTasks.length) * 100);
+          })(),
           priority: (plan.priority || 'medium') as 'high' | 'medium' | 'low',
           responsibleId: plan.responsibleId || '',
           responsibleAr: plan.responsible?.fullName || risk.owner?.fullName || 'غير محدد',

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { recalculateTaskStatus, recalculateTreatmentStatus } from '@/lib/treatment-status';
 
 // GET - جلب خطوات المهمة
 export async function GET(
@@ -242,6 +243,15 @@ export async function PATCH(
         },
       },
     });
+
+    // إعادة حساب حالة المهمة بناءً على الخطوات ثم حالة خطة المعالجة
+    if (status !== undefined) {
+      const { taskId: tId } = await params;
+      const task = await recalculateTaskStatus(tId);
+      if (task?.treatmentPlanId) {
+        await recalculateTreatmentStatus(task.treatmentPlanId);
+      }
+    }
 
     return NextResponse.json({
       success: true,

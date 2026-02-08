@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { recalculateTreatmentStatus } from '@/lib/treatment-status';
 
 // PATCH - تحديث مهمة
 export async function PATCH(
@@ -97,6 +98,11 @@ export async function PATCH(
     });
 
     console.log('Task updated successfully:', task.id);
+
+    // إعادة حساب حالة وتقدم خطة المعالجة تلقائيًا
+    if (body.status !== undefined) {
+      await recalculateTreatmentStatus(treatmentId);
+    }
 
     return NextResponse.json({
       success: true,
