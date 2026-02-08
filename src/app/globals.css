@@ -243,6 +243,17 @@ body {
   animation: slideUp 0.2s ease-out;
 }
 
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* Card Styles */
 .card-hover {
   transition: all 0.15s ease;

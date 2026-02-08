@@ -599,16 +599,33 @@ export default function TreatmentPage() {
   }, [risks]);
 
   const filteredTreatments = useMemo(() => {
-    return treatments.filter((t) => {
-      const matchesSearch =
-        t.riskNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.titleAr.includes(searchQuery) ||
-        t.titleEn.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
-      const matchesStrategy = filterStrategy === 'all' || t.strategy === filterStrategy;
-      const matchesDepartment = filterDepartment === 'all' || t.departmentId === filterDepartment;
-      return matchesSearch && matchesStatus && matchesStrategy && matchesDepartment;
-    });
+    // ترتيب الأولوية: متأخر → قيد التنفيذ → لم يبدأ → مكتمل → ملغي
+    const statusOrder: Record<string, number> = {
+      overdue: 0,
+      inProgress: 1,
+      notStarted: 2,
+      completed: 3,
+      cancelled: 4,
+    };
+
+    return treatments
+      .filter((t) => {
+        const matchesSearch =
+          t.riskNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          t.titleAr.includes(searchQuery) ||
+          t.titleEn.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
+        const matchesStrategy = filterStrategy === 'all' || t.strategy === filterStrategy;
+        const matchesDepartment = filterDepartment === 'all' || t.departmentId === filterDepartment;
+        return matchesSearch && matchesStatus && matchesStrategy && matchesDepartment;
+      })
+      .sort((a, b) => {
+        const orderA = statusOrder[a.status] ?? 99;
+        const orderB = statusOrder[b.status] ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        // نفس الحالة → الأقل تقدمًا أولاً
+        return a.progress - b.progress;
+      });
   }, [treatments, searchQuery, filterStatus, filterStrategy, filterDepartment]);
 
   // Pagination - عرض الصفحة الحالية فقط
@@ -1184,16 +1201,44 @@ Risk Management Team`;
             </Button>
           </div>
         ) : (
-          paginatedTreatments.map((treatment) => {
+          paginatedTreatments.map((treatment, index) => {
             const StrategyIcon = strategyConfig[treatment.strategy].icon;
             const StatusIcon = statusConfig[treatment.status].icon;
             const statusConf = statusConfig[treatment.status];
             const strategyConf = strategyConfig[treatment.strategy];
 
+            // ألوان الشريط الجانبي حسب الحالة
+            const statusBorderColor = {
+              overdue: 'border-s-rose-500',
+              inProgress: 'border-s-sky-500',
+              notStarted: 'border-s-gray-300 dark:border-s-gray-600',
+              completed: 'border-s-emerald-500',
+              cancelled: 'border-s-gray-400',
+            }[treatment.status] || 'border-s-gray-300';
+
+            // ظل خفيف ملون حسب الحالة عند التحويم
+            const statusHoverGlow = {
+              overdue: 'hover:shadow-rose-100 dark:hover:shadow-rose-900/20',
+              inProgress: 'hover:shadow-sky-100 dark:hover:shadow-sky-900/20',
+              completed: 'hover:shadow-emerald-100 dark:hover:shadow-emerald-900/20',
+              notStarted: 'hover:shadow-gray-100 dark:hover:shadow-gray-800/20',
+              cancelled: 'hover:shadow-gray-100 dark:hover:shadow-gray-800/20',
+            }[treatment.status] || '';
+
+            // لون شريط التقدم حسب الحالة
+            const progressBarColor = {
+              overdue: 'bg-rose-500',
+              inProgress: 'bg-sky-500',
+              completed: 'bg-emerald-500',
+              notStarted: 'bg-gray-300',
+              cancelled: 'bg-gray-400',
+            }[treatment.status] || 'bg-[#F39200]';
+
             return (
               <Card
                 key={treatment.id}
-                className="overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group border border-gray-100 dark:border-gray-700 rounded-xl bg-[#FFFFFF] dark:bg-[#1E293B]"
+                className={`overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border border-gray-100 dark:border-gray-700 rounded-xl bg-[#FFFFFF] dark:bg-[#1E293B] border-s-4 ${statusBorderColor} ${statusHoverGlow} hover:-translate-y-1`}
+                style={{ animationDelay: `${index * 80}ms`, animation: 'fadeSlideUp 0.5s ease-out forwards', opacity: 0 }}
                 onClick={() => router.push(`/treatment/${treatment.id}`)}
               >
                 {/* Card Header with Strategy Color */}
@@ -1208,7 +1253,7 @@ Risk Management Team`;
                         {treatment.riskNumber}
                       </span>
                     </div>
-                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConf.bgClass} ${statusConf.colorClass}`}>
+                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConf.bgClass} ${statusConf.colorClass} ${treatment.status === 'overdue' ? 'animate-pulse' : ''}`}>
                       <StatusIcon className="h-3 w-3" />
                       <span>{isAr ? statusConf.labelAr : statusConf.labelEn}</span>
                     </div>
@@ -1232,15 +1277,36 @@ Risk Management Team`;
                     </span>
                   </div>
 
+                  {/* Tasks Mini Summary */}
+                  {treatment.tasks.length > 0 && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="flex -space-x-1 rtl:space-x-reverse">
+                        {['completed', 'inProgress', 'notStarted'].map((s) => {
+                          const count = treatment.tasks.filter(t => t.status === s).length;
+                          if (count === 0) return null;
+                          const dotColor = s === 'completed' ? 'bg-emerald-400' : s === 'inProgress' ? 'bg-sky-400' : 'bg-gray-300';
+                          return (
+                            <div key={s} className={`w-4 h-4 rounded-full ${dotColor} border-2 border-white dark:border-gray-800 flex items-center justify-center`}>
+                              <span className="text-[8px] font-bold text-white">{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <span className="text-gray-400">
+                        {treatment.tasks.filter(t => t.status === 'completed').length}/{treatment.tasks.length} {isAr ? 'مهام' : 'tasks'}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Progress Bar */}
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className="text-gray-500 dark:text-gray-400">{isAr ? 'التقدم' : 'Progress'}</span>
-                      <span className="font-semibold text-[#F39200]">{treatment.progress}%</span>
+                      <span className={`font-semibold ${treatment.status === 'completed' ? 'text-emerald-600' : treatment.status === 'overdue' ? 'text-rose-600' : 'text-[#F39200]'}`}>{treatment.progress}%</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-[#F39200] transition-all duration-500"
+                        className={`h-full rounded-full ${progressBarColor} transition-all duration-1000 ease-out`}
                         style={{ width: `${treatment.progress}%` }}
                       />
                     </div>
@@ -1254,7 +1320,7 @@ Risk Management Team`;
                         {isAr ? treatment.responsibleAr : treatment.responsibleEn}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    <div className={`flex items-center gap-1.5 text-xs ${treatment.status === 'overdue' ? 'text-rose-500 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>
                       <Calendar className="h-3.5 w-3.5" />
                       <span>{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
                     </div>
