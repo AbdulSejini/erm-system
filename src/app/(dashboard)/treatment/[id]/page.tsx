@@ -925,7 +925,7 @@ export default function TreatmentDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-[1800px] mx-auto p-4 md:p-6 space-y-8">
+      <div className="max-w-[1800px] mx-auto p-4 md:p-6 space-y-10">
         {/* Hero Section */}
         <div ref={overviewRef} className="relative overflow-hidden rounded-3xl bg-white dark:bg-gray-800 shadow-xl animate-fadeIn">
           <div className={`absolute inset-0 opacity-5 ${strategyConf.bgClass}`} />
@@ -1067,19 +1067,25 @@ export default function TreatmentDetailPage() {
         </div>
 
         {/* Tasks Section */}
-        <div ref={tasksRef} className="animate-slideUp">
-          <div className="flex items-center justify-between mb-6">
+        <div ref={tasksRef} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 animate-slideUp">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20">
             <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-[#F39200]/10">
+              <div className="p-2 rounded-xl bg-[#F39200]/20">
                 <ListChecks className="h-6 w-6 text-[#F39200]" />
               </div>
               {isAr ? 'المهام' : 'Tasks'}
               <Badge className="bg-[#F39200] text-white">{treatment.tasks.length}</Badge>
+              {treatment.tasks.length > 0 && (
+                <span className="text-sm font-normal text-gray-500 ms-2">
+                  ({treatment.tasks.filter(t => t.status === 'completed').length}/{treatment.tasks.length} {isAr ? 'مكتمل' : 'completed'})
+                </span>
+              )}
             </h2>
           </div>
 
+          <div className="p-6">
           {treatment.tasks.length > 0 ? (
-            <div className="grid gap-6">
+            <div className="space-y-6">
               {treatment.tasks.map((task, index) => {
                 const taskStatus = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.notStarted;
                 const TaskStatusIcon = taskStatus.icon;
@@ -1087,20 +1093,29 @@ export default function TreatmentDetailPage() {
                 const updates = taskUpdates[task.id] || [];
                 const completedSteps = steps.filter(s => s.status === 'completed').length;
 
+                // لون الشريط الجانبي حسب حالة المهمة
+                const taskBorderColor = {
+                  completed: 'border-s-emerald-500',
+                  inProgress: 'border-s-sky-500',
+                  overdue: 'border-s-rose-500',
+                  notStarted: 'border-s-gray-300 dark:border-s-gray-600',
+                  cancelled: 'border-s-gray-400',
+                }[task.status] || 'border-s-gray-300';
+
                 return (
                   <div
                     key={task.id}
-                    className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300"
+                    className={`rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 border-s-4 ${taskBorderColor} hover:shadow-md transition-all duration-300 bg-gray-50 dark:bg-gray-700/30`}
                   >
                     {/* Task Header */}
-                    <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+                    <div className="p-5">
                       <div className="flex items-start gap-4">
-                        <div className="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-[#F39200] to-amber-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                        <div className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-[#F39200] to-amber-500 flex items-center justify-center text-white font-bold text-base shadow-md">
                           {index + 1}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                          <div className="flex items-center gap-3 mb-1.5">
+                            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
                               {isAr ? task.titleAr : task.titleEn}
                             </h3>
                             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${taskStatus.bgClass} ${taskStatus.colorClass}`}>
@@ -1109,7 +1124,7 @@ export default function TreatmentDetailPage() {
                             </div>
                           </div>
                           {(task.descriptionAr || task.descriptionEn) && (
-                            <p className="text-gray-600 dark:text-gray-400 mb-3">
+                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 leading-relaxed">
                               {isAr ? task.descriptionAr : task.descriptionEn}
                             </p>
                           )}
@@ -1144,7 +1159,7 @@ export default function TreatmentDetailPage() {
                     </div>
 
                     {/* Task Actions */}
-                    <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-700 rtl:divide-x-reverse">
+                    <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-600 rtl:divide-x-reverse border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/50">
                       {/* Workflow Steps */}
                       <div className="p-4">
                         <button
@@ -1287,11 +1302,12 @@ export default function TreatmentDetailPage() {
               })}
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-12 text-center border border-gray-100 dark:border-gray-700">
+            <div className="p-12 text-center">
               <ListChecks className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 dark:text-gray-400">{isAr ? 'لا توجد مهام حتى الآن' : 'No tasks yet'}</p>
             </div>
           )}
+          </div>
         </div>
 
         {/* Risk Details Section */}
