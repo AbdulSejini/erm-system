@@ -141,6 +141,8 @@ interface TaskData {
   dueDate: string | null;
   actionOwnerId: string | null;
   monitorOwnerId: string | null;
+  actionOwnerEmail: string | null;
+  monitorOwnerEmail: string | null;
   oneDriveUrl: string | null;
   oneDriveFileName: string | null;
 }
@@ -377,6 +379,8 @@ export default function TreatmentPage() {
   const [riskOwnersList, setRiskOwnersList] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; nameAr: string; nameEn: string }[]>([]);
   const [canEditDelete, setCanEditDelete] = useState(false); // صلاحية التعديل والحذف (admin و riskManager و riskAnalyst فقط)
+  const [sessionUserId, setSessionUserId] = useState('');
+  const [sessionUserEmail, setSessionUserEmail] = useState('');
 
   // UI states
   const [searchQuery, setSearchQuery] = useState('');
@@ -470,6 +474,14 @@ export default function TreatmentPage() {
           const effectiveRole = (isImpersonating && impersonatedUser?.role)
             ? impersonatedUser.role
             : sessionData?.user?.role;
+          const effectiveId = (isImpersonating && impersonatedUser?.id)
+            ? impersonatedUser.id
+            : sessionData?.user?.id || '';
+          const effectiveEmail = (isImpersonating && impersonatedUser?.email)
+            ? impersonatedUser.email
+            : sessionData?.user?.email || '';
+          setSessionUserId(effectiveId);
+          setSessionUserEmail(effectiveEmail);
           if (effectiveRole) {
             // فقط admin و riskManager و riskAnalyst يمكنهم التعديل والحذف
             setCanEditDelete(['admin', 'riskManager', 'riskAnalyst'].includes(effectiveRole));
@@ -588,6 +600,8 @@ export default function TreatmentPage() {
             dueDate: (t.dueDate as string) || null,
             actionOwnerId: (t.actionOwnerId as string) || null,
             monitorOwnerId: (t.monitorOwnerId as string) || null,
+            actionOwnerEmail: (t.actionOwner as { email?: string } | null)?.email || null,
+            monitorOwnerEmail: (t.monitorOwner as { email?: string } | null)?.email || null,
             oneDriveUrl: (t.oneDriveUrl as string) || null,
             oneDriveFileName: (t.oneDriveFileName as string) || null,
           })),
@@ -597,6 +611,19 @@ export default function TreatmentPage() {
         }))
       );
   }, [risks]);
+
+  // فحص صلاحية التعديل لكل خطة: بناءً على الدور أو المشاركة (المسؤول / المكلف / المتابع)
+  const canEditTreatment = useCallback((treatment: Treatment) => {
+    if (canEditDelete) return true; // صلاحية بناءً على الدور
+    if (treatment.responsibleId === sessionUserId) return true; // المسؤول عن الخطة
+    if (sessionUserEmail) {
+      return (treatment.tasks || []).some(task =>
+        task.actionOwnerEmail === sessionUserEmail ||
+        task.monitorOwnerEmail === sessionUserEmail
+      );
+    }
+    return false;
+  }, [canEditDelete, sessionUserId, sessionUserEmail]);
 
   const filteredTreatments = useMemo(() => {
     // ترتيب الأولوية: متأخر → قيد التنفيذ → لم يبدأ → مكتمل → ملغي
@@ -1340,8 +1367,8 @@ Risk Management Team`;
                       <Eye className="h-3.5 w-3.5 me-1" />
                       {isAr ? 'عرض' : 'View'}
                     </Button>
-                    {/* زر التعديل - متاح فقط لمدير النظام ومدير المخاطر */}
-                    {canEditDelete && (
+                    {/* زر التعديل - متاح للأدوار المصرح لها أو المسؤول/المكلف/المتابع */}
+                    {canEditTreatment(treatment) && (
                       <Button
                         variant="outline"
                         size="sm"

@@ -67,6 +67,7 @@ import {
   CheckSquare,
   Eye,
 } from 'lucide-react';
+import OneDrivePicker from '@/components/OneDrivePicker';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
 
 // Strategy config
@@ -353,6 +354,12 @@ export default function TreatmentDetailPage() {
   const [submittingStep, setSubmittingStep] = useState<string | null>(null);
   const [loadingSteps, setLoadingSteps] = useState<Record<string, boolean>>({});
 
+  // OneDrive attachment state for steps and updates
+  const [newStepAttachmentUrl, setNewStepAttachmentUrl] = useState<Record<string, string>>({});
+  const [newStepAttachmentName, setNewStepAttachmentName] = useState<Record<string, string>>({});
+  const [newUpdateAttachmentUrl, setNewUpdateAttachmentUrl] = useState<Record<string, string>>({});
+  const [newUpdateAttachmentName, setNewUpdateAttachmentName] = useState<Record<string, string>>({});
+
   // Change log state
   const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([]);
   const [loadingChangeLogs, setLoadingChangeLogs] = useState(false);
@@ -392,16 +399,21 @@ export default function TreatmentDetailPage() {
 
         // Check user permissions
         // إذا كان المدير ينتحل شخصية مستخدم آخر، نستخدم دور المستخدم المنتحل
+        let effectiveRole = '';
+        let effectiveUserId = '';
+        let effectiveEmail = '';
         const userRes = await fetch('/api/auth/session');
         if (userRes.ok) {
           const sessionData = await userRes.json();
-          // استخدم دور المستخدم المنتحل إذا كان الانتحال فعالاً
-          const effectiveRole = (isImpersonating && impersonatedUser?.role)
+          effectiveRole = (isImpersonating && impersonatedUser?.role)
             ? impersonatedUser.role
-            : sessionData?.user?.role;
-          if (effectiveRole) {
-            setCanDelete(['admin', 'riskManager', 'riskAnalyst'].includes(effectiveRole));
-          }
+            : sessionData?.user?.role || '';
+          effectiveUserId = (isImpersonating && impersonatedUser?.id)
+            ? impersonatedUser.id
+            : sessionData?.user?.id || '';
+          effectiveEmail = (isImpersonating && impersonatedUser?.email)
+            ? impersonatedUser.email
+            : sessionData?.user?.email || '';
         }
 
         // Fetch treatment details
@@ -477,6 +489,24 @@ export default function TreatmentDetailPage() {
                 dueDate: treatmentData.dueDate?.split('T')[0] || '',
                 tasks: treatmentData.tasks || [],
               });
+
+              // فحص الصلاحيات: بناءً على الدور أو المشاركة في الخطة
+              let canEdit = ['admin', 'riskManager', 'riskAnalyst'].includes(effectiveRole);
+              if (!canEdit) {
+                // هل المستخدم هو المسؤول عن الخطة؟
+                if (foundTreatment.responsible?.id === effectiveUserId) {
+                  canEdit = true;
+                }
+                // هل المستخدم مكلف أو متابع في أي مهمة (عبر البريد الإلكتروني)؟
+                if (!canEdit && effectiveEmail) {
+                  const tasks = foundTreatment.tasks || [];
+                  canEdit = tasks.some((task: { actionOwner?: { email?: string }; monitorOwner?: { email?: string } }) =>
+                    task.actionOwner?.email === effectiveEmail ||
+                    task.monitorOwner?.email === effectiveEmail
+                  );
+                }
+              }
+              setCanDelete(canEdit);
 
               // Fetch change logs and discussions
               fetchChangeLogs();
@@ -660,7 +690,12 @@ export default function TreatmentDetailPage() {
       const res = await fetch(`/api/tasks/${taskId}/updates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, type: 'update' }),
+        body: JSON.stringify({
+          content,
+          type: 'update',
+          attachmentUrl: newUpdateAttachmentUrl[taskId] || null,
+          attachmentName: newUpdateAttachmentName[taskId] || null,
+        }),
       });
 
       if (res.ok) {
@@ -671,6 +706,8 @@ export default function TreatmentDetailPage() {
             [taskId]: [data.data, ...(prev[taskId] || [])],
           }));
           setNewUpdateContent(prev => ({ ...prev, [taskId]: '' }));
+          setNewUpdateAttachmentUrl(prev => ({ ...prev, [taskId]: '' }));
+          setNewUpdateAttachmentName(prev => ({ ...prev, [taskId]: '' }));
         }
       }
     } catch (error) {
@@ -715,7 +752,11 @@ export default function TreatmentDetailPage() {
       const res = await fetch(`/api/tasks/${taskId}/steps`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify({
+          title,
+          attachmentUrl: newStepAttachmentUrl[taskId] || null,
+          attachmentName: newStepAttachmentName[taskId] || null,
+        }),
       });
 
       if (res.ok) {
@@ -726,6 +767,8 @@ export default function TreatmentDetailPage() {
             [taskId]: [...(prev[taskId] || []), data.data],
           }));
           setNewStepTitle(prev => ({ ...prev, [taskId]: '' }));
+          setNewStepAttachmentUrl(prev => ({ ...prev, [taskId]: '' }));
+          setNewStepAttachmentName(prev => ({ ...prev, [taskId]: '' }));
         }
       }
     } catch (error) {
@@ -1202,6 +1245,19 @@ export default function TreatmentDetailPage() {
                                         <span className={`flex-1 ${step.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
                                           {step.title}
                                         </span>
+                                        {step.attachmentUrl && (
+                                          <a
+                                            href={step.attachmentUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 shrink-0"
+                                            title={step.attachmentName || (isAr ? 'مرفق' : 'Attachment')}
+                                          >
+                                            <Paperclip className="h-3 w-3" />
+                                            <span className="max-w-[100px] truncate">{step.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                            <ExternalLink className="h-3 w-3" />
+                                          </a>
+                                        )}
                                         <span className="text-xs text-gray-500">{formatTimeAgo(step.createdAt)}</span>
                                       </div>
                                     </div>
@@ -1209,22 +1265,49 @@ export default function TreatmentDetailPage() {
                                 })}
 
                                 {/* Add Step */}
-                                <div className="flex gap-2">
-                                  <Input
-                                    value={newStepTitle[task.id] || ''}
-                                    onChange={(e) => setNewStepTitle(prev => ({ ...prev, [task.id]: e.target.value }))}
-                                    placeholder={isAr ? 'أضف خطوة جديدة...' : 'Add a new step...'}
-                                    className="flex-1"
-                                    onKeyPress={(e) => e.key === 'Enter' && submitTaskStep(task.id)}
-                                  />
-                                  <Button
-                                    size="sm"
-                                    onClick={() => submitTaskStep(task.id)}
-                                    disabled={submittingStep === task.id || !newStepTitle[task.id]?.trim()}
-                                    className="bg-emerald-500 hover:bg-emerald-600"
-                                  >
-                                    {submittingStep === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                                  </Button>
+                                <div className="space-y-2">
+                                  <div className="flex gap-2">
+                                    <Input
+                                      value={newStepTitle[task.id] || ''}
+                                      onChange={(e) => setNewStepTitle(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                      placeholder={isAr ? 'أضف خطوة جديدة...' : 'Add a new step...'}
+                                      className="flex-1"
+                                      onKeyPress={(e) => e.key === 'Enter' && submitTaskStep(task.id)}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => submitTaskStep(task.id)}
+                                      disabled={submittingStep === task.id || !newStepTitle[task.id]?.trim()}
+                                      className="bg-emerald-500 hover:bg-emerald-600"
+                                    >
+                                      {submittingStep === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                    </Button>
+                                  </div>
+                                  {/* OneDrive attachment for step */}
+                                  {newStepTitle[task.id]?.trim() && (
+                                    <OneDrivePicker
+                                      isAr={isAr}
+                                      onFileSelect={(file) => {
+                                        setNewStepAttachmentUrl(prev => ({ ...prev, [task.id]: file.url }));
+                                        setNewStepAttachmentName(prev => ({ ...prev, [task.id]: file.name }));
+                                      }}
+                                    />
+                                  )}
+                                  {newStepAttachmentUrl[task.id] && (
+                                    <div className="flex items-center gap-2 text-xs text-emerald-600">
+                                      <Paperclip className="h-3 w-3" />
+                                      <span className="truncate max-w-[200px]">{newStepAttachmentName[task.id] || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                      <button
+                                        onClick={() => {
+                                          setNewStepAttachmentUrl(prev => ({ ...prev, [task.id]: '' }));
+                                          setNewStepAttachmentName(prev => ({ ...prev, [task.id]: '' }));
+                                        }}
+                                        className="text-red-400 hover:text-red-600"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               </>
                             )}
@@ -1257,22 +1340,47 @@ export default function TreatmentDetailPage() {
                             ) : (
                               <>
                                 {/* Add Update */}
-                                <div className="flex gap-2">
-                                  <Input
-                                    value={newUpdateContent[task.id] || ''}
-                                    onChange={(e) => setNewUpdateContent(prev => ({ ...prev, [task.id]: e.target.value }))}
-                                    placeholder={isAr ? 'أضف تحديث...' : 'Add an update...'}
-                                    className="flex-1"
-                                    onKeyPress={(e) => e.key === 'Enter' && submitTaskUpdate(task.id)}
+                                <div className="space-y-2">
+                                  <div className="flex gap-2">
+                                    <Input
+                                      value={newUpdateContent[task.id] || ''}
+                                      onChange={(e) => setNewUpdateContent(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                      placeholder={isAr ? 'أضف تحديث...' : 'Add an update...'}
+                                      className="flex-1"
+                                      onKeyPress={(e) => e.key === 'Enter' && submitTaskUpdate(task.id)}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => submitTaskUpdate(task.id)}
+                                      disabled={submittingUpdate === task.id || !newUpdateContent[task.id]?.trim()}
+                                      className="bg-sky-500 hover:bg-sky-600"
+                                    >
+                                      {submittingUpdate === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                    </Button>
+                                  </div>
+                                  {/* OneDrive attachment for update */}
+                                  <OneDrivePicker
+                                    isAr={isAr}
+                                    onFileSelect={(file) => {
+                                      setNewUpdateAttachmentUrl(prev => ({ ...prev, [task.id]: file.url }));
+                                      setNewUpdateAttachmentName(prev => ({ ...prev, [task.id]: file.name }));
+                                    }}
                                   />
-                                  <Button
-                                    size="sm"
-                                    onClick={() => submitTaskUpdate(task.id)}
-                                    disabled={submittingUpdate === task.id || !newUpdateContent[task.id]?.trim()}
-                                    className="bg-sky-500 hover:bg-sky-600"
-                                  >
-                                    {submittingUpdate === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                  </Button>
+                                  {newUpdateAttachmentUrl[task.id] && (
+                                    <div className="flex items-center gap-2 text-xs text-sky-600">
+                                      <Paperclip className="h-3 w-3" />
+                                      <span className="truncate max-w-[200px]">{newUpdateAttachmentName[task.id] || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                      <button
+                                        onClick={() => {
+                                          setNewUpdateAttachmentUrl(prev => ({ ...prev, [task.id]: '' }));
+                                          setNewUpdateAttachmentName(prev => ({ ...prev, [task.id]: '' }));
+                                        }}
+                                        className="text-red-400 hover:text-red-600"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
 
                                 {updates.map((update) => (
@@ -1287,6 +1395,18 @@ export default function TreatmentDetailPage() {
                                           <span className="text-xs text-gray-500">{formatTimeAgo(update.createdAt)}</span>
                                         </div>
                                         <p className="text-sm text-gray-700 dark:text-gray-300">{update.content}</p>
+                                        {update.attachmentUrl && (
+                                          <a
+                                            href={update.attachmentUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 dark:text-sky-400 mt-1"
+                                          >
+                                            <Paperclip className="h-3 w-3" />
+                                            <span className="max-w-[200px] truncate">{update.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                            <ExternalLink className="h-3 w-3" />
+                                          </a>
+                                        )}
                                       </div>
                                     </div>
                                   </div>

@@ -3,6 +3,83 @@ import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { getClientInfo } from '@/lib/audit';
 
+// دالة فحص صلاحيات التعديل/الحذف على خطة المعالجة
+// المصرح لهم: admin, riskManager, riskAnalyst, المسؤول عن الخطة, المكلف بمهمة, المتابع لمهمة
+async function checkTreatmentEditPermission(
+  userId: string,
+  riskId: string,
+  treatmentId: string
+): Promise<{ allowed: boolean; error?: string; status?: number }> {
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, email: true },
+  });
+
+  if (!currentUser) {
+    return { allowed: false, error: 'المستخدم غير موجود', status: 403 };
+  }
+
+  // مسار سريع: صلاحية بناءً على الدور
+  if (['admin', 'riskManager', 'riskAnalyst'].includes(currentUser.role)) {
+    return { allowed: true };
+  }
+
+  // جلب خطة المعالجة مع بيانات الملكية للمهام
+  const treatment = await prisma.treatmentPlan.findFirst({
+    where: { id: treatmentId, riskId },
+    select: {
+      responsibleId: true,
+      tasks: {
+        select: {
+          actionOwnerId: true,
+          monitorOwnerId: true,
+          actionOwner: { select: { email: true } },
+          monitorOwner: { select: { email: true } },
+        },
+      },
+    },
+  });
+
+  if (!treatment) {
+    return { allowed: false, error: 'خطة المعالجة غير موجودة', status: 404 };
+  }
+
+  // فحص: هل المستخدم هو المسؤول عن الخطة؟
+  if (treatment.responsibleId === userId) {
+    return { allowed: true };
+  }
+
+  // فحص: هل المستخدم مكلف أو متابع عبر RiskOwner (مطابقة بالبريد الإلكتروني)
+  if (currentUser.email) {
+    const userRiskOwner = await prisma.riskOwner.findFirst({
+      where: { email: currentUser.email },
+      select: { id: true },
+    });
+
+    const isInvolvedInTask = treatment.tasks.some(task => {
+      // مطابقة بمعرف RiskOwner
+      if (userRiskOwner) {
+        if (task.actionOwnerId === userRiskOwner.id) return true;
+        if (task.monitorOwnerId === userRiskOwner.id) return true;
+      }
+      // مطابقة مباشرة بالبريد الإلكتروني (احتياطي)
+      if (task.actionOwner?.email === currentUser.email) return true;
+      if (task.monitorOwner?.email === currentUser.email) return true;
+      return false;
+    });
+
+    if (isInvolvedInTask) {
+      return { allowed: true };
+    }
+  }
+
+  return {
+    allowed: false,
+    error: 'ليس لديك صلاحية. هذا الإجراء متاح لمدير المخاطر أو مدير النظام أو محلل المخاطر أو المسؤول عن الخطة أو المكلف أو المتابع.',
+    status: 403,
+  };
+}
+
 // أسماء الحقول بالعربي
 const fieldNamesAr: Record<string, string> = {
   titleAr: 'العنوان بالعربي',
@@ -42,16 +119,12 @@ export async function PATCH(
       );
     }
 
-    // التحقق من صلاحيات المستخدم - فقط مدير المخاطر أو مدير النظام أو محلل المخاطر يمكنهم التعديل
-    const currentUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (!currentUser || !['admin', 'riskManager', 'riskAnalyst'].includes(currentUser.role)) {
+    // التحقق من صلاحيات المستخدم - الأدوار المصرح لها + المسؤول عن الخطة + المكلف + المتابع
+    const permCheck = await checkTreatmentEditPermission(session.user.id, riskId, treatmentId);
+    if (!permCheck.allowed) {
       return NextResponse.json(
-        { success: false, error: 'ليس لديك صلاحية تعديل خطط المعالجة. هذا الإجراء متاح فقط لمدير المخاطر أو مدير النظام أو محلل المخاطر.' },
-        { status: 403 }
+        { success: false, error: permCheck.error },
+        { status: permCheck.status || 403 }
       );
     }
 
@@ -376,16 +449,12 @@ export async function DELETE(
       );
     }
 
-    // التحقق من صلاحيات المستخدم - فقط مدير المخاطر أو مدير النظام يمكنهم الحذف
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (!user || !['admin', 'riskManager', 'riskAnalyst'].includes(user.role)) {
+    // التحقق من صلاحيات المستخدم - الأدوار المصرح لها + المسؤول عن الخطة + المكلف + المتابع
+    const permCheck = await checkTreatmentEditPermission(session.user.id, riskId, treatmentId);
+    if (!permCheck.allowed) {
       return NextResponse.json(
-        { success: false, error: 'ليس لديك صلاحية حذف خطط المعالجة. هذا الإجراء متاح فقط لمدير المخاطر أو مدير النظام أو محلل المخاطر.' },
-        { status: 403 }
+        { success: false, error: permCheck.error },
+        { status: permCheck.status || 403 }
       );
     }
 
