@@ -511,6 +511,15 @@ export default function TreatmentDetailPage() {
               // Fetch change logs and discussions
               fetchChangeLogs();
               fetchDiscussions();
+
+              // تحميل خطوات سير العمل والتحديثات لجميع المهام تلقائياً
+              const tasks = foundTreatment.tasks || [];
+              for (const task of tasks) {
+                if (task.id) {
+                  fetchTaskSteps(task.id as string);
+                  fetchTaskUpdates(task.id as string);
+                }
+              }
             }
           }
         }
