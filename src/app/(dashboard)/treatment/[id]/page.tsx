@@ -360,6 +360,13 @@ export default function TreatmentDetailPage() {
   const [newUpdateAttachmentUrl, setNewUpdateAttachmentUrl] = useState<Record<string, string>>({});
   const [newUpdateAttachmentName, setNewUpdateAttachmentName] = useState<Record<string, string>>({});
 
+  // Step editing state
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [editingStepTitle, setEditingStepTitle] = useState('');
+  const [editingStepAttachmentUrl, setEditingStepAttachmentUrl] = useState('');
+  const [editingStepAttachmentName, setEditingStepAttachmentName] = useState('');
+  const [savingStep, setSavingStep] = useState(false);
+
   // Change log state
   const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([]);
   const [loadingChangeLogs, setLoadingChangeLogs] = useState(false);
@@ -809,6 +816,76 @@ export default function TreatmentDetailPage() {
     }
   };
 
+  // بدء تعديل خطوة
+  const startEditStep = (step: TaskStep) => {
+    setEditingStepId(step.id);
+    setEditingStepTitle(step.title);
+    setEditingStepAttachmentUrl(step.attachmentUrl || '');
+    setEditingStepAttachmentName(step.attachmentName || '');
+  };
+
+  // إلغاء تعديل خطوة
+  const cancelEditStep = () => {
+    setEditingStepId(null);
+    setEditingStepTitle('');
+    setEditingStepAttachmentUrl('');
+    setEditingStepAttachmentName('');
+  };
+
+  // حفظ تعديل خطوة
+  const saveStepEdit = async (taskId: string, stepId: string) => {
+    if (!editingStepTitle.trim()) return;
+    setSavingStep(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/steps`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stepId,
+          title: editingStepTitle.trim(),
+          attachmentUrl: editingStepAttachmentUrl || null,
+          attachmentName: editingStepAttachmentName || null,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTaskSteps(prev => ({
+            ...prev,
+            [taskId]: prev[taskId]?.map(s => s.id === stepId ? data.data : s) || [],
+          }));
+          cancelEditStep();
+        }
+      }
+    } catch (error) {
+      console.error('Error saving step edit:', error);
+    } finally {
+      setSavingStep(false);
+    }
+  };
+
+  // حذف خطوة
+  const deleteStep = async (taskId: string, stepId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/steps?stepId=${stepId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTaskSteps(prev => ({
+            ...prev,
+            [taskId]: prev[taskId]?.filter(s => s.id !== stepId) || [],
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting step:', error);
+    }
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -1210,17 +1287,17 @@ export default function TreatmentDetailPage() {
                       </div>
                     </div>
 
-                    {/* Task Actions */}
-                    <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-600 rtl:divide-x-reverse border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/50">
+                    {/* Task Actions - عمود واحد بعرض كامل */}
+                    <div className="flex flex-col border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/50">
                       {/* Workflow Steps */}
-                      <div className="p-4">
+                      <div className="p-5">
                         <button
                           onClick={() => toggleStepsExpanded(task.id)}
-                          className="w-full flex items-center justify-between p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors"
+                          className="w-full flex items-center justify-between p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors"
                         >
                           <div className="flex items-center gap-3">
                             <ListOrdered className="h-5 w-5 text-emerald-600" />
-                            <span className="font-medium text-emerald-700 dark:text-emerald-300">{isAr ? 'خطوات سير العمل' : 'Workflow Steps'}</span>
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300">{isAr ? 'خطوات سير العمل' : 'Workflow Steps'}</span>
                             {steps.length > 0 && (
                               <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-800 dark:text-emerald-300">
                                 {completedSteps}/{steps.length}
@@ -1241,41 +1318,112 @@ export default function TreatmentDetailPage() {
                                 {steps.map((step, stepIndex) => {
                                   const stepConf = stepStatusConfig[step.status];
                                   const StepIcon = stepConf.icon;
+                                  const isEditing = editingStepId === step.id;
                                   return (
-                                    <div key={step.id} className={`p-3 rounded-xl ${stepConf.bg} border border-gray-200 dark:border-gray-600`}>
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-xs font-bold text-gray-500 w-6">{stepIndex + 1}</span>
-                                        <button
-                                          onClick={() => updateStepStatus(task.id, step.id, step.status === 'completed' ? 'pending' : 'completed')}
-                                          className={`p-1 rounded-full ${step.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-gray-200 dark:bg-gray-600'}`}
-                                        >
-                                          <StepIcon className="h-4 w-4" />
-                                        </button>
-                                        <span className={`flex-1 ${step.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                          {step.title}
-                                        </span>
-                                        {step.attachmentUrl && (
-                                          <a
-                                            href={step.attachmentUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 shrink-0"
-                                            title={step.attachmentName || (isAr ? 'مرفق' : 'Attachment')}
+                                    <div key={step.id} className={`p-4 rounded-xl ${stepConf.bg} border border-gray-200 dark:border-gray-600`}>
+                                      {isEditing ? (
+                                        /* وضع التعديل */
+                                        <div className="space-y-3">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xs font-bold text-gray-500 w-6">{stepIndex + 1}</span>
+                                            <span className="text-sm font-medium text-emerald-700">{isAr ? 'تعديل الخطوة' : 'Edit Step'}</span>
+                                          </div>
+                                          <Input
+                                            value={editingStepTitle}
+                                            onChange={(e) => setEditingStepTitle(e.target.value)}
+                                            placeholder={isAr ? 'عنوان الخطوة...' : 'Step title...'}
+                                            className="w-full"
+                                            autoFocus
+                                            onKeyPress={(e) => e.key === 'Enter' && saveStepEdit(task.id, step.id)}
+                                          />
+                                          <OneDrivePicker
+                                            isAr={isAr}
+                                            onFileSelect={(file) => {
+                                              setEditingStepAttachmentUrl(file.url);
+                                              setEditingStepAttachmentName(file.name);
+                                            }}
+                                          />
+                                          {editingStepAttachmentUrl && (
+                                            <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg">
+                                              <Paperclip className="h-3.5 w-3.5" />
+                                              <a href={editingStepAttachmentUrl} target="_blank" rel="noopener noreferrer" className="truncate max-w-[300px] hover:underline">
+                                                {editingStepAttachmentName || (isAr ? 'مرفق' : 'Attachment')}
+                                              </a>
+                                              <button
+                                                onClick={() => { setEditingStepAttachmentUrl(''); setEditingStepAttachmentName(''); }}
+                                                className="text-red-400 hover:text-red-600 ms-auto"
+                                              >
+                                                <X className="h-3.5 w-3.5" />
+                                              </button>
+                                            </div>
+                                          )}
+                                          <div className="flex gap-2 justify-end">
+                                            <Button size="sm" variant="outline" onClick={cancelEditStep} className="text-xs">
+                                              {isAr ? 'إلغاء' : 'Cancel'}
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              onClick={() => saveStepEdit(task.id, step.id)}
+                                              disabled={savingStep || !editingStepTitle.trim()}
+                                              className="bg-emerald-500 hover:bg-emerald-600 text-xs"
+                                            >
+                                              {savingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Save className="h-3.5 w-3.5 me-1" />{isAr ? 'حفظ' : 'Save'}</>}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        /* وضع العرض */
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-xs font-bold text-gray-500 w-6">{stepIndex + 1}</span>
+                                          <button
+                                            onClick={() => updateStepStatus(task.id, step.id, step.status === 'completed' ? 'pending' : 'completed')}
+                                            className={`p-1.5 rounded-full ${step.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-gray-200 dark:bg-gray-600'}`}
                                           >
-                                            <Paperclip className="h-3 w-3" />
-                                            <span className="max-w-[100px] truncate">{step.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
-                                            <ExternalLink className="h-3 w-3" />
-                                          </a>
-                                        )}
-                                        <span className="text-xs text-gray-500">{formatTimeAgo(step.createdAt)}</span>
-                                      </div>
+                                            <StepIcon className="h-4 w-4" />
+                                          </button>
+                                          <span className={`flex-1 text-sm ${step.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                            {step.title}
+                                          </span>
+                                          {step.attachmentUrl && (
+                                            <a
+                                              href={step.attachmentUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 shrink-0 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg"
+                                              title={step.attachmentName || (isAr ? 'مرفق' : 'Attachment')}
+                                            >
+                                              <Paperclip className="h-3 w-3" />
+                                              <span className="max-w-[150px] truncate">{step.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                              <ExternalLink className="h-3 w-3" />
+                                            </a>
+                                          )}
+                                          <span className="text-xs text-gray-400 shrink-0">{formatTimeAgo(step.createdAt)}</span>
+                                          {/* أزرار التعديل والحذف */}
+                                          <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                              onClick={() => startEditStep(step)}
+                                              className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                                              title={isAr ? 'تعديل' : 'Edit'}
+                                            >
+                                              <Pencil className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => deleteStep(task.id, step.id)}
+                                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                                              title={isAr ? 'حذف' : 'Delete'}
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
 
                                 {/* Add Step */}
-                                <div className="space-y-2">
-                                  <div className="flex gap-2">
+                                <div className="space-y-3 p-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-xl border border-dashed border-emerald-200 dark:border-emerald-800">
+                                  <div className="flex gap-3">
                                     <Input
                                       value={newStepTitle[task.id] || ''}
                                       onChange={(e) => setNewStepTitle(prev => ({ ...prev, [task.id]: e.target.value }))}
@@ -1287,33 +1435,30 @@ export default function TreatmentDetailPage() {
                                       size="sm"
                                       onClick={() => submitTaskStep(task.id)}
                                       disabled={submittingStep === task.id || !newStepTitle[task.id]?.trim()}
-                                      className="bg-emerald-500 hover:bg-emerald-600"
+                                      className="bg-emerald-500 hover:bg-emerald-600 px-4"
                                     >
-                                      {submittingStep === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                      {submittingStep === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 me-1" />{isAr ? 'إضافة' : 'Add'}</>}
                                     </Button>
                                   </div>
-                                  {/* OneDrive attachment for step */}
-                                  {newStepTitle[task.id]?.trim() && (
-                                    <OneDrivePicker
-                                      isAr={isAr}
-                                      onFileSelect={(file) => {
-                                        setNewStepAttachmentUrl(prev => ({ ...prev, [task.id]: file.url }));
-                                        setNewStepAttachmentName(prev => ({ ...prev, [task.id]: file.name }));
-                                      }}
-                                    />
-                                  )}
+                                  <OneDrivePicker
+                                    isAr={isAr}
+                                    onFileSelect={(file) => {
+                                      setNewStepAttachmentUrl(prev => ({ ...prev, [task.id]: file.url }));
+                                      setNewStepAttachmentName(prev => ({ ...prev, [task.id]: file.name }));
+                                    }}
+                                  />
                                   {newStepAttachmentUrl[task.id] && (
-                                    <div className="flex items-center gap-2 text-xs text-emerald-600">
-                                      <Paperclip className="h-3 w-3" />
-                                      <span className="truncate max-w-[200px]">{newStepAttachmentName[task.id] || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                    <div className="flex items-center gap-2 text-xs text-emerald-600 bg-white dark:bg-gray-800 p-2 rounded-lg">
+                                      <Paperclip className="h-3.5 w-3.5" />
+                                      <span className="truncate max-w-[300px]">{newStepAttachmentName[task.id] || (isAr ? 'مرفق' : 'Attachment')}</span>
                                       <button
                                         onClick={() => {
                                           setNewStepAttachmentUrl(prev => ({ ...prev, [task.id]: '' }));
                                           setNewStepAttachmentName(prev => ({ ...prev, [task.id]: '' }));
                                         }}
-                                        className="text-red-400 hover:text-red-600"
+                                        className="text-red-400 hover:text-red-600 ms-auto"
                                       >
-                                        <X className="h-3 w-3" />
+                                        <X className="h-3.5 w-3.5" />
                                       </button>
                                     </div>
                                   )}
@@ -1325,14 +1470,14 @@ export default function TreatmentDetailPage() {
                       </div>
 
                       {/* Updates */}
-                      <div className="p-4">
+                      <div className="p-5 border-t border-gray-200 dark:border-gray-600">
                         <button
                           onClick={() => toggleTaskExpanded(task.id)}
-                          className="w-full flex items-center justify-between p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
+                          className="w-full flex items-center justify-between p-4 rounded-xl bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
                         >
                           <div className="flex items-center gap-3">
                             <MessageSquare className="h-5 w-5 text-sky-600" />
-                            <span className="font-medium text-sky-700 dark:text-sky-300">{isAr ? 'التحديثات' : 'Updates'}</span>
+                            <span className="font-semibold text-sky-700 dark:text-sky-300">{isAr ? 'التحديثات' : 'Updates'}</span>
                             {updates.length > 0 && (
                               <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-800 dark:text-sky-300">{updates.length}</Badge>
                             )}
@@ -1349,8 +1494,8 @@ export default function TreatmentDetailPage() {
                             ) : (
                               <>
                                 {/* Add Update */}
-                                <div className="space-y-2">
-                                  <div className="flex gap-2">
+                                <div className="space-y-3 p-4 bg-sky-50/50 dark:bg-sky-900/10 rounded-xl border border-dashed border-sky-200 dark:border-sky-800">
+                                  <div className="flex gap-3">
                                     <Input
                                       value={newUpdateContent[task.id] || ''}
                                       onChange={(e) => setNewUpdateContent(prev => ({ ...prev, [task.id]: e.target.value }))}
@@ -1362,12 +1507,11 @@ export default function TreatmentDetailPage() {
                                       size="sm"
                                       onClick={() => submitTaskUpdate(task.id)}
                                       disabled={submittingUpdate === task.id || !newUpdateContent[task.id]?.trim()}
-                                      className="bg-sky-500 hover:bg-sky-600"
+                                      className="bg-sky-500 hover:bg-sky-600 px-4"
                                     >
-                                      {submittingUpdate === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                      {submittingUpdate === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="h-4 w-4 me-1" />{isAr ? 'إرسال' : 'Send'}</>}
                                     </Button>
                                   </div>
-                                  {/* OneDrive attachment for update */}
                                   <OneDrivePicker
                                     isAr={isAr}
                                     onFileSelect={(file) => {
@@ -1376,32 +1520,32 @@ export default function TreatmentDetailPage() {
                                     }}
                                   />
                                   {newUpdateAttachmentUrl[task.id] && (
-                                    <div className="flex items-center gap-2 text-xs text-sky-600">
-                                      <Paperclip className="h-3 w-3" />
-                                      <span className="truncate max-w-[200px]">{newUpdateAttachmentName[task.id] || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                    <div className="flex items-center gap-2 text-xs text-sky-600 bg-white dark:bg-gray-800 p-2 rounded-lg">
+                                      <Paperclip className="h-3.5 w-3.5" />
+                                      <span className="truncate max-w-[300px]">{newUpdateAttachmentName[task.id] || (isAr ? 'مرفق' : 'Attachment')}</span>
                                       <button
                                         onClick={() => {
                                           setNewUpdateAttachmentUrl(prev => ({ ...prev, [task.id]: '' }));
                                           setNewUpdateAttachmentName(prev => ({ ...prev, [task.id]: '' }));
                                         }}
-                                        className="text-red-400 hover:text-red-600"
+                                        className="text-red-400 hover:text-red-600 ms-auto"
                                       >
-                                        <X className="h-3 w-3" />
+                                        <X className="h-3.5 w-3.5" />
                                       </button>
                                     </div>
                                   )}
                                 </div>
 
                                 {updates.map((update) => (
-                                  <div key={update.id} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
+                                  <div key={update.id} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
                                     <div className="flex items-start gap-3">
-                                      <div className="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-800 flex items-center justify-center text-sky-600 dark:text-sky-300 font-bold text-sm">
+                                      <div className="w-9 h-9 rounded-full bg-sky-100 dark:bg-sky-800 flex items-center justify-center text-sky-600 dark:text-sky-300 font-bold text-sm shrink-0">
                                         {update.author.fullName.charAt(0)}
                                       </div>
-                                      <div className="flex-1">
+                                      <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                           <span className="font-medium text-sm">{isAr ? update.author.fullName : update.author.fullNameEn || update.author.fullName}</span>
-                                          <span className="text-xs text-gray-500">{formatTimeAgo(update.createdAt)}</span>
+                                          <span className="text-xs text-gray-400">{formatTimeAgo(update.createdAt)}</span>
                                         </div>
                                         <p className="text-sm text-gray-700 dark:text-gray-300">{update.content}</p>
                                         {update.attachmentUrl && (
@@ -1409,10 +1553,10 @@ export default function TreatmentDetailPage() {
                                             href={update.attachmentUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 dark:text-sky-400 mt-1"
+                                            className="inline-flex items-center gap-1.5 text-xs text-sky-600 hover:text-sky-800 dark:text-sky-400 mt-2 bg-sky-50 dark:bg-sky-900/30 px-2.5 py-1 rounded-lg"
                                           >
                                             <Paperclip className="h-3 w-3" />
-                                            <span className="max-w-[200px] truncate">{update.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                            <span className="max-w-[250px] truncate">{update.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
                                             <ExternalLink className="h-3 w-3" />
                                           </a>
                                         )}
