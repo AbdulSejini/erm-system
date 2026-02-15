@@ -61,6 +61,12 @@ async function createBackupData() {
     incidents,
     treatmentPlanChangeLogs,
     treatmentDiscussions,
+    complianceDomains,
+    regulatoryBodies,
+    complianceObligations,
+    complianceRiskLinks,
+    complianceAssessments,
+    complianceChangeLogs,
   ] = await Promise.all([
     // المستخدمين (بدون كلمات المرور)
     prisma.user.findMany({
@@ -149,6 +155,16 @@ async function createBackupData() {
     }),
     // مناقشات خطط المعالجة
     prisma.treatmentDiscussion.findMany(),
+    // بيانات الالتزام
+    prisma.complianceDomain.findMany(),
+    prisma.regulatoryBody.findMany(),
+    prisma.complianceObligation.findMany(),
+    prisma.complianceRiskLink.findMany(),
+    prisma.complianceAssessment.findMany(),
+    prisma.complianceChangeLog.findMany({
+      take: 10000,
+      orderBy: { createdAt: 'desc' },
+    }),
   ]);
 
   const stats = {
@@ -180,6 +196,12 @@ async function createBackupData() {
     incidents: incidents.length,
     treatmentPlanChangeLogs: treatmentPlanChangeLogs.length,
     treatmentDiscussions: treatmentDiscussions.length,
+    complianceDomains: complianceDomains.length,
+    regulatoryBodies: regulatoryBodies.length,
+    complianceObligations: complianceObligations.length,
+    complianceRiskLinks: complianceRiskLinks.length,
+    complianceAssessments: complianceAssessments.length,
+    complianceChangeLogs: complianceChangeLogs.length,
   };
 
   const backup = {
@@ -223,6 +245,13 @@ async function createBackupData() {
       notifications,
       // سجل التدقيق
       auditLogs,
+      // الالتزام
+      complianceDomains,
+      regulatoryBodies,
+      complianceObligations,
+      complianceRiskLinks,
+      complianceAssessments,
+      complianceChangeLogs,
     },
     stats,
   };

@@ -58,6 +58,10 @@ model User {
   treatmentChangeLogs        TreatmentPlanChangeLog[] @relation("TreatmentChangeLogUser")
   treatmentDiscussions       TreatmentDiscussion[]    @relation("TreatmentDiscussionAuthor")
   createdBackups             SystemBackup[]           @relation("BackupCreator")
+  complianceChangeLogs       ComplianceChangeLog[]    @relation("ComplianceChangeLogUser")
+  complianceAssessments      ComplianceAssessment[]   @relation("ComplianceAssessor")
+  complianceRiskLinks        ComplianceRiskLink[]     @relation("ComplianceRiskLinker")
+  createdObligations         ComplianceObligation[]   @relation("ComplianceObligationCreator")
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -226,6 +230,7 @@ model Risk {
   changeLogs    RiskChangeLog[]   // سجل التعديلات على الخطر
   residualRiskChangeRequests ResidualRiskChangeRequest[] // طلبات تغيير الخطر المتبقي
   approvalRequest RiskApprovalRequest? // طلب اعتماد الخطر الجديد
+  complianceLinks ComplianceRiskLink[] // ربط الالتزامات المرتبطة بالخطر
 
   @@index([categoryId])
   @@index([departmentId])
@@ -826,5 +831,206 @@ model SystemBackup {
 
   @@index([backupType])
   @@index([status])
+  @@index([createdAt])
+}
+
+// =============================================
+// نظام الالتزام (Compliance Module)
+// =============================================
+
+// مجالات الالتزام (Compliance Domains)
+model ComplianceDomain {
+  id        String    @id @default(cuid())
+  code      String    @unique // BOD, AUC, NRC, RMC, DIS, COI, etc.
+  nameAr    String
+  nameEn    String
+  order     Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // العلاقات
+  obligations ComplianceObligation[]
+}
+
+// الجهات الرقابية (Regulatory Bodies)
+model RegulatoryBody {
+  id        String    @id @default(cuid())
+  code      String    @unique // CMA, MOCI, ZATCA, HRSD, etc.
+  nameAr    String
+  nameEn    String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // العلاقات
+  obligations ComplianceObligation[]
+}
+
+// الالتزامات (Compliance Obligations) - النموذج الرئيسي
+model ComplianceObligation {
+  id                String    @id @default(cuid())
+  code              String    @unique // CMP-BOD-001, CMP-AUC-001, etc.
+  sequenceNumber    Int       // الرقم التسلسلي
+
+  // التعريف
+  domainId          String    // مجال الالتزام
+  subDomainAr       String?   // المجال الفرعي (عربي)
+  subDomainEn       String?   // المجال الفرعي (إنجليزي)
+  titleAr           String    // الالتزام / المتطلب (عربي)
+  titleEn           String    // الالتزام / المتطلب (إنجليزي)
+
+  // المرجع التنظيمي
+  regulatoryReference   String?   // المرجع النظامي
+  articleNumber         String?   // رقم المادة / البند
+  internalPolicyAr      String?   // السياسة الداخلية المرتبطة (عربي)
+  internalPolicyEn      String?   // السياسة الداخلية المرتبطة (إنجليزي)
+  policyDocumentNumber  String?   // رقم وثيقة السياسة
+  regulatoryBodyId      String?   // الجهة الرقابية
+  obligationType        String    @default("mandatory") // mandatory, optional, advisory (إلزامي، اختياري، استرشادي)
+
+  // المسؤولية
+  responsibleDepartmentAr String?  // المسؤول الداخلي - الإدارة (عربي)
+  responsibleDepartmentEn String?  // المسؤول الداخلي - الإدارة (إنجليزي)
+  directOwnerAr           String?  // المسؤول المباشر (عربي)
+  directOwnerEn           String?  // المسؤول المباشر (إنجليزي)
+  backupOwnerAr           String?  // المسؤول البديل (عربي)
+  backupOwnerEn           String?  // المسؤول البديل (إنجليزي)
+  defenseLine             String?  // خط الدفاع (first, second, third)
+
+  // التوقيت والدورية
+  recurrence            String?   // annual, quarterly, monthly, continuous, perEvent, perMeeting
+  nextDueDate           DateTime? // تاريخ الاستحقاق القادم
+  lastReviewDate        DateTime? // تاريخ آخر مراجعة
+  nextReviewDate        DateTime? // تاريخ المراجعة القادمة
+  alertDaysBefore       Int       @default(30) // مهلة التنبيه (أيام)
+
+  // تقييم المخاطر والأثر
+  criticalityLevel          String?   // critical, high, medium, low (حرج، مرتفع، متوسط، منخفض)
+  nonComplianceLikelihood   Int?      // احتمالية عدم الالتزام (1-5)
+  nonComplianceImpact       Int?      // أثر عدم الالتزام (1-5)
+  riskScore                 Int?      // درجة المخاطرة (محسوبة)
+  riskRating                String?   // تصنيف المخاطرة
+  potentialPenaltiesAr      String?   // العقوبات / الجزاءات المحتملة (عربي)
+  potentialPenaltiesEn      String?   // العقوبات / الجزاءات المحتملة (إنجليزي)
+
+  // حالة الالتزام والمراقبة
+  complianceStatus          String    @default("notAssessed") // compliant, partiallyCompliant, nonCompliant, notAssessed
+  completionPercentage      Float     @default(0) // نسبة الإنجاز (0-1)
+  controlActivitiesAr       String?   // أنشطة الرقابة المرتبطة (عربي)
+  controlActivitiesEn       String?   // أنشطة الرقابة المرتبطة (إنجليزي)
+  testingMethod             String?   // documentReview, fieldInspection, dataAnalysis, selfAssessment, operationalTest, externalAudit
+  lastTestResult            String?   // passed, partial, failed, notTested
+  lastTestDate              DateTime? // تاريخ آخر اختبار
+  evidenceRequirementsAr    String?   // متطلبات الأدلة والتوثيق (عربي)
+  evidenceRequirementsEn    String?   // متطلبات الأدلة والتوثيق (إنجليزي)
+
+  // تحليل الفجوات والإجراءات
+  gapDescriptionAr          String?   // وصف الفجوة (عربي)
+  gapDescriptionEn          String?   // وصف الفجوة (إنجليزي)
+  remediationPlanAr         String?   // خطة المعالجة (عربي)
+  remediationPlanEn         String?   // خطة المعالجة (إنجليزي)
+  remediationTargetDate     DateTime? // تاريخ الاستهداف للمعالجة
+  remediationOwnerAr        String?   // مسؤول المعالجة (عربي)
+  remediationOwnerEn        String?   // مسؤول المعالجة (إنجليزي)
+  remediationStatus         String?   // notStarted, inProgress, completed, notApplicable
+
+  // الربط والتتبع
+  linkedRiskNumbers         String?   // معرفات المخاطر المرتبطة (نص خام من الاكسل مثل "GOV-R-222, GOV-R-224")
+  kpiKriAr                  String?   // مؤشرات الأداء (عربي)
+  kpiKriEn                  String?   // مؤشرات الأداء (إنجليزي)
+  notesAr                   String?   // ملاحظات (عربي)
+  notesEn                   String?   // ملاحظات (إنجليزي)
+
+  // Meta
+  isActive      Boolean   @default(true)
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // العلاقات
+  domain          ComplianceDomain?      @relation(fields: [domainId], references: [id])
+  regulatoryBody  RegulatoryBody?        @relation(fields: [regulatoryBodyId], references: [id])
+  createdBy       User?                  @relation("ComplianceObligationCreator", fields: [createdById], references: [id])
+  riskLinks       ComplianceRiskLink[]
+  assessments     ComplianceAssessment[]
+  changeLogs      ComplianceChangeLog[]
+
+  @@index([domainId])
+  @@index([regulatoryBodyId])
+  @@index([complianceStatus])
+  @@index([criticalityLevel])
+  @@index([obligationType])
+  @@index([recurrence])
+  @@index([isActive])
+  @@index([createdAt])
+  @@index([sequenceNumber])
+}
+
+// ربط الالتزام بالمخاطر (Compliance-Risk Link)
+model ComplianceRiskLink {
+  id            String    @id @default(cuid())
+  obligationId  String
+  riskId        String
+  linkedAt      DateTime  @default(now())
+  linkedById    String?   // من قام بالربط (null للربط التلقائي من الاستيراد)
+
+  // العلاقات
+  obligation  ComplianceObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  risk        Risk                 @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  linkedBy    User?                @relation("ComplianceRiskLinker", fields: [linkedById], references: [id])
+
+  @@unique([obligationId, riskId])
+  @@index([obligationId])
+  @@index([riskId])
+}
+
+// تقييمات الالتزام (Compliance Assessments)
+model ComplianceAssessment {
+  id              String    @id @default(cuid())
+  obligationId    String
+  assessorId      String
+  testingMethod   String?   // documentReview, fieldInspection, dataAnalysis, selfAssessment, operationalTest, externalAudit
+  testResult      String    // passed, partial, failed
+  testDate        DateTime
+  findingsAr      String?   // نتائج الاختبار (عربي)
+  findingsEn      String?   // نتائج الاختبار (إنجليزي)
+  evidenceNotes   String?   // ملاحظات الأدلة
+  attachmentUrl   String?   // رابط المرفق
+  attachmentName  String?   // اسم المرفق
+  createdAt       DateTime  @default(now())
+
+  // العلاقات
+  obligation  ComplianceObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  assessor    User                 @relation("ComplianceAssessor", fields: [assessorId], references: [id])
+
+  @@index([obligationId])
+  @@index([assessorId])
+  @@index([testDate])
+}
+
+// سجل تعديلات الالتزام (Compliance Change Log)
+model ComplianceChangeLog {
+  id              String    @id @default(cuid())
+  obligationId    String
+  userId          String
+  changeType      String    // create, update, delete, assessment_add, status_change, risk_link, risk_unlink
+  fieldName       String?   // اسم الحقل المتغير
+  fieldNameAr     String?   // اسم الحقل بالعربي
+  oldValue        String?   // القيمة القديمة (JSON)
+  newValue        String?   // القيمة الجديدة (JSON)
+  description     String?   // وصف التغيير
+  descriptionAr   String?   // وصف التغيير بالعربي
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+
+  // العلاقات
+  obligation  ComplianceObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  user        User                 @relation("ComplianceChangeLogUser", fields: [userId], references: [id])
+
+  @@index([obligationId])
+  @@index([userId])
+  @@index([changeType])
   @@index([createdAt])
 }

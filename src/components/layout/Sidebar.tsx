@@ -25,6 +25,7 @@ import {
   Circle,
   Activity,
   CheckSquare,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface OnlineUser {
@@ -92,6 +93,11 @@ const navItems: NavItem[] = [
     href: '/tracking',
     labelKey: 'navigation.tracking',
     icon: Target,
+  },
+  {
+    href: '/compliance',
+    labelKey: 'navigation.compliance',
+    icon: ShieldCheck,
   },
   {
     href: '/incidents',
