@@ -75,7 +75,13 @@
     "discussions": "Discussions",
     "tracking": "Risk Tracking",
     "compliance": "Compliance Register",
-    "complianceDashboard": "Compliance Dashboard"
+    "complianceDashboard": "Compliance Dashboard",
+    "groupMain": "Main",
+    "groupRiskManagement": "Risk Management",
+    "groupTreatment": "Treatment",
+    "groupComplianceIncidents": "Compliance & Incidents",
+    "groupCollaboration": "Collaboration",
+    "groupSystem": "System"
   },
   "dashboard": {
     "title": "Dashboard",

@@ -75,7 +75,13 @@
     "discussions": "المناقشات",
     "tracking": "متابعة المخاطر",
     "compliance": "سجل الالتزام",
-    "complianceDashboard": "لوحة الالتزام"
+    "complianceDashboard": "لوحة الالتزام",
+    "groupMain": "الرئيسية",
+    "groupRiskManagement": "إدارة المخاطر",
+    "groupTreatment": "المعالجة",
+    "groupComplianceIncidents": "الالتزام والحوادث",
+    "groupCollaboration": "التعاون",
+    "groupSystem": "النظام"
   },
   "dashboard": {
     "title": "لوحة المعلومات",

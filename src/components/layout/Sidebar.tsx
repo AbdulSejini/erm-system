@@ -48,71 +48,54 @@ interface NavItem {
   badge?: number;
 }
 
-const navItems: NavItem[] = [
+interface NavGroup {
+  labelKey: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
   {
-    href: '/dashboard',
-    labelKey: 'navigation.dashboard',
-    icon: LayoutDashboard,
+    labelKey: 'navigation.groupMain',
+    items: [
+      { href: '/dashboard', labelKey: 'navigation.dashboard', icon: LayoutDashboard },
+    ],
   },
   {
-    href: '/risks',
-    labelKey: 'navigation.risks',
-    icon: AlertTriangle,
+    labelKey: 'navigation.groupRiskManagement',
+    items: [
+      { href: '/risks', labelKey: 'navigation.risks', icon: AlertTriangle },
+      { href: '/risk-approvals', labelKey: 'navigation.riskApprovals', icon: CheckSquare },
+      { href: '/assessment', labelKey: 'navigation.assessment', icon: ClipboardCheck },
+      { href: '/tracking', labelKey: 'navigation.tracking', icon: Target },
+    ],
   },
   {
-    href: '/risk-approvals',
-    labelKey: 'navigation.riskApprovals',
-    icon: CheckSquare,
+    labelKey: 'navigation.groupTreatment',
+    items: [
+      { href: '/treatment', labelKey: 'navigation.treatment', icon: Wrench },
+      { href: '/treatment-monitoring', labelKey: 'navigation.treatmentMonitoring', icon: Activity },
+    ],
   },
   {
-    href: '/assessment',
-    labelKey: 'navigation.assessment',
-    icon: ClipboardCheck,
+    labelKey: 'navigation.groupComplianceIncidents',
+    items: [
+      { href: '/compliance', labelKey: 'navigation.compliance', icon: ShieldCheck },
+      { href: '/incidents', labelKey: 'navigation.incidents', icon: AlertCircle },
+    ],
   },
   {
-    href: '/treatment',
-    labelKey: 'navigation.treatment',
-    icon: Wrench,
+    labelKey: 'navigation.groupCollaboration',
+    items: [
+      { href: '/champions', labelKey: 'navigation.champions', icon: Users },
+      { href: '/discussions', labelKey: 'navigation.discussions', icon: MessageSquare },
+    ],
   },
   {
-    href: '/treatment-monitoring',
-    labelKey: 'navigation.treatmentMonitoring',
-    icon: Activity,
-  },
-  {
-    href: '/champions',
-    labelKey: 'navigation.champions',
-    icon: Users,
-  },
-  {
-    href: '/discussions',
-    labelKey: 'navigation.discussions',
-    icon: MessageSquare,
-  },
-  {
-    href: '/tracking',
-    labelKey: 'navigation.tracking',
-    icon: Target,
-  },
-  {
-    href: '/compliance',
-    labelKey: 'navigation.compliance',
-    icon: ShieldCheck,
-  },
-  {
-    href: '/incidents',
-    labelKey: 'navigation.incidents',
-    icon: AlertCircle,
-  },
-  {
-    href: '/reports',
-    labelKey: 'navigation.reports',
-    icon: FileBarChart,
-  },
-  {
-    href: '/settings',
-    labelKey: 'navigation.settings',
-    icon: Settings,
+    labelKey: 'navigation.groupSystem',
+    items: [
+      { href: '/reports', labelKey: 'navigation.reports', icon: FileBarChart },
+      { href: '/settings', labelKey: 'navigation.settings', icon: Settings },
+    ],
   },
 ];
 
@@ -254,57 +237,77 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-3">
-          <ul className="space-y-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              const Icon = item.icon;
+          <div className="space-y-1">
+            {navGroups.map((group, groupIndex) => (
+              <div key={group.labelKey} className={groupIndex > 0 ? 'pt-4' : ''}>
+                {/* Group Label */}
+                {!isCollapsed ? (
+                  <div className="px-3 pb-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-secondary)] opacity-60">
+                      {t(group.labelKey)}
+                    </span>
+                  </div>
+                ) : (
+                  groupIndex > 0 && (
+                    <div className="mx-2 mb-2 border-t border-[var(--border)] opacity-50" />
+                  )
+                )}
 
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={onMobileClose}
-                    className={cn(
-                      'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 relative',
-                      isActive
-                        ? 'bg-[var(--primary-light)] text-[var(--primary)]'
-                        : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)] hover:text-[var(--foreground)]',
-                      isCollapsed && 'justify-center px-2'
-                    )}
-                    title={isCollapsed ? t(item.labelKey) : undefined}
-                  >
-                    {/* Active Indicator */}
-                    {isActive && (
-                      <div className={cn(
-                        'absolute top-1/2 -translate-y-1/2 w-1 h-6 bg-[var(--primary)] rounded-full',
-                        isRTL ? '-end-0' : '-start-0'
-                      )} />
-                    )}
+                {/* Group Items */}
+                <ul className="space-y-1">
+                  {group.items.map((item) => {
+                    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    const Icon = item.icon;
 
-                    {/* Icon Container */}
-                    <div className={cn(
-                      'flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 shrink-0',
-                      isActive
-                        ? 'bg-[var(--primary)] text-white shadow-sm'
-                        : 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] group-hover:bg-[var(--border)] group-hover:text-[var(--foreground)]'
-                    )}>
-                      <Icon className="h-[18px] w-[18px]" />
-                    </div>
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          onClick={onMobileClose}
+                          className={cn(
+                            'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 relative',
+                            isActive
+                              ? 'bg-[var(--primary-light)] text-[var(--primary)]'
+                              : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)] hover:text-[var(--foreground)]',
+                            isCollapsed && 'justify-center px-2'
+                          )}
+                          title={isCollapsed ? t(item.labelKey) : undefined}
+                        >
+                          {/* Active Indicator */}
+                          {isActive && (
+                            <div className={cn(
+                              'absolute top-1/2 -translate-y-1/2 w-1 h-6 bg-[var(--primary)] rounded-full',
+                              isRTL ? '-end-0' : '-start-0'
+                            )} />
+                          )}
 
-                    {!isCollapsed && (
-                      <span className="truncate">{t(item.labelKey)}</span>
-                    )}
+                          {/* Icon Container */}
+                          <div className={cn(
+                            'flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 shrink-0',
+                            isActive
+                              ? 'bg-[var(--primary)] text-white shadow-sm'
+                              : 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] group-hover:bg-[var(--border)] group-hover:text-[var(--foreground)]'
+                          )}>
+                            <Icon className="h-[18px] w-[18px]" />
+                          </div>
 
-                    {!isCollapsed && item.badge && (
-                      <span className="ms-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-xs text-white font-bold">
-                        {item.badge}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                          {!isCollapsed && (
+                            <span className="truncate">{t(item.labelKey)}</span>
+                          )}
+
+                          {!isCollapsed && item.badge && (
+                            <span className="ms-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-xs text-white font-bold">
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         </nav>
 
         {/* Online Users Section - Only for admin and riskManager */}
