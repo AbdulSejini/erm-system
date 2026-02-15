@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 
+// Vercel function config - extend timeout for seed operation
+export const maxDuration = 60;
+
 // --- Mapping helpers ---
 
 const domainArToEn: Record<string, string> = {
@@ -292,7 +295,7 @@ export async function POST() {
       }
     }
 
-    // --- Execute in a transaction ---
+    // --- Execute in a transaction (with extended timeout for large seed) ---
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create ComplianceDomain records
       const domainIdMap = new Map<string, string>();
@@ -438,16 +441,16 @@ export async function POST() {
         obligations: obligationIds.length,
         riskLinks: riskLinksCreated,
       };
-    });
+    }, { timeout: 60000 });
 
     return NextResponse.json({
       success: true,
       message: 'تم استيراد بيانات الالتزام بنجاح',
-      summary: {
-        domainsCreated: result.domains,
-        regulatoryBodiesCreated: result.regulatoryBodies,
-        obligationsCreated: result.obligations,
-        riskLinksCreated: result.riskLinks,
+      data: {
+        domains: result.domains,
+        regulatoryBodies: result.regulatoryBodies,
+        obligations: result.obligations,
+        riskLinks: result.riskLinks,
       },
     });
   } catch (error) {
