@@ -837,6 +837,15 @@
     "filters": "Filters",
     "clearFilters": "Clear Filters",
     "exportExcel": "Export Excel",
-    "exportPDF": "Export PDF"
+    "exportPDF": "Export PDF",
+    "printObligation": "Print Obligation",
+    "editSuccess": "Obligation updated successfully",
+    "editError": "Failed to update obligation",
+    "deleteSuccess": "Obligation deleted successfully",
+    "saving": "Saving...",
+    "generalInfo": "General Information",
+    "dates": "Dates",
+    "riskDetails": "Risk Details",
+    "veryLow": "Very Low"
   }
 }

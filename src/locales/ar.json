@@ -837,6 +837,15 @@
     "filters": "التصفية",
     "clearFilters": "مسح التصفية",
     "exportExcel": "تصدير Excel",
-    "exportPDF": "تصدير PDF"
+    "exportPDF": "تصدير PDF",
+    "printObligation": "طباعة الالتزام",
+    "editSuccess": "تم تحديث الالتزام بنجاح",
+    "editError": "فشل في تحديث الالتزام",
+    "deleteSuccess": "تم حذف الالتزام بنجاح",
+    "saving": "جاري الحفظ...",
+    "generalInfo": "المعلومات العامة",
+    "dates": "التواريخ",
+    "riskDetails": "تفاصيل المخاطر",
+    "veryLow": "منخفض جداً"
   }
 }
