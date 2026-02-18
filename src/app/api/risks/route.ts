@@ -426,6 +426,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // تحديد مالك الخطر (User) - من الطلب أو من الجلسة
+    const ownerId = body.ownerId || session?.user?.id;
+    if (!ownerId) {
+      return NextResponse.json(
+        { success: false, error: 'مالك الخطر مطلوب - يرجى تسجيل الدخول' },
+        { status: 400 }
+      );
+    }
+
     // إنشاء خطر واحد
     const risk = await prisma.risk.create({
       data: {
@@ -454,10 +463,10 @@ export async function POST(request: NextRequest) {
           : null,
         status: body.status || 'open',
         approvalStatus: body.approvalStatus || 'Draft',
-        ownerId: body.ownerId,
+        ownerId: ownerId,
         riskOwnerId: body.riskOwnerId || null,
         championId: body.championId || null,
-        createdById: body.createdById || body.ownerId,
+        createdById: body.createdById || ownerId,
         mitigationActionsAr: body.mitigationActionsAr,
         mitigationActionsEn: body.mitigationActionsEn,
         followUpDate: body.followUpDate ? new Date(body.followUpDate) : null,
