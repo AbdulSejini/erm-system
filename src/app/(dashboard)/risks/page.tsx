@@ -1331,10 +1331,22 @@ export default function RisksPage() {
         complianceNoteAr: string;
       };
 
-      // توليد رقم خطر تلقائي - الحصول على كود الوظيفة من departmentId
+      // توليد رقم خطر تلقائي - الحصول على الرقم التسلسلي التالي من API
       const selectedDept = allDepartments.find(d => d.id === riskData.departmentId);
       const deptCode = selectedDept?.code || 'RISK';
-      const riskNumber = `${deptCode}-${String(Date.now()).slice(-3)}`;
+      let riskNumber = `${deptCode}-R-001`;
+      try {
+        const nextNumRes = await fetch(`/api/risks/next-number?deptCode=${encodeURIComponent(deptCode)}`);
+        if (nextNumRes.ok) {
+          const nextNumData = await nextNumRes.json();
+          if (nextNumData.success) {
+            riskNumber = nextNumData.data.nextNumber;
+          }
+        }
+      } catch {
+        // fallback to timestamp if API fails
+        riskNumber = `${deptCode}-R-${String(Date.now()).slice(-3)}`;
+      }
 
       const response = await fetch('/api/risks', {
         method: 'POST',

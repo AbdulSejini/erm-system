@@ -164,6 +164,9 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
   const [riskChampions, setRiskChampions] = useState<User[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
+  // رقم الخطر التالي
+  const [expectedRiskNumber, setExpectedRiskNumber] = useState<string>('');
+
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -219,6 +222,33 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
 
     fetchData();
   }, []);
+
+  // جلب رقم الخطر التالي عند تغيير الوظيفة
+  const fetchNextRiskNumber = useCallback(async (departmentId: string) => {
+    const dept = departments.find(d => d.id === departmentId);
+    if (!dept) {
+      setExpectedRiskNumber('');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/risks/next-number?deptCode=${encodeURIComponent(dept.code)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setExpectedRiskNumber(data.data.nextNumber);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching next risk number:', error);
+    }
+  }, [departments]);
+
+  // تحديث الرقم عند تغيير الوظيفة
+  useEffect(() => {
+    if (formData.departmentId && departments.length > 0) {
+      fetchNextRiskNumber(formData.departmentId);
+    }
+  }, [formData.departmentId, departments, fetchNextRiskNumber]);
 
   // Calculate risk score and rating
   const riskScore = useMemo(() =>
@@ -496,13 +526,13 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
       </div>
 
       {/* Auto-generated Risk Number Preview */}
-      {formData.categoryId && formData.departmentId && (
+      {formData.departmentId && expectedRiskNumber && (
         <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-4">
           <p className="mb-2 text-sm font-medium text-[var(--foreground-secondary)]">
             {isAr ? 'رقم الخطر المتوقع:' : 'Expected Risk Number:'}
           </p>
           <code className="rounded bg-[var(--background-tertiary)] px-3 py-1.5 text-lg font-mono">
-            {departments.find(d => d.id === formData.departmentId)?.code || 'XXX'}-{String(Math.floor(Math.random() * 100) + 1).padStart(3, '0')}
+            {expectedRiskNumber}
           </code>
           <p className="mt-2 text-xs text-[var(--foreground-muted)]">
             {t('risks.wizard.autoNumbering')}
