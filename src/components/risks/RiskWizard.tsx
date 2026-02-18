@@ -55,6 +55,14 @@ interface RiskOwnerType {
   departmentId?: string;
 }
 
+interface RiskSourceType {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  isActive: boolean;
+}
+
 interface User {
   id: string;
   fullName: string;
@@ -69,6 +77,7 @@ interface RiskFormData {
   descriptionAr: string;
   descriptionEn: string;
   issuedBy: string;
+  sourceId: string;
 
   // Step 2: Classification
   categoryId: string;
@@ -107,7 +116,8 @@ const initialFormData: RiskFormData = {
   titleEn: '',
   descriptionAr: '',
   descriptionEn: '',
-  issuedBy: 'Internal',
+  issuedBy: '',
+  sourceId: '',
   categoryId: '',
   departmentId: '',
   processText: '',
@@ -149,6 +159,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
   // Data from API
   const [categories, setCategories] = useState<RiskCategory[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [riskSources, setRiskSources] = useState<RiskSourceType[]>([]);
   const [riskOwners, setRiskOwners] = useState<RiskOwnerType[]>([]);
   const [riskChampions, setRiskChampions] = useState<User[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -176,6 +187,14 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
         if (deptRes.ok) {
           const deptData = await deptRes.json();
           setDepartments(deptData.data || []);
+        }
+
+        // Fetch risk sources (الجهة المصدرة)
+        const srcRes = await fetch('/api/sources');
+        if (srcRes.ok) {
+          const srcData = await srcRes.json();
+          const activeSources = (srcData.data || []).filter((s: RiskSourceType) => s.isActive);
+          setRiskSources(activeSources);
         }
 
         // Fetch risk owners from RiskOwner table
@@ -390,13 +409,19 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
       <div className="w-full sm:w-1/2">
         <Select
           label={t('risks.issuedBy')}
-          options={[
-            { value: 'Internal', label: t('risks.issuers.Internal') },
-            { value: 'KPMG', label: t('risks.issuers.KPMG') },
-            { value: 'External', label: t('risks.issuers.External') },
-          ]}
-          value={formData.issuedBy}
-          onChange={(value) => updateField('issuedBy', value)}
+          options={riskSources.map(src => ({
+            value: src.id,
+            label: isAr ? src.nameAr : src.nameEn,
+          }))}
+          value={formData.sourceId}
+          onChange={(value) => {
+            updateField('sourceId', value);
+            // تحديث issuedBy أيضاً للتوافق
+            const selectedSource = riskSources.find(s => s.id === value);
+            updateField('issuedBy', selectedSource?.code || '');
+          }}
+          placeholder={isAr ? 'اختر الجهة المصدرة' : 'Select Source'}
+          disabled={isLoadingData}
         />
       </div>
     </div>
@@ -822,6 +847,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
   const renderStep6 = () => {
     const selectedCategory = categories.find(c => c.id === formData.categoryId);
     const selectedDept = departments.find(d => d.id === formData.departmentId);
+    const selectedSource = riskSources.find(s => s.id === formData.sourceId);
     const selectedOwner = riskOwners.find(o => o.id === formData.riskOwnerId);
     const selectedChampion = riskChampions.find(u => u.id === formData.championId);
 
@@ -850,7 +876,9 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
               </div>
               <div>
                 <span className="text-[var(--foreground-secondary)]">{t('risks.issuedBy')}: </span>
-                <span className="font-medium">{t(`risks.issuers.${formData.issuedBy}`)}</span>
+                <span className="font-medium">
+                  {selectedSource ? (isAr ? selectedSource.nameAr : selectedSource.nameEn) : '-'}
+                </span>
               </div>
             </div>
           </Card>
