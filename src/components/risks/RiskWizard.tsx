@@ -22,12 +22,24 @@ import {
   calculateRiskScore,
   getRiskRating,
   getRiskRatingColor,
-  DEFAULT_RISK_CATEGORIES,
   DEFAULT_LIKELIHOOD_CRITERIA,
   DEFAULT_IMPACT_CRITERIA,
 } from '@/types';
 
 // Types for data from database
+interface RiskCategory {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr?: string | null;
+  descriptionEn?: string | null;
+  examplesAr?: string | null;
+  examplesEn?: string | null;
+  color?: string | null;
+  isActive: boolean;
+}
+
 interface Department {
   id: string;
   nameAr: string;
@@ -135,6 +147,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
   const [showGuidance, setShowGuidance] = useState(true);
 
   // Data from API
+  const [categories, setCategories] = useState<RiskCategory[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [riskOwners, setRiskOwners] = useState<RiskOwnerType[]>([]);
   const [riskChampions, setRiskChampions] = useState<User[]>([]);
@@ -150,6 +163,14 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     const fetchData = async () => {
       setIsLoadingData(true);
       try {
+        // Fetch categories from database
+        const catRes = await fetch('/api/categories');
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          const activeCategories = (catData.data || []).filter((c: RiskCategory) => c.isActive);
+          setCategories(activeCategories);
+        }
+
         // Fetch departments
         const deptRes = await fetch('/api/departments');
         if (deptRes.ok) {
@@ -392,20 +413,21 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
         <div>
           <Select
             label={`${t('risks.riskCategory')} *`}
-            options={DEFAULT_RISK_CATEGORIES.map(cat => ({
-              value: cat.code,
+            options={categories.map(cat => ({
+              value: cat.id,
               label: isAr ? cat.nameAr : cat.nameEn,
             }))}
             value={formData.categoryId}
             onChange={(value) => updateField('categoryId', value)}
             placeholder={isAr ? 'اختر فئة الخطر' : 'Select Risk Category'}
             error={errors.categoryId}
+            disabled={isLoadingData}
           />
           {formData.categoryId && (
             <p className="mt-1 text-xs text-[var(--foreground-secondary)]">
               {isAr
-                ? DEFAULT_RISK_CATEGORIES.find(c => c.code === formData.categoryId)?.examplesAr
-                : DEFAULT_RISK_CATEGORIES.find(c => c.code === formData.categoryId)?.examplesEn
+                ? categories.find(c => c.id === formData.categoryId)?.examplesAr
+                : categories.find(c => c.id === formData.categoryId)?.examplesEn
               }
             </p>
           )}
@@ -798,7 +820,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
   );
 
   const renderStep6 = () => {
-    const selectedCategory = DEFAULT_RISK_CATEGORIES.find(c => c.code === formData.categoryId);
+    const selectedCategory = categories.find(c => c.id === formData.categoryId);
     const selectedDept = departments.find(d => d.id === formData.departmentId);
     const selectedOwner = riskOwners.find(o => o.id === formData.riskOwnerId);
     const selectedChampion = riskChampions.find(u => u.id === formData.championId);
