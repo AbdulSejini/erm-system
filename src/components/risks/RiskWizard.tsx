@@ -455,7 +455,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
             {isAr ? 'رقم الخطر المتوقع:' : 'Expected Risk Number:'}
           </p>
           <code className="rounded bg-[var(--background-tertiary)] px-3 py-1.5 text-lg font-mono">
-            {formData.categoryId}-R-{String(Math.floor(Math.random() * 100) + 1).padStart(3, '0')}
+            {departments.find(d => d.id === formData.departmentId)?.code || 'XXX'}-{String(Math.floor(Math.random() * 100) + 1).padStart(3, '0')}
           </code>
           <p className="mt-2 text-xs text-[var(--foreground-muted)]">
             {t('risks.wizard.autoNumbering')}
