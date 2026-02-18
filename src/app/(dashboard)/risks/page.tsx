@@ -1356,7 +1356,9 @@ export default function RisksPage() {
           riskNumber,
           layersOfProtectionAr: riskData.existingControlsAr,
           layersOfProtectionEn: riskData.existingControlsEn,
-          ownerId: riskData.riskOwnerId, // للتوافق مع API الحالي
+          ownerId: currentUser?.id, // المستخدم الحالي (User table)
+          riskOwnerId: riskData.riskOwnerId, // مالك الخطر (RiskOwner table)
+          createdById: currentUser?.id,
           status: 'open',
           approvalStatus: 'Draft',
         }),
