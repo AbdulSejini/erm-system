@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - إنشاء التزام جديد (admin/riskManager فقط)
+// POST - إنشاء التزام جديد (admin/riskManager/riskAnalyst)
 export async function POST(request: NextRequest) {
   try {
     const clientIP = getClientIP(request);
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!['admin', 'riskManager'].includes(session.user.role)) {
+    if (!['admin', 'riskManager', 'riskAnalyst'].includes(session.user.role)) {
       return NextResponse.json({ success: false, error: 'ليس لديك صلاحية إنشاء التزامات' }, { status: 403 });
     }
 

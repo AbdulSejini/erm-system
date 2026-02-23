@@ -68,7 +68,7 @@ export default function CompliancePage() {
 
   const effectiveRole = (isImpersonating && impersonatedUser?.role)
     ? impersonatedUser.role : session?.user?.role;
-  const canCreate = effectiveRole && ['admin', 'riskManager'].includes(effectiveRole);
+  const canCreate = effectiveRole && ['admin', 'riskManager', 'riskAnalyst'].includes(effectiveRole);
 
   const [obligations, setObligations] = useState<Obligation[]>([]);
   const [domains, setDomains] = useState<ComplianceDomain[]>([]);
