@@ -102,7 +102,7 @@ export async function PATCH(
 
     const role = session.user.role;
 
-    // admin/riskManager = تعديل كامل, riskAnalyst = حالة ونسبة فقط
+    // admin/riskManager/riskAnalyst = تعديل كامل
     if (!['admin', 'riskManager', 'riskAnalyst'].includes(role)) {
       return NextResponse.json({ success: false, error: 'ليس لديك صلاحية تعديل الالتزامات' }, { status: 403 });
     }
@@ -115,57 +115,46 @@ export async function PATCH(
     const body = await request.json();
     const clientInfo = getClientInfo(request);
 
-    // riskAnalyst يمكنه تعديل الحالة والنسبة فقط
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let updateData: any = {};
 
-    if (role === 'riskAnalyst') {
-      const allowedFields = ['complianceStatus', 'completionPercentage', 'lastTestResult', 'lastTestDate', 'notesAr', 'notesEn'];
-      for (const field of allowedFields) {
-        if (body[field] !== undefined) {
-          updateData[field] = field.includes('Date') && body[field] ? new Date(body[field]) : body[field];
-        }
-      }
-    } else {
-      // admin/riskManager - تعديل كامل
-      const fields = [
-        'titleAr', 'titleEn',
-        'domainId', 'subDomainAr', 'subDomainEn',
-        'regulatoryReference', 'articleNumber',
-        'internalPolicyAr', 'internalPolicyEn', 'policyDocumentNumber',
-        'regulatoryBodyId', 'obligationType',
-        'responsibleDepartmentAr', 'responsibleDepartmentEn',
-        'directOwnerAr', 'directOwnerEn',
-        'backupOwnerAr', 'backupOwnerEn', 'defenseLine',
-        'recurrence', 'alertDaysBefore',
-        'criticalityLevel', 'nonComplianceLikelihood', 'nonComplianceImpact',
-        'potentialPenaltiesAr', 'potentialPenaltiesEn',
-        'complianceStatus', 'completionPercentage',
-        'controlActivitiesAr', 'controlActivitiesEn',
-        'testingMethod', 'lastTestResult',
-        'evidenceRequirementsAr', 'evidenceRequirementsEn',
-        'gapDescriptionAr', 'gapDescriptionEn',
-        'remediationPlanAr', 'remediationPlanEn',
-        'remediationOwnerAr', 'remediationOwnerEn', 'remediationStatus',
-        'linkedRiskNumbers', 'kpiKriAr', 'kpiKriEn',
-        'notesAr', 'notesEn',
-      ];
-      const dateFields = ['nextDueDate', 'lastReviewDate', 'nextReviewDate', 'lastTestDate', 'remediationTargetDate'];
+    const fields = [
+      'titleAr', 'titleEn',
+      'domainId', 'subDomainAr', 'subDomainEn',
+      'regulatoryReference', 'articleNumber',
+      'internalPolicyAr', 'internalPolicyEn', 'policyDocumentNumber',
+      'regulatoryBodyId', 'obligationType',
+      'responsibleDepartmentAr', 'responsibleDepartmentEn',
+      'directOwnerAr', 'directOwnerEn',
+      'backupOwnerAr', 'backupOwnerEn', 'defenseLine',
+      'recurrence', 'alertDaysBefore',
+      'criticalityLevel', 'nonComplianceLikelihood', 'nonComplianceImpact',
+      'potentialPenaltiesAr', 'potentialPenaltiesEn',
+      'complianceStatus', 'completionPercentage',
+      'controlActivitiesAr', 'controlActivitiesEn',
+      'testingMethod', 'lastTestResult',
+      'evidenceRequirementsAr', 'evidenceRequirementsEn',
+      'gapDescriptionAr', 'gapDescriptionEn',
+      'remediationPlanAr', 'remediationPlanEn',
+      'remediationOwnerAr', 'remediationOwnerEn', 'remediationStatus',
+      'linkedRiskNumbers', 'kpiKriAr', 'kpiKriEn',
+      'notesAr', 'notesEn',
+    ];
+    const dateFields = ['nextDueDate', 'lastReviewDate', 'nextReviewDate', 'lastTestDate', 'remediationTargetDate'];
 
-      for (const field of fields) {
-        if (body[field] !== undefined) updateData[field] = body[field];
-      }
-      for (const field of dateFields) {
-        if (body[field] !== undefined) updateData[field] = body[field] ? new Date(body[field]) : null;
-      }
+    for (const field of fields) {
+      if (body[field] !== undefined) updateData[field] = body[field];
+    }
+    for (const field of dateFields) {
+      if (body[field] !== undefined) updateData[field] = body[field] ? new Date(body[field]) : null;
+    }
 
-      // إعادة حساب درجة المخاطر
-      if (body.nonComplianceLikelihood !== undefined || body.nonComplianceImpact !== undefined) {
-        const likelihood = body.nonComplianceLikelihood ?? existing.nonComplianceLikelihood;
-        const impact = body.nonComplianceImpact ?? existing.nonComplianceImpact;
-        updateData.riskScore = likelihood * impact;
-        updateData.riskRating = calculateRiskRating(likelihood * impact);
-      }
+    // إعادة حساب درجة المخاطر
+    if (body.nonComplianceLikelihood !== undefined || body.nonComplianceImpact !== undefined) {
+      const likelihood = body.nonComplianceLikelihood ?? existing.nonComplianceLikelihood;
+      const impact = body.nonComplianceImpact ?? existing.nonComplianceImpact;
+      updateData.riskScore = likelihood * impact;
+      updateData.riskRating = calculateRiskRating(likelihood * impact);
     }
 
     const updated = await prisma.complianceObligation.update({

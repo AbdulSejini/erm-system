@@ -652,21 +652,17 @@ function EditModal({
     notesEn: obligation.notesEn || '',
   });
 
-  const isAnalyst = effectiveRole === 'riskAnalyst';
-
-  // riskAnalyst يرى فقط التابات اللي يقدر يعدلها
-  const allTabs = [
-    { key: 'general', label: t('compliance.generalInfo'), analystAccess: false },
-    { key: 'responsibility', label: t('compliance.responsibility'), analystAccess: false },
-    { key: 'dates', label: t('compliance.dates'), analystAccess: false },
-    { key: 'monitoring', label: t('compliance.statusAndMonitoring'), analystAccess: true },
-    { key: 'risk', label: t('compliance.riskDetails'), analystAccess: false },
-    { key: 'gap', label: t('compliance.gapAnalysis'), analystAccess: false },
-    { key: 'notes', label: t('compliance.notes'), analystAccess: true },
+  const tabs = [
+    { key: 'general', label: t('compliance.generalInfo') },
+    { key: 'responsibility', label: t('compliance.responsibility') },
+    { key: 'dates', label: t('compliance.dates') },
+    { key: 'monitoring', label: t('compliance.statusAndMonitoring') },
+    { key: 'risk', label: t('compliance.riskDetails') },
+    { key: 'gap', label: t('compliance.gapAnalysis') },
+    { key: 'notes', label: t('compliance.notes') },
   ];
 
-  const tabs = isAnalyst ? allTabs.filter(tab => tab.analystAccess) : allTabs;
-  const [activeTab, setActiveTab] = useState(isAnalyst ? 'monitoring' : 'general');
+  const [activeTab, setActiveTab] = useState('general');
 
   const handleChange = (field: string, value: unknown) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -697,17 +693,22 @@ function EditModal({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 px-6 py-2 border-b border-[var(--border)] overflow-x-auto">
-          {tabs.map(tab => (
+        <div className="flex gap-1 px-6 py-3 border-b border-[var(--border)] overflow-x-auto bg-[var(--muted)]/30">
+          {tabs.map((tab, index) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
                 activeTab === tab.key
-                  ? 'bg-[var(--primary)] text-white'
-                  : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)]'
+                  ? 'bg-[#F39200] text-white shadow-md shadow-[#F39200]/20'
+                  : 'text-[var(--foreground-secondary)] hover:bg-[var(--background)] hover:text-[var(--foreground)] border border-transparent hover:border-[var(--border)]'
               }`}
             >
+              <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                activeTab === tab.key
+                  ? 'bg-white/20 text-white'
+                  : 'bg-[var(--border)] text-[var(--foreground-secondary)]'
+              }`}>{index + 1}</span>
               {tab.label}
             </button>
           ))}
@@ -718,25 +719,21 @@ function EditModal({
           {activeTab === 'general' && (
             <div className="space-y-4">
               <FormField label={t('compliance.obligationTitle') + ' (AR)'} required>
-                <input value={form.titleAr} onChange={e => handleChange('titleAr', e.target.value)} disabled={isAnalyst}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                <input value={form.titleAr} onChange={e => handleChange('titleAr', e.target.value)}                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
               </FormField>
               <FormField label={t('compliance.obligationTitle') + ' (EN)'}>
-                <input value={form.titleEn} onChange={e => handleChange('titleEn', e.target.value)} disabled={isAnalyst}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                <input value={form.titleEn} onChange={e => handleChange('titleEn', e.target.value)}                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
               </FormField>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.obligationType')}>
-                  <select value={form.obligationType} onChange={e => handleChange('obligationType', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
+                  <select value={form.obligationType} onChange={e => handleChange('obligationType', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
                     <option value="mandatory">{t('compliance.mandatory')}</option>
                     <option value="optional">{t('compliance.optional')}</option>
                     <option value="advisory">{t('compliance.advisory')}</option>
                   </select>
                 </FormField>
                 <FormField label={t('compliance.criticalityLevel')}>
-                  <select value={form.criticalityLevel} onChange={e => handleChange('criticalityLevel', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
+                  <select value={form.criticalityLevel} onChange={e => handleChange('criticalityLevel', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
                     <option value="critical">{t('compliance.critical')}</option>
                     <option value="high">{t('compliance.high')}</option>
                     <option value="medium">{t('compliance.medium')}</option>
@@ -746,22 +743,18 @@ function EditModal({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.regulatoryReference')}>
-                  <input value={form.regulatoryReference} onChange={e => handleChange('regulatoryReference', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.regulatoryReference} onChange={e => handleChange('regulatoryReference', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.articleNumber')}>
-                  <input value={form.articleNumber} onChange={e => handleChange('articleNumber', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.articleNumber} onChange={e => handleChange('articleNumber', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.internalPolicy') + ' (AR)'}>
-                  <input value={form.internalPolicyAr} onChange={e => handleChange('internalPolicyAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.internalPolicyAr} onChange={e => handleChange('internalPolicyAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.policyDocumentNumber')}>
-                  <input value={form.policyDocumentNumber} onChange={e => handleChange('policyDocumentNumber', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.policyDocumentNumber} onChange={e => handleChange('policyDocumentNumber', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
             </div>
@@ -771,37 +764,30 @@ function EditModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.responsibleDepartment') + ' (AR)'}>
-                  <input value={form.responsibleDepartmentAr} onChange={e => handleChange('responsibleDepartmentAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.responsibleDepartmentAr} onChange={e => handleChange('responsibleDepartmentAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.responsibleDepartment') + ' (EN)'}>
-                  <input value={form.responsibleDepartmentEn} onChange={e => handleChange('responsibleDepartmentEn', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.responsibleDepartmentEn} onChange={e => handleChange('responsibleDepartmentEn', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.directOwner') + ' (AR)'}>
-                  <input value={form.directOwnerAr} onChange={e => handleChange('directOwnerAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.directOwnerAr} onChange={e => handleChange('directOwnerAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.directOwner') + ' (EN)'}>
-                  <input value={form.directOwnerEn} onChange={e => handleChange('directOwnerEn', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.directOwnerEn} onChange={e => handleChange('directOwnerEn', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.backupOwner') + ' (AR)'}>
-                  <input value={form.backupOwnerAr} onChange={e => handleChange('backupOwnerAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.backupOwnerAr} onChange={e => handleChange('backupOwnerAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.backupOwner') + ' (EN)'}>
-                  <input value={form.backupOwnerEn} onChange={e => handleChange('backupOwnerEn', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.backupOwnerEn} onChange={e => handleChange('backupOwnerEn', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
               <FormField label={t('compliance.defenseLine')}>
-                <select value={form.defenseLine} onChange={e => handleChange('defenseLine', e.target.value)} disabled={isAnalyst}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
+                <select value={form.defenseLine} onChange={e => handleChange('defenseLine', e.target.value)}                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
                   <option value="">{isAr ? 'اختر' : 'Select'}</option>
                   <option value="first">{t('compliance.firstLine')}</option>
                   <option value="second">{t('compliance.secondLine')}</option>
@@ -815,8 +801,7 @@ function EditModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.recurrence')}>
-                  <select value={form.recurrence} onChange={e => handleChange('recurrence', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
+                  <select value={form.recurrence} onChange={e => handleChange('recurrence', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
                     <option value="annual">{t('compliance.annual')}</option>
                     <option value="quarterly">{t('compliance.quarterly')}</option>
                     <option value="monthly">{t('compliance.monthly')}</option>
@@ -826,22 +811,18 @@ function EditModal({
                   </select>
                 </FormField>
                 <FormField label={t('compliance.alertDaysBefore')}>
-                  <input type="number" value={form.alertDaysBefore} onChange={e => handleChange('alertDaysBefore', parseInt(e.target.value))} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input type="number" value={form.alertDaysBefore} onChange={e => handleChange('alertDaysBefore', parseInt(e.target.value))}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <FormField label={t('compliance.nextDueDate')}>
-                  <input type="date" value={form.nextDueDate} onChange={e => handleChange('nextDueDate', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input type="date" value={form.nextDueDate} onChange={e => handleChange('nextDueDate', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.lastReviewDate')}>
-                  <input type="date" value={form.lastReviewDate} onChange={e => handleChange('lastReviewDate', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input type="date" value={form.lastReviewDate} onChange={e => handleChange('lastReviewDate', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.nextReviewDate')}>
-                  <input type="date" value={form.nextReviewDate} onChange={e => handleChange('nextReviewDate', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input type="date" value={form.nextReviewDate} onChange={e => handleChange('nextReviewDate', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
             </div>
@@ -865,8 +846,7 @@ function EditModal({
                 </FormField>
               </div>
               <FormField label={t('compliance.controlActivities') + ' (AR)'}>
-                <textarea rows={3} value={form.controlActivitiesAr} onChange={e => handleChange('controlActivitiesAr', e.target.value)} disabled={isAnalyst}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                <textarea rows={3} value={form.controlActivitiesAr} onChange={e => handleChange('controlActivitiesAr', e.target.value)}                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
               </FormField>
               <div className="grid grid-cols-3 gap-4">
                 <FormField label={t('compliance.testingMethod')}>
@@ -897,8 +877,7 @@ function EditModal({
                 </FormField>
               </div>
               <FormField label={t('compliance.evidenceRequirements') + ' (AR)'}>
-                <textarea rows={2} value={form.evidenceRequirementsAr} onChange={e => handleChange('evidenceRequirementsAr', e.target.value)} disabled={isAnalyst}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                <textarea rows={2} value={form.evidenceRequirementsAr} onChange={e => handleChange('evidenceRequirementsAr', e.target.value)}                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
               </FormField>
             </div>
           )}
@@ -907,14 +886,12 @@ function EditModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.nonComplianceLikelihood')}>
-                  <select value={form.nonComplianceLikelihood} onChange={e => handleChange('nonComplianceLikelihood', parseInt(e.target.value))} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
+                  <select value={form.nonComplianceLikelihood} onChange={e => handleChange('nonComplianceLikelihood', parseInt(e.target.value))}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
                     {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </FormField>
                 <FormField label={t('compliance.nonComplianceImpact')}>
-                  <select value={form.nonComplianceImpact} onChange={e => handleChange('nonComplianceImpact', parseInt(e.target.value))} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
+                  <select value={form.nonComplianceImpact} onChange={e => handleChange('nonComplianceImpact', parseInt(e.target.value))}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
                     {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </FormField>
@@ -925,12 +902,10 @@ function EditModal({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.potentialPenalties') + ' (AR)'}>
-                  <textarea rows={2} value={form.potentialPenaltiesAr} onChange={e => handleChange('potentialPenaltiesAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <textarea rows={2} value={form.potentialPenaltiesAr} onChange={e => handleChange('potentialPenaltiesAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.potentialPenalties') + ' (EN)'}>
-                  <textarea rows={2} value={form.potentialPenaltiesEn} onChange={e => handleChange('potentialPenaltiesEn', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <textarea rows={2} value={form.potentialPenaltiesEn} onChange={e => handleChange('potentialPenaltiesEn', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
             </div>
@@ -940,36 +915,29 @@ function EditModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.gapDescription') + ' (AR)'}>
-                  <textarea rows={3} value={form.gapDescriptionAr} onChange={e => handleChange('gapDescriptionAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <textarea rows={3} value={form.gapDescriptionAr} onChange={e => handleChange('gapDescriptionAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.gapDescription') + ' (EN)'}>
-                  <textarea rows={3} value={form.gapDescriptionEn} onChange={e => handleChange('gapDescriptionEn', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <textarea rows={3} value={form.gapDescriptionEn} onChange={e => handleChange('gapDescriptionEn', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.remediationPlan') + ' (AR)'}>
-                  <textarea rows={3} value={form.remediationPlanAr} onChange={e => handleChange('remediationPlanAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <textarea rows={3} value={form.remediationPlanAr} onChange={e => handleChange('remediationPlanAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.remediationPlan') + ' (EN)'}>
-                  <textarea rows={3} value={form.remediationPlanEn} onChange={e => handleChange('remediationPlanEn', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <textarea rows={3} value={form.remediationPlanEn} onChange={e => handleChange('remediationPlanEn', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <FormField label={t('compliance.remediationTargetDate')}>
-                  <input type="date" value={form.remediationTargetDate} onChange={e => handleChange('remediationTargetDate', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input type="date" value={form.remediationTargetDate} onChange={e => handleChange('remediationTargetDate', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.remediationOwner') + ' (AR)'}>
-                  <input value={form.remediationOwnerAr} onChange={e => handleChange('remediationOwnerAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <input value={form.remediationOwnerAr} onChange={e => handleChange('remediationOwnerAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.remediationStatus')}>
-                  <select value={form.remediationStatus} onChange={e => handleChange('remediationStatus', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
+                  <select value={form.remediationStatus} onChange={e => handleChange('remediationStatus', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50">
                     <option value="notApplicable">{t('compliance.notApplicable')}</option>
                     <option value="notStarted">{t('compliance.notStarted')}</option>
                     <option value="inProgress">{t('compliance.inProgress')}</option>
@@ -984,12 +952,10 @@ function EditModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <FormField label={t('compliance.kpiKri') + ' (AR)'}>
-                  <textarea rows={3} value={form.kpiKriAr} onChange={e => handleChange('kpiKriAr', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <textarea rows={3} value={form.kpiKriAr} onChange={e => handleChange('kpiKriAr', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
                 <FormField label={t('compliance.kpiKri') + ' (EN)'}>
-                  <textarea rows={3} value={form.kpiKriEn} onChange={e => handleChange('kpiKriEn', e.target.value)} disabled={isAnalyst}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
+                  <textarea rows={3} value={form.kpiKriEn} onChange={e => handleChange('kpiKriEn', e.target.value)}                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-[var(--foreground)] disabled:opacity-50" />
                 </FormField>
               </div>
               <div className="grid grid-cols-2 gap-4">
