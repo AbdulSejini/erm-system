@@ -26,6 +26,7 @@ import {
   Activity,
   CheckSquare,
   ShieldCheck,
+  CalendarDays,
 } from 'lucide-react';
 
 interface OnlineUser {
@@ -80,6 +81,7 @@ const navGroups: NavGroup[] = [
     labelKey: 'navigation.groupComplianceIncidents',
     items: [
       { href: '/compliance', labelKey: 'navigation.compliance', icon: ShieldCheck },
+      { href: '/compliance/calendar', labelKey: 'navigation.complianceCalendar', icon: CalendarDays },
       { href: '/incidents', labelKey: 'navigation.incidents', icon: AlertCircle },
     ],
   },
