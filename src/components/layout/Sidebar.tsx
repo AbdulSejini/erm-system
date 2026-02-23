@@ -157,11 +157,17 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
     };
   }, [canSeeOnlineUsers]);
 
-  // Send heartbeat to mark user as active (pauses when tab is hidden)
+  // Send heartbeat only when user is actively using the site
   useEffect(() => {
     if (!session?.user?.id) return;
 
+    let isActive = false;
+
+    const markActive = () => { isActive = true; };
+
     const sendHeartbeat = async () => {
+      if (!isActive) return;
+      isActive = false;
       try {
         await fetch('/api/users/online', { method: 'POST' });
       } catch (error) {
@@ -169,22 +175,19 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
       }
     };
 
-    sendHeartbeat();
-    let interval = setInterval(sendHeartbeat, 10 * 60 * 1000);
+    // Track actual user activity
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(e => document.addEventListener(e, markActive));
 
-    const handleVisibility = () => {
-      if (document.hidden) {
-        clearInterval(interval);
-      } else {
-        sendHeartbeat();
-        interval = setInterval(sendHeartbeat, 10 * 60 * 1000);
-      }
-    };
+    // Send initial heartbeat on load (user just opened the page = active)
+    fetch('/api/users/online', { method: 'POST' }).catch(() => {});
 
-    document.addEventListener('visibilitychange', handleVisibility);
+    // Check every 5 min: only send if user was active
+    const interval = setInterval(sendHeartbeat, 5 * 60 * 1000);
+
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
+      events.forEach(e => document.removeEventListener(e, markActive));
     };
   }, [session?.user?.id]);
 
