@@ -652,8 +652,21 @@ function EditModal({
     notesEn: obligation.notesEn || '',
   });
 
-  const [activeTab, setActiveTab] = useState('general');
   const isAnalyst = effectiveRole === 'riskAnalyst';
+
+  // riskAnalyst يرى فقط التابات اللي يقدر يعدلها
+  const allTabs = [
+    { key: 'general', label: t('compliance.generalInfo'), analystAccess: false },
+    { key: 'responsibility', label: t('compliance.responsibility'), analystAccess: false },
+    { key: 'dates', label: t('compliance.dates'), analystAccess: false },
+    { key: 'monitoring', label: t('compliance.statusAndMonitoring'), analystAccess: true },
+    { key: 'risk', label: t('compliance.riskDetails'), analystAccess: false },
+    { key: 'gap', label: t('compliance.gapAnalysis'), analystAccess: false },
+    { key: 'notes', label: t('compliance.notes'), analystAccess: true },
+  ];
+
+  const tabs = isAnalyst ? allTabs.filter(tab => tab.analystAccess) : allTabs;
+  const [activeTab, setActiveTab] = useState(isAnalyst ? 'monitoring' : 'general');
 
   const handleChange = (field: string, value: unknown) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -663,16 +676,6 @@ function EditModal({
     e.preventDefault();
     onSave(form);
   };
-
-  const tabs = [
-    { key: 'general', label: t('compliance.generalInfo') },
-    { key: 'responsibility', label: t('compliance.responsibility') },
-    { key: 'dates', label: t('compliance.dates') },
-    { key: 'monitoring', label: t('compliance.statusAndMonitoring') },
-    { key: 'risk', label: t('compliance.riskDetails') },
-    { key: 'gap', label: t('compliance.gapAnalysis') },
-    { key: 'notes', label: t('compliance.notes') },
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
