@@ -176,11 +176,31 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     }
   }, [previousUnreadCount, unreadCount]);
 
-  // Fetch notifications on mount and every 30 seconds
+  // Fetch notifications on mount and every 60 seconds (pauses when tab is hidden)
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval>;
+
+    const startPolling = () => {
+      interval = setInterval(fetchNotifications, 60000);
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        fetchNotifications();
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [fetchNotifications]);
 
   // Mark all as read

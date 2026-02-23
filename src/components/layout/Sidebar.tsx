@@ -122,7 +122,7 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
   // Check if user has permission to see online users (based on effective role)
   const canSeeOnlineUsers = effectiveRole && ['admin', 'riskManager'].includes(effectiveRole);
 
-  // Fetch online users
+  // Fetch online users (pauses when tab is hidden)
   useEffect(() => {
     if (!canSeeOnlineUsers) return;
 
@@ -138,16 +138,26 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
       }
     };
 
-    // Initial fetch
     fetchOnlineUsers();
+    let interval = setInterval(fetchOnlineUsers, 60000);
 
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchOnlineUsers, 30000);
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        fetchOnlineUsers();
+        interval = setInterval(fetchOnlineUsers, 60000);
+      }
+    };
 
-    return () => clearInterval(interval);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [canSeeOnlineUsers]);
 
-  // Send heartbeat to mark user as active
+  // Send heartbeat to mark user as active (pauses when tab is hidden)
   useEffect(() => {
     if (!session?.user?.id) return;
 
@@ -159,13 +169,23 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
       }
     };
 
-    // Send heartbeat every 2 minutes
-    const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
-
-    // Initial heartbeat
     sendHeartbeat();
+    let interval = setInterval(sendHeartbeat, 3 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        sendHeartbeat();
+        interval = setInterval(sendHeartbeat, 3 * 60 * 1000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [session?.user?.id]);
 
   // Get role label

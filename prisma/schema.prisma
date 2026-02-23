@@ -62,6 +62,8 @@ model User {
   complianceAssessments      ComplianceAssessment[]   @relation("ComplianceAssessor")
   complianceRiskLinks        ComplianceRiskLink[]     @relation("ComplianceRiskLinker")
   createdObligations         ComplianceObligation[]   @relation("ComplianceObligationCreator")
+
+  @@index([status, lastLogin])
 }
 
 // صلاحيات اطلاع المستخدم على الإدارات
@@ -312,6 +314,10 @@ model TreatmentPlan {
   residualRiskChangeRequests ResidualRiskChangeRequest[] // طلبات تغيير الخطر المتبقي المرتبطة
   changeLogs  TreatmentPlanChangeLog[] // سجل التعديلات
   discussions TreatmentDiscussion[]    // المناقشات
+
+  @@index([riskId])
+  @@index([status, priority, dueDate])
+  @@index([responsibleId])
 }
 
 // مهام المعالجة
@@ -446,6 +452,9 @@ model Notification {
 
   // العلاقات
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
 }
 
 // سجل التدقيق

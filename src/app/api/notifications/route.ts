@@ -17,21 +17,33 @@ export async function GET(request: NextRequest) {
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    const notifications = await prisma.notification.findMany({
-      where: {
-        userId: session.user.id,
-        ...(unreadOnly ? { isRead: false } : {})
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit
-    });
-
-    const unreadCount = await prisma.notification.count({
-      where: {
-        userId: session.user.id,
-        isRead: false
-      }
-    });
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where: {
+          userId: session.user.id,
+          ...(unreadOnly ? { isRead: false } : {})
+        },
+        select: {
+          id: true,
+          type: true,
+          titleAr: true,
+          titleEn: true,
+          messageAr: true,
+          messageEn: true,
+          link: true,
+          isRead: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit
+      }),
+      prisma.notification.count({
+        where: {
+          userId: session.user.id,
+          isRead: false
+        }
+      })
+    ]);
 
     return NextResponse.json({
       success: true,

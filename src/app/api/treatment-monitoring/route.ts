@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     let effectiveUserRole = session.user.role || 'employee';
     let effectiveUserEmail = session.user.email || '';
 
-    // التحقق من صلاحية الانتحال
+    // التحقق من صلاحية الانتحال + البحث عن مالك الخطر في استعلام واحد
     if (impersonateUserId && session.user.role === 'admin') {
       const impersonatedUser = await prisma.user.findUnique({
         where: { id: impersonateUserId },
@@ -33,11 +33,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // البحث عن مالك الخطر المرتبط بهذا المستخدم عبر البريد
-    const userRiskOwner = await prisma.riskOwner.findFirst({
-      where: { email: effectiveUserEmail },
-      select: { id: true },
-    });
+    // البحث عن مالك الخطر - فقط إذا المستخدم ليس admin/riskManager/riskAnalyst
+    const needsFiltering = !['admin', 'riskManager', 'riskAnalyst'].includes(effectiveUserRole);
+    const userRiskOwner = needsFiltering
+      ? await prisma.riskOwner.findFirst({
+          where: { email: effectiveUserEmail },
+          select: { id: true },
+        })
+      : null;
 
     // جلب جميع خطط المعالجة مع التفاصيل الكاملة
     const allTreatmentPlans = await prisma.treatmentPlan.findMany({
@@ -122,13 +125,24 @@ export async function GET(request: NextRequest) {
           },
         },
         tasks: {
-          include: {
+          select: {
+            id: true,
+            titleAr: true,
+            titleEn: true,
+            status: true,
+            priority: true,
+            dueDate: true,
+            completionDate: true,
+            order: true,
+            assignedToId: true,
+            monitorId: true,
+            actionOwnerId: true,
+            monitorOwnerId: true,
             assignedTo: {
               select: {
                 id: true,
                 fullName: true,
                 fullNameEn: true,
-                avatar: true,
                 email: true,
               },
             },

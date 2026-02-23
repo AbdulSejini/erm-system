@@ -147,11 +147,21 @@ export async function GET(request: NextRequest) {
     const risks = await prisma.risk.findMany({
       where,
       include: {
-        category: true,
-        department: true,
-        source: true,
+        category: {
+          select: { id: true, nameAr: true, nameEn: true, color: true },
+        },
+        department: {
+          select: { id: true, nameAr: true, nameEn: true },
+        },
+        source: {
+          select: { id: true, nameAr: true, nameEn: true },
+        },
         riskOwner: {
-          include: {
+          select: {
+            id: true,
+            fullName: true,
+            fullNameEn: true,
+            email: true,
             department: {
               select: {
                 id: true,
