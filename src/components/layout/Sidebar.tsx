@@ -170,14 +170,14 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
     };
 
     sendHeartbeat();
-    let interval = setInterval(sendHeartbeat, 3 * 60 * 1000);
+    let interval = setInterval(sendHeartbeat, 10 * 60 * 1000);
 
     const handleVisibility = () => {
       if (document.hidden) {
         clearInterval(interval);
       } else {
         sendHeartbeat();
-        interval = setInterval(sendHeartbeat, 3 * 60 * 1000);
+        interval = setInterval(sendHeartbeat, 10 * 60 * 1000);
       }
     };
 

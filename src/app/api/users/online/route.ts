@@ -12,14 +12,14 @@ export async function GET() {
       return NextResponse.json({ users: [] });
     }
 
-    // Consider users online if they logged in within the last 5 minutes
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    // Consider users online if they logged in within the last 10 minutes
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
 
     const onlineUsers = await prisma.user.findMany({
       where: {
         status: 'active',
         lastLogin: {
-          gte: fiveMinutesAgo,
+          gte: tenMinutesAgo,
         },
       },
       select: {
