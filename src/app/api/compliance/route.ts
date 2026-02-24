@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!['admin', 'riskManager', 'riskAnalyst'].includes(session.user.role)) {
+    if (!['admin', 'riskManager', 'riskAnalyst', 'riskChampion'].includes(session.user.role)) {
       return NextResponse.json({ success: false, error: 'ليس لديك صلاحية إنشاء التزامات' }, { status: 403 });
     }
 
