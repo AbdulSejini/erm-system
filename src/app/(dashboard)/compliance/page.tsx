@@ -74,6 +74,8 @@ export default function CompliancePage() {
   const [domains, setDomains] = useState<ComplianceDomain[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -141,6 +143,34 @@ export default function CompliancePage() {
       console.error('Error seeding:', error);
     } finally {
       setSeeding(false);
+    }
+  };
+
+  const handleCreate = async (formData: Record<string, unknown>) => {
+    setSaving(true);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (isImpersonating && impersonatedUser?.id) {
+        headers['X-Impersonate-User-Id'] = impersonatedUser.id;
+      }
+      const res = await fetch('/api/compliance', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowCreateModal(false);
+        fetchObligations();
+        router.push(`/compliance/${data.data.id}`);
+      } else {
+        alert(data.error || (isAr ? 'حدث خطأ' : 'An error occurred'));
+      }
+    } catch (error) {
+      console.error('Error creating obligation:', error);
+      alert(isAr ? 'حدث خطأ في الاتصال' : 'Connection error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -217,7 +247,7 @@ export default function CompliancePage() {
 
           {canCreate && (
             <button
-              onClick={() => {/* TODO: Add obligation modal */}}
+              onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors text-sm"
             >
               <Plus className="h-4 w-4" />
@@ -433,6 +463,305 @@ export default function CompliancePage() {
           </table>
         </div>
       )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <CreateModal
+          domains={domains}
+          onSave={handleCreate}
+          onClose={() => setShowCreateModal(false)}
+          saving={saving}
+          t={t}
+          isAr={isAr}
+        />
+      )}
+    </div>
+  );
+}
+
+// --- Create Modal ---
+function CreateModal({
+  domains,
+  onSave,
+  onClose,
+  saving,
+  t,
+  isAr,
+}: {
+  domains: ComplianceDomain[];
+  onSave: (data: Record<string, unknown>) => void;
+  onClose: () => void;
+  saving: boolean;
+  t: (key: string) => string;
+  isAr: boolean;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [form, setForm] = useState<Record<string, any>>({
+    titleAr: '',
+    titleEn: '',
+    domainId: '',
+    subDomainAr: '',
+    subDomainEn: '',
+    obligationType: 'mandatory',
+    criticalityLevel: 'medium',
+    responsibleDepartmentAr: '',
+    responsibleDepartmentEn: '',
+    directOwnerAr: '',
+    directOwnerEn: '',
+    backupOwnerAr: '',
+    backupOwnerEn: '',
+    defenseLine: '',
+    recurrence: 'annual',
+    nextDueDate: '',
+    alertDaysBefore: 30,
+    regulatoryReference: '',
+    articleNumber: '',
+    internalPolicyAr: '',
+    internalPolicyEn: '',
+    policyDocumentNumber: '',
+    complianceStatus: 'notAssessed',
+    completionPercentage: 0,
+    nonComplianceLikelihood: 1,
+    nonComplianceImpact: 1,
+    notesAr: '',
+    notesEn: '',
+  });
+
+  const tabs = [
+    { key: 'general', label: isAr ? 'المعلومات الأساسية' : 'Basic Info' },
+    { key: 'responsibility', label: isAr ? 'المسؤولية' : 'Responsibility' },
+    { key: 'dates', label: isAr ? 'التواريخ' : 'Dates' },
+    { key: 'risk', label: isAr ? 'المخاطر' : 'Risk' },
+    { key: 'notes', label: isAr ? 'ملاحظات' : 'Notes' },
+  ];
+
+  const [activeTab, setActiveTab] = useState('general');
+
+  const handleChange = (field: string, value: unknown) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.titleAr && !form.titleEn) {
+      alert(isAr ? 'عنوان الالتزام مطلوب (عربي أو إنجليزي)' : 'Obligation title is required (Arabic or English)');
+      return;
+    }
+    if (!form.domainId) {
+      alert(isAr ? 'المجال مطلوب' : 'Domain is required');
+      return;
+    }
+    onSave(form);
+  };
+
+  const inputClass = "w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[#F39200]/30 focus:border-[#F39200] outline-none transition-all";
+  const labelClass = "block text-xs font-semibold text-[var(--foreground-secondary)] mb-1";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-[var(--background)] rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+              <Plus className="h-4 w-4" />
+            </div>
+            <h2 className="text-lg font-bold text-[var(--foreground)]">{t('compliance.addObligation')}</h2>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--background-tertiary)] transition-colors">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 px-6 py-3 border-b border-[var(--border)] overflow-x-auto bg-[var(--muted)]/30">
+          {tabs.map((tab, index) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                activeTab === tab.key
+                  ? 'bg-[#F39200] text-white shadow-md shadow-[#F39200]/20'
+                  : 'text-[var(--foreground-secondary)] hover:bg-[var(--background)] hover:text-[var(--foreground)] border border-transparent hover:border-[var(--border)]'
+              }`}
+            >
+              <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-[var(--border)] text-[var(--foreground-secondary)]'
+              }`}>{index + 1}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
+          {activeTab === 'general' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className={labelClass}>{isAr ? 'العنوان بالعربي' : 'Title (Arabic)'} *</label>
+                <input className={inputClass} value={form.titleAr} onChange={e => handleChange('titleAr', e.target.value)} dir="rtl" />
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelClass}>{isAr ? 'العنوان بالإنجليزي' : 'Title (English)'}</label>
+                <input className={inputClass} value={form.titleEn} onChange={e => handleChange('titleEn', e.target.value)} dir="ltr" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'المجال' : 'Domain'} *</label>
+                <select className={inputClass} value={form.domainId} onChange={e => handleChange('domainId', e.target.value)}>
+                  <option value="">{isAr ? '-- اختر المجال --' : '-- Select Domain --'}</option>
+                  {domains.map(d => (
+                    <option key={d.id} value={d.id}>{isAr ? d.nameAr : d.nameEn}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'نوع الالتزام' : 'Obligation Type'}</label>
+                <select className={inputClass} value={form.obligationType} onChange={e => handleChange('obligationType', e.target.value)}>
+                  <option value="mandatory">{isAr ? 'إلزامي' : 'Mandatory'}</option>
+                  <option value="advisory">{isAr ? 'استشاري' : 'Advisory'}</option>
+                  <option value="bestPractice">{isAr ? 'أفضل الممارسات' : 'Best Practice'}</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'مستوى الأهمية' : 'Criticality Level'}</label>
+                <select className={inputClass} value={form.criticalityLevel} onChange={e => handleChange('criticalityLevel', e.target.value)}>
+                  <option value="critical">{isAr ? 'حرج' : 'Critical'}</option>
+                  <option value="high">{isAr ? 'عالي' : 'High'}</option>
+                  <option value="medium">{isAr ? 'متوسط' : 'Medium'}</option>
+                  <option value="low">{isAr ? 'منخفض' : 'Low'}</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'المجال الفرعي بالعربي' : 'Sub-Domain (Arabic)'}</label>
+                <input className={inputClass} value={form.subDomainAr} onChange={e => handleChange('subDomainAr', e.target.value)} dir="rtl" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'المرجع التنظيمي' : 'Regulatory Reference'}</label>
+                <input className={inputClass} value={form.regulatoryReference} onChange={e => handleChange('regulatoryReference', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'رقم المادة' : 'Article Number'}</label>
+                <input className={inputClass} value={form.articleNumber} onChange={e => handleChange('articleNumber', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'السياسة الداخلية' : 'Internal Policy'}</label>
+                <input className={inputClass} value={form.internalPolicyAr} onChange={e => handleChange('internalPolicyAr', e.target.value)} dir="rtl" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'رقم وثيقة السياسة' : 'Policy Document #'}</label>
+                <input className={inputClass} value={form.policyDocumentNumber} onChange={e => handleChange('policyDocumentNumber', e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'responsibility' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>{isAr ? 'الإدارة المسؤولة (عربي)' : 'Responsible Dept (AR)'}</label>
+                <input className={inputClass} value={form.responsibleDepartmentAr} onChange={e => handleChange('responsibleDepartmentAr', e.target.value)} dir="rtl" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'الإدارة المسؤولة (إنجليزي)' : 'Responsible Dept (EN)'}</label>
+                <input className={inputClass} value={form.responsibleDepartmentEn} onChange={e => handleChange('responsibleDepartmentEn', e.target.value)} dir="ltr" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'المالك المباشر (عربي)' : 'Direct Owner (AR)'}</label>
+                <input className={inputClass} value={form.directOwnerAr} onChange={e => handleChange('directOwnerAr', e.target.value)} dir="rtl" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'المالك المباشر (إنجليزي)' : 'Direct Owner (EN)'}</label>
+                <input className={inputClass} value={form.directOwnerEn} onChange={e => handleChange('directOwnerEn', e.target.value)} dir="ltr" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'المالك البديل (عربي)' : 'Backup Owner (AR)'}</label>
+                <input className={inputClass} value={form.backupOwnerAr} onChange={e => handleChange('backupOwnerAr', e.target.value)} dir="rtl" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'المالك البديل (إنجليزي)' : 'Backup Owner (EN)'}</label>
+                <input className={inputClass} value={form.backupOwnerEn} onChange={e => handleChange('backupOwnerEn', e.target.value)} dir="ltr" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'خط الدفاع' : 'Defense Line'}</label>
+                <select className={inputClass} value={form.defenseLine} onChange={e => handleChange('defenseLine', e.target.value)}>
+                  <option value="">{isAr ? '-- اختر --' : '-- Select --'}</option>
+                  <option value="first">{isAr ? 'خط الدفاع الأول' : 'First Line'}</option>
+                  <option value="second">{isAr ? 'خط الدفاع الثاني' : 'Second Line'}</option>
+                  <option value="third">{isAr ? 'خط الدفاع الثالث' : 'Third Line'}</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'dates' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>{isAr ? 'التكرار' : 'Recurrence'}</label>
+                <select className={inputClass} value={form.recurrence} onChange={e => handleChange('recurrence', e.target.value)}>
+                  <option value="annual">{isAr ? 'سنوي' : 'Annual'}</option>
+                  <option value="semiAnnual">{isAr ? 'نصف سنوي' : 'Semi-Annual'}</option>
+                  <option value="quarterly">{isAr ? 'ربع سنوي' : 'Quarterly'}</option>
+                  <option value="monthly">{isAr ? 'شهري' : 'Monthly'}</option>
+                  <option value="asNeeded">{isAr ? 'حسب الحاجة' : 'As Needed'}</option>
+                  <option value="oneTime">{isAr ? 'مرة واحدة' : 'One Time'}</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'تاريخ الاستحقاق القادم' : 'Next Due Date'}</label>
+                <input type="date" className={inputClass} value={form.nextDueDate} onChange={e => handleChange('nextDueDate', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'التنبيه قبل (أيام)' : 'Alert Days Before'}</label>
+                <input type="number" className={inputClass} value={form.alertDaysBefore} onChange={e => handleChange('alertDaysBefore', parseInt(e.target.value) || 30)} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'risk' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>{isAr ? 'احتمالية عدم الالتزام' : 'Non-Compliance Likelihood'} (1-5)</label>
+                <input type="number" min="1" max="5" className={inputClass} value={form.nonComplianceLikelihood} onChange={e => handleChange('nonComplianceLikelihood', parseInt(e.target.value) || 1)} />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'أثر عدم الالتزام' : 'Non-Compliance Impact'} (1-5)</label>
+                <input type="number" min="1" max="5" className={inputClass} value={form.nonComplianceImpact} onChange={e => handleChange('nonComplianceImpact', parseInt(e.target.value) || 1)} />
+              </div>
+              <div className="md:col-span-2 p-3 rounded-lg bg-[var(--background-tertiary)]">
+                <span className={labelClass}>{isAr ? 'درجة المخاطرة' : 'Risk Score'}: </span>
+                <span className="text-lg font-bold text-[#F39200]">{(form.nonComplianceLikelihood || 1) * (form.nonComplianceImpact || 1)}</span>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className={labelClass}>{isAr ? 'ملاحظات (عربي)' : 'Notes (Arabic)'}</label>
+                <textarea rows={3} className={inputClass} value={form.notesAr} onChange={e => handleChange('notesAr', e.target.value)} dir="rtl" />
+              </div>
+              <div>
+                <label className={labelClass}>{isAr ? 'ملاحظات (إنجليزي)' : 'Notes (English)'}</label>
+                <textarea rows={3} className={inputClass} value={form.notesEn} onChange={e => handleChange('notesEn', e.target.value)} dir="ltr" />
+              </div>
+            </div>
+          )}
+        </form>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border)]">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)] transition-colors">
+            {isAr ? 'إلغاء' : 'Cancel'}
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium bg-[#F39200] text-white hover:bg-[#e08600] transition-colors disabled:opacity-50"
+          >
+            {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {saving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'إنشاء الالتزام' : 'Create Obligation')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
