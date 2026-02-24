@@ -264,7 +264,7 @@ export default function IncidentsPage() {
                     </td>
                     <td className="p-2 sm:p-3 md:p-4 text-xs sm:text-sm text-[var(--foreground-secondary)] hidden sm:table-cell">
                       {new Date(incident.incidentDate).toLocaleDateString(
-                        isAr ? 'ar-SA' : 'en-US'
+                        isAr ? 'ar-SA-u-ca-gregory' : 'en-US'
                       )}
                     </td>
                     <td className="p-2 sm:p-3 md:p-4">

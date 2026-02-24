@@ -1031,7 +1031,7 @@ export default function ChampionsPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    <span>{new Date(champion.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+                    <span>{new Date(champion.createdAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
                   </div>
                 </div>
 

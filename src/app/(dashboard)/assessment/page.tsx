@@ -886,7 +886,7 @@ export default function AssessmentPage() {
                       <td className="p-2 sm:p-3 md:p-4">
                         <span className="text-[10px] sm:text-xs text-[var(--foreground-secondary)]">
                           {new Date(assessment.nextReviewDate).toLocaleDateString(
-                            isAr ? 'ar-SA' : 'en-US'
+                            isAr ? 'ar-SA-u-ca-gregory' : 'en-US'
                           )}
                         </span>
                       </td>
@@ -1047,7 +1047,7 @@ export default function AssessmentPage() {
                             {isAr ? 'تاريخ المراجعة القادمة' : 'Next Review Date'}
                           </div>
                           <p className="font-medium text-[var(--foreground)]">
-                            {new Date(selectedAssessment.nextReviewDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                            {new Date(selectedAssessment.nextReviewDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                           </p>
                         </div>
                       </div>
@@ -1213,7 +1213,7 @@ export default function AssessmentPage() {
                             </p>
                           </div>
                           <span className="text-xs text-[var(--foreground-muted)]">
-                            {new Date(log.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                            {new Date(log.createdAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                           </span>
                         </div>
                         {(log.oldValue || log.newValue) && (

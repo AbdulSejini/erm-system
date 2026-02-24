@@ -898,7 +898,7 @@ export default function TreatmentDetailPage() {
     if (minutes < 60) return isAr ? `منذ ${minutes} دقيقة` : `${minutes}m ago`;
     if (hours < 24) return isAr ? `منذ ${hours} ساعة` : `${hours}h ago`;
     if (days < 7) return isAr ? `منذ ${days} يوم` : `${days}d ago`;
-    return date.toLocaleDateString(isAr ? 'ar-SA' : 'en-US');
+    return date.toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US');
   };
 
   const stepStatusConfig = {
@@ -1114,14 +1114,14 @@ export default function TreatmentDetailPage() {
                     <Calendar className="h-5 w-5 text-gray-500" />
                     <div>
                       <p className="text-xs text-gray-500">{isAr ? 'تاريخ البدء' : 'Start Date'}</p>
-                      <p className="font-medium text-sm">{new Date(treatment.startDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</p>
+                      <p className="font-medium text-sm">{new Date(treatment.startDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50">
                     <Clock className="h-5 w-5 text-gray-500" />
                     <div>
                       <p className="text-xs text-gray-500">{isAr ? 'الموعد النهائي' : 'Due Date'}</p>
-                      <p className="font-medium text-sm">{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</p>
+                      <p className="font-medium text-sm">{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</p>
                     </div>
                   </div>
                 </div>
@@ -1267,7 +1267,7 @@ export default function TreatmentDetailPage() {
                             {task.dueDate && (
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4" />
-                                <span>{new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+                                <span>{new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
                               </div>
                             )}
                             {task.oneDriveUrl && (

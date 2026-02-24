@@ -1349,7 +1349,7 @@ Risk Management Team`;
                     </div>
                     <div className={`flex items-center gap-1.5 text-xs ${treatment.status === 'overdue' ? 'text-rose-500 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>
                       <Calendar className="h-3.5 w-3.5" />
-                      <span>{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
+                      <span>{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { month: 'short', day: 'numeric' })}</span>
                     </div>
                   </div>
 
@@ -2405,7 +2405,7 @@ Risk Management Team`;
               <div className="p-3 rounded-lg bg-[var(--background-secondary)]">
                 <p className="text-xs text-[var(--foreground-secondary)]">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
                 <p className="font-medium mt-1">
-                  {new Date(selectedTreatment.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                  {new Date(selectedTreatment.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                 </p>
               </div>
             </div>

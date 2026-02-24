@@ -864,7 +864,7 @@ export default function RiskTrackingPage() {
                               {risk.followUpDate && (
                                 <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-medium' : ''}`}>
                                   <Calendar className="h-3 w-3" />
-                                  <span>{new Date(risk.followUpDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}</span>
+                                  <span>{new Date(risk.followUpDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { month: 'short', day: 'numeric' })}</span>
                                 </div>
                               )}
                             </div>
@@ -1122,7 +1122,7 @@ export default function RiskTrackingPage() {
                   ) : (
                     <span className={`text-sm font-medium ${selectedRisk.followUpDate && new Date(selectedRisk.followUpDate) < new Date() ? 'text-red-500' : 'text-[var(--foreground)]'}`}>
                       {selectedRisk.followUpDate
-                        ? new Date(selectedRisk.followUpDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')
+                        ? new Date(selectedRisk.followUpDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')
                         : '-'}
                     </span>
                   )}

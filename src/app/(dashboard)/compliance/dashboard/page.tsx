@@ -532,7 +532,7 @@ export default function ComplianceDashboardPage() {
                       <td className="px-4 py-3 text-center">
                         <div className="flex flex-col items-center">
                           <span className="text-xs text-[var(--foreground)]">
-                            {new Date(item.nextDueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}
+                            {new Date(item.nextDueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { month: 'short', day: 'numeric' })}
                           </span>
                           <span className={`text-[10px] font-medium ${daysLeft <= 7 ? 'text-red-500' : daysLeft <= 14 ? 'text-orange-500' : 'text-[var(--foreground-secondary)]'}`}>
                             {daysLeft <= 0

@@ -285,7 +285,7 @@ export default function DiscussionsPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat(language === 'ar' ? 'ar-SA' : 'en-US', {
+    return new Intl.DateTimeFormat(language === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

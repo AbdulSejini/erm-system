@@ -54,7 +54,7 @@ export function getRiskLevelBgColor(level: RiskLevel): string {
 
 export function formatDate(date: Date | string, locale: 'ar' | 'en' = 'ar'): string {
   const d = new Date(date);
-  return d.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+  return d.toLocaleDateString(locale === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -63,7 +63,7 @@ export function formatDate(date: Date | string, locale: 'ar' | 'en' = 'ar'): str
 
 export function formatDateTime(date: Date | string, locale: 'ar' | 'en' = 'ar'): string {
   const d = new Date(date);
-  return d.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+  return d.toLocaleDateString(locale === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

@@ -212,7 +212,7 @@ export function RiskDiscussion({ riskId, currentUserId, currentUserRole }: RiskD
     if (diffHours < 24) return isAr ? `منذ ${diffHours} ساعة` : `${diffHours}h ago`;
     if (diffDays < 7) return isAr ? `منذ ${diffDays} يوم` : `${diffDays}d ago`;
 
-    return date.toLocaleDateString(isAr ? 'ar-SA' : 'en-US', {
+    return date.toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

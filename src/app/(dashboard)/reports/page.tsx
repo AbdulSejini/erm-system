@@ -384,7 +384,7 @@ export default function ReportsPage() {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '';
     try {
-      return new Date(dateString).toLocaleDateString(isAr ? 'ar-SA' : 'en-US');
+      return new Date(dateString).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US');
     } catch {
       return '';
     }
@@ -1196,14 +1196,14 @@ export default function ReportsPage() {
               <div>
                 <p className="text-xs text-[var(--foreground-muted)]">{isAr ? 'تاريخ التقرير' : 'Report Date'}</p>
                 <p className="font-semibold text-[var(--foreground)]">
-                  {new Date().toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {new Date().toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
               </div>
               <div className="text-end">
                 <p className="text-xs text-[var(--foreground-muted)]">{isAr ? 'الفترة' : 'Period'}</p>
                 <p className="font-semibold text-[var(--foreground)]">
                   {dateFrom && dateTo
-                    ? `${new Date(dateFrom).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')} - ${new Date(dateTo).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}`
+                    ? `${new Date(dateFrom).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')} - ${new Date(dateTo).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}`
                     : (isAr ? 'جميع الفترات' : 'All time')
                   }
                 </p>

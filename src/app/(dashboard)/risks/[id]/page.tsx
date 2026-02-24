@@ -656,13 +656,13 @@ export default function RiskDetailPage() {
                             <div className="p-3 rounded-lg bg-[var(--background-tertiary)]">
                               <p className="text-[var(--foreground-secondary)] mb-1">{isAr ? 'تاريخ البدء' : 'Start Date'}</p>
                               <p className="font-semibold text-[var(--foreground)]">
-                                {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                               </p>
                             </div>
                             <div className="p-3 rounded-lg bg-[var(--background-tertiary)]">
                               <p className="text-[var(--foreground-secondary)] mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
                               <p className="font-semibold text-[var(--foreground)]">
-                                {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                               </p>
                             </div>
                             <div className="p-3 rounded-lg bg-[var(--background-tertiary)]">
@@ -733,7 +733,7 @@ export default function RiskDetailPage() {
                                       )}
                                       {task.dueDate && (
                                         <span>
-                                          {isAr ? 'الاستحقاق:' : 'Due:'} {new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                          {isAr ? 'الاستحقاق:' : 'Due:'} {new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                                         </span>
                                       )}
                                     </div>
@@ -859,7 +859,7 @@ export default function RiskDetailPage() {
                       <div>
                         <p className="text-sm text-[var(--foreground-secondary)]">{isAr ? 'تاريخ المتابعة' : 'Follow-up Date'}</p>
                         <p className="font-medium text-[var(--foreground)]">
-                          {new Date(risk.followUpDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                          {new Date(risk.followUpDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                         </p>
                       </div>
                     </div>
@@ -870,7 +870,7 @@ export default function RiskDetailPage() {
                       <div>
                         <p className="text-sm text-[var(--foreground-secondary)]">{isAr ? 'تاريخ المراجعة' : 'Review Date'}</p>
                         <p className="font-medium text-[var(--foreground)]">
-                          {new Date(risk.nextReviewDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                          {new Date(risk.nextReviewDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                         </p>
                       </div>
                     </div>
@@ -880,7 +880,7 @@ export default function RiskDetailPage() {
                     <div>
                       <p className="text-sm text-[var(--foreground-secondary)]">{isAr ? 'تاريخ الإنشاء' : 'Created'}</p>
                       <p className="font-medium text-[var(--foreground)]">
-                        {new Date(risk.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                        {new Date(risk.createdAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                       </p>
                     </div>
                   </div>
@@ -954,7 +954,7 @@ export default function RiskDetailPage() {
                             )}
                           </div>
                           <span className="text-xs text-[var(--foreground-muted)] whitespace-nowrap">
-                            {new Date(log.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', {
+                            {new Date(log.createdAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
@@ -1109,7 +1109,7 @@ function PrintRiskModal({
                 {isAr ? 'شركة الكابلات السعودية' : 'Saudi Cable Company'}
               </p>
               <p className="text-xs text-gray-500">
-                {new Date().toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                {new Date().toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
           </div>
@@ -1400,13 +1400,13 @@ function PrintRiskModal({
                         <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
                           <p className="text-gray-500 mb-1">{isAr ? 'تاريخ البدء' : 'Start Date'}</p>
                           <p className="font-semibold" style={{ color: brandColors.dark }}>
-                            {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                            {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                           </p>
                         </div>
                         <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
                           <p className="text-gray-500 mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
                           <p className="font-semibold" style={{ color: brandColors.dark }}>
-                            {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                            {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                           </p>
                         </div>
                         <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
@@ -1528,7 +1528,7 @@ function PrintRiskModal({
                                     <div className="p-2 rounded bg-gray-50">
                                       <p className="text-gray-500">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
                                       <p className="font-medium">
-                                        {new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                        {new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                                       </p>
                                     </div>
                                   )}
@@ -1536,7 +1536,7 @@ function PrintRiskModal({
                                     <div className="p-2 rounded bg-green-50">
                                       <p className="text-green-600">{isAr ? 'تاريخ الإنجاز' : 'Completed'}</p>
                                       <p className="font-medium text-green-700">
-                                        {new Date(task.completionDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                        {new Date(task.completionDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                                       </p>
                                     </div>
                                   )}
@@ -1563,20 +1563,20 @@ function PrintRiskModal({
               <div className="p-3 rounded-lg bg-gray-50">
                 <p className="text-xs text-gray-500">{isAr ? 'تاريخ الإنشاء' : 'Created'}</p>
                 <p className="font-medium" style={{ color: brandColors.dark }}>
-                  {new Date(risk.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                  {new Date(risk.createdAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-gray-50">
                 <p className="text-xs text-gray-500">{isAr ? 'آخر تحديث' : 'Last Updated'}</p>
                 <p className="font-medium" style={{ color: brandColors.dark }}>
-                  {new Date(risk.updatedAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                  {new Date(risk.updatedAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                 </p>
               </div>
               {risk.followUpDate && (
                 <div className="p-3 rounded-lg bg-orange-50">
                   <p className="text-xs text-orange-600">{isAr ? 'تاريخ المتابعة' : 'Follow-up Date'}</p>
                   <p className="font-medium text-orange-700">
-                    {new Date(risk.followUpDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                    {new Date(risk.followUpDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                   </p>
                 </div>
               )}
@@ -1584,7 +1584,7 @@ function PrintRiskModal({
                 <div className="p-3 rounded-lg bg-blue-50">
                   <p className="text-xs text-blue-600">{isAr ? 'تاريخ المراجعة' : 'Review Date'}</p>
                   <p className="font-medium text-blue-700">
-                    {new Date(risk.nextReviewDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                    {new Date(risk.nextReviewDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                   </p>
                 </div>
               )}

@@ -419,7 +419,7 @@ export default function CompliancePage() {
                     <td className="px-4 py-3 text-center">
                       {obligation.nextDueDate ? (
                         <span className={`text-xs ${isOverdue ? 'text-red-500 font-semibold' : 'text-[var(--foreground-secondary)]'}`}>
-                          {new Date(obligation.nextDueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                          {new Date(obligation.nextDueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                           {isOverdue && <AlertTriangle className="h-3 w-3 inline ms-1" />}
                         </span>
                       ) : (

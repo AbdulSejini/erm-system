@@ -502,7 +502,7 @@ export default function TreatmentMonitoringPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', {
+    return new Date(dateString).toLocaleDateString(language === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

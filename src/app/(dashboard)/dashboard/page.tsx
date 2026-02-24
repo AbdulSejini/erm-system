@@ -615,7 +615,7 @@ export default function DashboardPage() {
               {t('dashboard.welcome')}، {session?.user?.name || (isAr ? 'مستخدم' : 'User')}
             </p>
             <p className="text-white/60 text-xs mt-1">
-              {new Date().toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {new Date().toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
 
@@ -1049,7 +1049,7 @@ export default function DashboardPage() {
                       {isAr ? risk.championAr : risk.championEn}
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-500">
-                      {new Date(risk.date).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                      {new Date(risk.date).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                     </td>
                   </tr>
                 ))}

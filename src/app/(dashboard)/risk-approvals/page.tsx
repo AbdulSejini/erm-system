@@ -319,7 +319,7 @@ export default function RiskApprovalsPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      {new Date(request.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                      {new Date(request.createdAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                     </span>
                   </div>
                 </div>
@@ -506,7 +506,7 @@ export default function RiskApprovalsPage() {
                   </p>
                   <p>
                     <span className="text-[var(--foreground-muted)]">{isAr ? 'تاريخ الإرسال:' : 'Submitted on:'}</span>{' '}
-                    {new Date(selectedRequest.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', {
+                    {new Date(selectedRequest.createdAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',

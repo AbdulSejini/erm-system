@@ -234,7 +234,7 @@ export default function ComplianceDetailPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(dateStr).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const getTimeAgo = (dateStr: string) => {
@@ -331,7 +331,7 @@ export default function ComplianceDetailPage() {
             <p className="text-sm text-gray-500">{isAr ? 'نموذج الالتزام التنظيمي' : 'Regulatory Compliance Form'}</p>
             <div className="flex justify-center gap-4 mt-2 text-xs text-gray-500">
               <span>{obligation.code}</span>
-              <span>{new Date().toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+              <span>{new Date().toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
             </div>
           </div>
         </div>

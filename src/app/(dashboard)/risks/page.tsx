@@ -2638,7 +2638,7 @@ export default function RisksPage() {
                   <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
                     <Calendar className="h-4 w-4" />
                     <span>{isAr ? 'تاريخ التحديد:' : 'Identified Date:'}</span>
-                    <span className="font-medium">{new Date(selectedRisk.identifiedDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+                    <span className="font-medium">{new Date(selectedRisk.identifiedDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
                   </div>
                 </div>
               ) : viewModalTab === 'assessment' ? (
@@ -2741,7 +2741,7 @@ export default function RisksPage() {
                                 {assessment.assessmentType === 'inherent' ? (isAr ? 'كامن' : 'Inherent') : (isAr ? 'متبقي' : 'Residual')}
                               </Badge>
                               <span className="text-xs text-[var(--foreground-muted)]">
-                                {new Date(assessment.assessmentDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                {new Date(assessment.assessmentDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                               </span>
                             </div>
                             <div className="flex items-center gap-4 text-sm">
@@ -2847,13 +2847,13 @@ export default function RisksPage() {
                               <div className="p-2 rounded bg-[var(--background-secondary)]">
                                 <p className="text-[var(--foreground-muted)]">{isAr ? 'تاريخ البدء' : 'Start'}</p>
                                 <p className="font-medium text-[var(--foreground)]">
-                                  {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                  {new Date(plan.startDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                                 </p>
                               </div>
                               <div className="p-2 rounded bg-[var(--background-secondary)]">
                                 <p className="text-[var(--foreground-muted)]">{isAr ? 'الاستحقاق' : 'Due'}</p>
                                 <p className="font-medium text-[var(--foreground)]">
-                                  {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                                  {new Date(plan.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                                 </p>
                               </div>
                               <div className="p-2 rounded bg-[var(--background-secondary)]">
@@ -2969,7 +2969,7 @@ export default function RisksPage() {
                           <div className="flex items-center gap-4 text-xs text-[var(--foreground-muted)]">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              {new Date(incident.occurredAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                              {new Date(incident.occurredAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}
                             </span>
                             {incident.reportedBy && (
                               <span className="flex items-center gap-1">
@@ -3034,7 +3034,7 @@ export default function RisksPage() {
                                   )}
                                 </div>
                                 <span className="text-xs text-[var(--foreground-muted)] whitespace-nowrap">
-                                  {new Date(log.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', {
+                                  {new Date(log.createdAt).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', {
                                     month: 'short',
                                     day: 'numeric',
                                     hour: '2-digit',
