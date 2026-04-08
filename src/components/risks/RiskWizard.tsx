@@ -223,7 +223,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     fetchData();
   }, []);
 
-  // جلب رقم الخطر التالي عند تغيير الوظيفة
+  // جلب رقم الخطر التالي عند تغيير تصنيف الخطر الفرعي
   const fetchNextRiskNumber = useCallback(async (departmentId: string) => {
     const dept = departments.find(d => d.id === departmentId);
     if (!dept) {
@@ -243,7 +243,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     }
   }, [departments]);
 
-  // تحديث الرقم عند تغيير الوظيفة
+  // تحديث الرقم عند تغيير تصنيف الخطر الفرعي
   useEffect(() => {
     if (formData.departmentId && departments.length > 0) {
       fetchNextRiskNumber(formData.departmentId);
@@ -461,7 +461,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     <div className="space-y-6">
       {showGuidance && renderGuidanceBox(
         t('risks.guidance.title'),
-        isAr ? 'اختر الفئة المناسبة للخطر ثم حدد الوظيفة والعملية المرتبطة به' : 'Select the appropriate risk category, then specify the related function and process'
+        isAr ? 'اختر الفئة المناسبة للخطر ثم حدد تصنيف الخطر الفرعي والعملية المرتبطة به' : 'Select the appropriate risk category, then specify the related function and process'
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -490,14 +490,14 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
 
         <div>
           <Select
-            label={`${isAr ? 'الوظيفة' : 'Function'} *`}
+            label={`${isAr ? 'تصنيف الخطر الفرعي' : 'Function'} *`}
             options={departments.map(dept => ({
               value: dept.id,
               label: isAr ? dept.nameAr : dept.nameEn,
             }))}
             value={formData.departmentId}
             onChange={(value) => updateField('departmentId', value)}
-            placeholder={isAr ? 'اختر الوظيفة' : 'Select Function'}
+            placeholder={isAr ? 'اختر تصنيف الخطر الفرعي' : 'Select Function'}
             error={errors.departmentId}
             disabled={isLoadingData}
           />
@@ -926,7 +926,7 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
                 </span>
               </div>
               <div>
-                <span className="text-[var(--foreground-secondary)]">{isAr ? 'الوظيفة' : 'Function'}: </span>
+                <span className="text-[var(--foreground-secondary)]">{isAr ? 'تصنيف الخطر الفرعي' : 'Function'}: </span>
                 <span className="font-medium">
                   {selectedDept ? (isAr ? selectedDept.nameAr : selectedDept.nameEn) : '-'}
                 </span>
