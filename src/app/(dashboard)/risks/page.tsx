@@ -1937,6 +1937,9 @@ function RisksPageContent() {
                     <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
                       {t('risks.riskCategory')}
                     </th>
+                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
+                      {t('risks.issuedBy')}
+                    </th>
                     <th
                       className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
                       onClick={() => handleSortChange('inherentScore')}
@@ -2039,6 +2042,11 @@ function RisksPageContent() {
                       <td className="p-2 sm:p-3 md:p-4">
                         <span className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
                           {t(`risks.categories.${risk.categoryCode}`)}
+                        </span>
+                      </td>
+                      <td className="p-2 sm:p-3 md:p-4">
+                        <span className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                          {risk.issuedBy || '—'}
                         </span>
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
@@ -2254,11 +2262,16 @@ function RisksPageContent() {
                   {isAr ? risk.descriptionAr : risk.descriptionEn}
                 </p>
 
-                {/* Category & Department */}
+                {/* Category, Issued By & Department */}
                 <div className="mb-4 flex flex-wrap gap-2 text-xs">
                   <span className="rounded-full bg-[var(--background-secondary)] px-2 py-1">
                     {t(`risks.categories.${risk.categoryCode}`)}
                   </span>
+                  {risk.issuedBy && (
+                    <span className="rounded-full bg-[var(--background-secondary)] px-2 py-1">
+                      {t('risks.issuedBy')}: {risk.issuedBy}
+                    </span>
+                  )}
                   <span className="rounded-full bg-[var(--background-secondary)] px-2 py-1">
                     {isAr ? risk.departmentAr : risk.departmentEn}
                   </span>
