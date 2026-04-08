@@ -650,6 +650,8 @@ function RisksPageContent() {
     !!(searchParams.get('rating') || searchParams.get('category') || searchParams.get('status') || searchParams.get('department'))
   );
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
   const [selectedRisk, setSelectedRisk] = useState<typeof mockRisks[0] | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -903,6 +905,36 @@ function RisksPageContent() {
     fetchDepartments();
     fetchRiskOwners();
   }, [fetchRisks, fetchCategories, fetchRiskStatuses, fetchDepartments, fetchRiskOwners]);
+
+  // Close the sort menu when the user clicks outside of it.
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setSortMenuOpen(false);
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSortMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [sortMenuOpen]);
+
+  // Default to the cards view on small screens on first mount.
+  // Runs once — if the user later toggles to table manually, we respect
+  // that choice until the next full reload.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setViewMode('cards');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch current user
   useEffect(() => {
@@ -1266,9 +1298,43 @@ function RisksPageContent() {
     total: risks.length,
     critical: risks.filter(r => r.inherentRating === 'Critical').length,
     major: risks.filter(r => r.inherentRating === 'Major').length,
-    open: risks.filter(r => r.status === 'open' || r.status === 'inProgress').length,
-    mitigated: risks.filter(r => r.status === 'mitigated' || r.status === 'closed').length,
+    // Counts reflect what the corresponding stat-card filter will show.
+    open: risks.filter(r => r.status === 'open').length,
+    mitigated: risks.filter(r => r.status === 'mitigated').length,
   }), [risks]);
+
+  /**
+   * Click-handler for the stat cards at the top of the page.
+   *
+   * Cards behave as toggles:
+   *   - Clicking an inactive card applies its filter (and clears any
+   *     conflicting filter in the same "axis" — rating or status).
+   *   - Clicking the already-active card clears that filter.
+   *   - Clicking "total" always clears rating + status (show everything).
+   *
+   * Filters live in searchParams so they stay shareable after the toggle.
+   */
+  const toggleStatFilter = useCallback((kind: 'total' | 'critical' | 'major' | 'open' | 'mitigated') => {
+    setCurrentPage(1);
+    switch (kind) {
+      case 'total':
+        setFilterRating('');
+        setFilterStatus('');
+        return;
+      case 'critical':
+        setFilterRating(filterRating === 'Critical' ? '' : 'Critical');
+        return;
+      case 'major':
+        setFilterRating(filterRating === 'Major' ? '' : 'Major');
+        return;
+      case 'open':
+        setFilterStatus(filterStatus === 'open' ? '' : 'open');
+        return;
+      case 'mitigated':
+        setFilterStatus(filterStatus === 'mitigated' ? '' : 'mitigated');
+        return;
+    }
+  }, [filterRating, filterStatus]);
 
   const getRatingBadgeVariant = (rating: RiskRating): 'critical' | 'high' | 'medium' | 'low' | 'default' => {
     switch (rating) {
@@ -1583,9 +1649,22 @@ function RisksPageContent() {
         </div>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards (clickable quick filters) */}
       <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-        <Card className="p-2 sm:p-3 md:p-4">
+        {/* Total — clears all rating/status filters */}
+        <button
+          type="button"
+          onClick={() => toggleStatFilter('total')}
+          aria-pressed={!filterRating && !filterStatus}
+          className={cn(
+            'rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
+            'hover:shadow-md hover:-translate-y-0.5',
+            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
+            !filterRating && !filterStatus
+              ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]'
+              : 'border-[var(--border)]'
+          )}
+        >
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--primary-light)] shrink-0">
               <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)]" />
@@ -1597,9 +1676,22 @@ function RisksPageContent() {
               </p>
             </div>
           </div>
-        </Card>
+        </button>
 
-        <Card className="p-2 sm:p-3 md:p-4">
+        {/* Critical rating filter */}
+        <button
+          type="button"
+          onClick={() => toggleStatFilter('critical')}
+          aria-pressed={filterRating === 'Critical'}
+          className={cn(
+            'rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
+            'hover:shadow-md hover:-translate-y-0.5',
+            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
+            filterRating === 'Critical'
+              ? 'border-[var(--risk-critical)] ring-1 ring-[var(--risk-critical)]'
+              : 'border-[var(--border)]'
+          )}
+        >
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--risk-critical-bg)] shrink-0">
               <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--risk-critical)]" />
@@ -1611,9 +1703,22 @@ function RisksPageContent() {
               </p>
             </div>
           </div>
-        </Card>
+        </button>
 
-        <Card className="p-2 sm:p-3 md:p-4">
+        {/* Major rating filter */}
+        <button
+          type="button"
+          onClick={() => toggleStatFilter('major')}
+          aria-pressed={filterRating === 'Major'}
+          className={cn(
+            'rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
+            'hover:shadow-md hover:-translate-y-0.5',
+            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
+            filterRating === 'Major'
+              ? 'border-[var(--risk-high)] ring-1 ring-[var(--risk-high)]'
+              : 'border-[var(--border)]'
+          )}
+        >
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--risk-high-bg)] shrink-0">
               <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--risk-high)]" />
@@ -1625,9 +1730,22 @@ function RisksPageContent() {
               </p>
             </div>
           </div>
-        </Card>
+        </button>
 
-        <Card className="p-2 sm:p-3 md:p-4">
+        {/* Open status filter */}
+        <button
+          type="button"
+          onClick={() => toggleStatFilter('open')}
+          aria-pressed={filterStatus === 'open'}
+          className={cn(
+            'rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
+            'hover:shadow-md hover:-translate-y-0.5',
+            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
+            filterStatus === 'open'
+              ? 'border-[var(--status-warning)] ring-1 ring-[var(--status-warning)]'
+              : 'border-[var(--border)]'
+          )}
+        >
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--status-warning)]/10 shrink-0">
               <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--status-warning)]" />
@@ -1639,9 +1757,22 @@ function RisksPageContent() {
               </p>
             </div>
           </div>
-        </Card>
+        </button>
 
-        <Card className="p-2 sm:p-3 md:p-4 col-span-2 sm:col-span-1">
+        {/* Mitigated status filter */}
+        <button
+          type="button"
+          onClick={() => toggleStatFilter('mitigated')}
+          aria-pressed={filterStatus === 'mitigated'}
+          className={cn(
+            'col-span-2 sm:col-span-1 rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
+            'hover:shadow-md hover:-translate-y-0.5',
+            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
+            filterStatus === 'mitigated'
+              ? 'border-[var(--status-success)] ring-1 ring-[var(--status-success)]'
+              : 'border-[var(--border)]'
+          )}
+        >
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--status-success)]/10 shrink-0">
               <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--status-success)]" />
@@ -1653,7 +1784,7 @@ function RisksPageContent() {
               </p>
             </div>
           </div>
-        </Card>
+        </button>
       </div>
 
       {/* Warning Banner for Fallback Data */}
@@ -1716,57 +1847,77 @@ function RisksPageContent() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 items-center">
-              {/* Sort Dropdown */}
-              <div className="relative group">
+              {/* Sort Dropdown — click-based, keyboard + touch friendly */}
+              <div className="relative" ref={sortMenuRef}>
                 <Button
                   variant="outline"
                   size="sm"
                   leftIcon={<ArrowUpDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
                   rightIcon={sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                   className="min-w-[120px]"
+                  onClick={() => setSortMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={sortMenuOpen}
                 >
                   <span className="text-xs sm:text-sm truncate">
                     {sortOptions.find(opt => opt.value === sortField)?.label}
                   </span>
                 </Button>
-                <div className="absolute top-full mt-1 end-0 z-50 min-w-[200px] rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <div className="p-1">
-                    <div className="px-2 py-1.5 text-xs font-medium text-[var(--foreground-secondary)]">
-                      {isAr ? 'ترتيب حسب' : 'Sort by'}
+                {sortMenuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute top-full mt-1 end-0 z-50 min-w-[200px] rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
+                  >
+                    <div className="p-1">
+                      <div className="px-2 py-1.5 text-xs font-medium text-[var(--foreground-secondary)]">
+                        {isAr ? 'ترتيب حسب' : 'Sort by'}
+                      </div>
+                      {sortOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          role="menuitem"
+                          onClick={() => {
+                            handleSortChange(option.value as SortField);
+                            setSortMenuOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortField === option.value ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
+                        >
+                          <span>{option.label}</span>
+                          {sortField === option.value && (
+                            sortDirection === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      ))}
                     </div>
-                    {sortOptions.map((option) => (
+                    <div className="border-t border-[var(--border)] p-1">
+                      <div className="px-2 py-1.5 text-xs font-medium text-[var(--foreground-secondary)]">
+                        {isAr ? 'اتجاه الترتيب' : 'Direction'}
+                      </div>
                       <button
-                        key={option.value}
-                        onClick={() => handleSortChange(option.value as SortField)}
-                        className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortField === option.value ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
+                        role="menuitem"
+                        onClick={() => {
+                          setSortDirection('asc');
+                          setSortMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortDirection === 'asc' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
                       >
-                        <span>{option.label}</span>
-                        {sortField === option.value && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
-                        )}
+                        <ArrowUp className="h-3.5 w-3.5" />
+                        <span>{isAr ? 'تصاعدي' : 'Ascending'}</span>
                       </button>
-                    ))}
-                  </div>
-                  <div className="border-t border-[var(--border)] p-1">
-                    <div className="px-2 py-1.5 text-xs font-medium text-[var(--foreground-secondary)]">
-                      {isAr ? 'اتجاه الترتيب' : 'Direction'}
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setSortDirection('desc');
+                          setSortMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortDirection === 'desc' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                        <span>{isAr ? 'تنازلي' : 'Descending'}</span>
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setSortDirection('asc')}
-                      className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortDirection === 'asc' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
-                    >
-                      <ArrowUp className="h-3.5 w-3.5" />
-                      <span>{isAr ? 'تصاعدي' : 'Ascending'}</span>
-                    </button>
-                    <button
-                      onClick={() => setSortDirection('desc')}
-                      className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortDirection === 'desc' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
-                    >
-                      <ArrowDown className="h-3.5 w-3.5" />
-                      <span>{isAr ? 'تنازلي' : 'Descending'}</span>
-                    </button>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Filter Button */}
@@ -1901,17 +2052,105 @@ function RisksPageContent() {
 
       {/* Risks Display */}
       {isLoading ? (
-        /* Loading State */
-        <Card>
-          <CardContent className="p-8">
-            <div className="flex flex-col items-center justify-center gap-4">
-              <RefreshCw className="h-8 w-8 animate-spin text-[var(--primary)]" />
-              <p className="text-sm text-[var(--foreground-secondary)]">
-                {isAr ? 'جاري تحميل المخاطر...' : 'Loading risks...'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        /* Skeleton Loading — matches the final layout so there's no
+           layout shift when real data arrives. Shows 8 shimmering rows
+           for the table view and 6 placeholder cards for the cards view. */
+        viewMode === 'table' ? (
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px]">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--background-secondary)]">
+                      {Array.from({ length: 9 }).map((_, i) => (
+                        <th key={i} className="p-2 sm:p-3 md:p-4">
+                          <div className="h-3 w-16 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 8 }).map((_, rowIdx) => (
+                      <tr key={rowIdx} className="border-b border-[var(--border)]">
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="h-5 w-20 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                        </td>
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="space-y-1.5">
+                            <div className="h-3 w-48 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                            <div className="h-2.5 w-32 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                          </div>
+                        </td>
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="h-3 w-20 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                        </td>
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="h-3 w-16 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                        </td>
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="h-5 w-20 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
+                        </td>
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="h-5 w-20 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
+                        </td>
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="h-5 w-16 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
+                        </td>
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="h-3 w-24 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                        </td>
+                        <td className="p-2 sm:p-3 md:p-4">
+                          <div className="flex items-center justify-center gap-1">
+                            <div className="h-6 w-6 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                            <div className="h-6 w-6 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                            <div className="h-6 w-6 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="p-4">
+                <div className="mb-3 flex items-start justify-between">
+                  <div className="h-5 w-24 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                  <div className="h-5 w-16 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
+                </div>
+                <div className="mb-2 h-4 w-3/4 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                <div className="mb-4 space-y-1.5">
+                  <div className="h-3 w-full animate-pulse rounded bg-[var(--background-tertiary)]" />
+                  <div className="h-3 w-5/6 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                </div>
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <div className="h-6 w-20 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
+                  <div className="h-6 w-24 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
+                </div>
+                <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg bg-[var(--background-secondary)] p-3">
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-16 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                    <div className="h-5 w-12 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-16 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                    <div className="h-5 w-12 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-[var(--border)] pt-4">
+                  <div className="h-3 w-24 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                  <div className="flex gap-1">
+                    <div className="h-7 w-7 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                    <div className="h-7 w-7 animate-pulse rounded bg-[var(--background-tertiary)]" />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )
       ) : viewMode === 'table' ? (
         /* Table View */
         <Card>
