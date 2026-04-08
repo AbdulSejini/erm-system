@@ -153,6 +153,27 @@ export function isAuthError(
   return 'error' in result;
 }
 
+// =============================================================================
+// Treatment plan access control
+// =============================================================================
+//
+// Rules (must mirror between the helper and any inline filter logic):
+//
+//   1. Privileged roles (admin / riskManager / riskAnalyst) see everything.
+//   2. Any user from the SAME DEPARTMENT as the risk that the plan treats.
+//      "Same department" includes both the user's primary departmentId and
+//      any departments granted via UserDepartmentAccess (canView).
+//   3. The plan's monitor.
+//   4. Anyone assigned to or monitoring a task under the plan (via User id
+//      OR RiskOwner id OR RiskOwner email).
+//   5. Anyone who participated in a task STEP under the plan — either
+//      created the step or marked it completed.
+//
+// Note: the previous rules included "responsible user" and "risk owner via
+// email" as independent conditions. Those have been removed in favor of
+// rule #2 (department membership) per the refined requirements.
+// -----------------------------------------------------------------------------
+
 /**
  * Roles that can see any treatment plan regardless of assignment.
  */
@@ -163,17 +184,148 @@ const TREATMENT_PRIVILEGED_ROLES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Check whether the given user may read a specific TreatmentPlan.
+ * Minimum shape a TreatmentPlan record must have to be evaluated for access.
+ * Inline route queries can widen this type freely — only the fields listed
+ * here are consulted.
+ */
+export interface TreatmentPlanAccessShape {
+  monitorId: string | null;
+  risk: { departmentId: string | null } | null;
+  tasks?: Array<{
+    assignedToId?: string | null;
+    monitorId?: string | null;
+    actionOwnerId?: string | null;
+    monitorOwnerId?: string | null;
+    actionOwner?: { email: string | null } | null;
+    monitorOwner?: { email: string | null } | null;
+    steps?: Array<{
+      createdById: string;
+      completedById: string | null;
+    }> | null;
+  }> | null;
+}
+
+/**
+ * Resolved per-user context reused across access checks — fetched once and
+ * then applied to many plans in memory. For privileged roles we short-circuit
+ * to `{ isPrivileged: true }` so callers can skip the DB lookup entirely.
+ */
+export type TreatmentAccessContext =
+  | { isPrivileged: true }
+  | {
+      isPrivileged: false;
+      userId: string;
+      userEmail: string;
+      /** User's primary department + accessible departments (UserDepartmentAccess) */
+      departmentIds: Set<string>;
+      /** Matching RiskOwner.id (if any) looked up via user.email */
+      riskOwnerId: string | null;
+    };
+
+/**
+ * Load the per-user context needed to evaluate treatment access for many
+ * plans. Call once per request, then pass to `userCanAccessTreatmentPlan`
+ * as many times as needed.
+ */
+export async function getUserTreatmentAccessContext(
+  userId: string,
+  userRole: string,
+  userEmail: string
+): Promise<TreatmentAccessContext> {
+  if (TREATMENT_PRIVILEGED_ROLES.has(userRole)) {
+    return { isPrivileged: true };
+  }
+
+  const { default: prisma } = await import('@/lib/prisma');
+
+  const [user, riskOwner] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        departmentId: true,
+        accessibleDepartments: {
+          where: { canView: true },
+          select: { departmentId: true },
+        },
+      },
+    }),
+    userEmail
+      ? prisma.riskOwner.findFirst({
+          where: { email: userEmail },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  const departmentIds = new Set<string>();
+  if (user?.departmentId) departmentIds.add(user.departmentId);
+  for (const a of user?.accessibleDepartments || []) {
+    departmentIds.add(a.departmentId);
+  }
+
+  return {
+    isPrivileged: false,
+    userId,
+    userEmail,
+    departmentIds,
+    riskOwnerId: riskOwner?.id ?? null,
+  };
+}
+
+/**
+ * Pure, in-memory access check. Given a treatment plan record (shaped per
+ * `TreatmentPlanAccessShape`) and a pre-resolved user context, decide
+ * whether the user is allowed to see this plan.
  *
- * The rules match the filter logic in /api/risks (GET, includeTreatments):
- *   - Privileged roles (admin/riskManager/riskAnalyst) see everything
- *   - The plan's responsible user
- *   - The plan's monitor user
- *   - The plan's risk owner (matched via email)
- *   - Anyone assigned to OR monitoring a task under the plan
- *
- * Returns true on access, false otherwise. Caller should respond with 403
- * (or 404 to avoid leaking existence).
+ * Safe to call many times per request after a single context load.
+ */
+export function userCanAccessTreatmentPlan(
+  plan: TreatmentPlanAccessShape,
+  context: TreatmentAccessContext
+): boolean {
+  if (context.isPrivileged) return true;
+
+  // Rule 2: same-department membership
+  const riskDeptId = plan.risk?.departmentId ?? null;
+  if (riskDeptId && context.departmentIds.has(riskDeptId)) {
+    return true;
+  }
+
+  // Rule 3: plan monitor
+  if (plan.monitorId && plan.monitorId === context.userId) {
+    return true;
+  }
+
+  // Rules 4 & 5: task involvement or step involvement
+  for (const task of plan.tasks || []) {
+    // Task-level involvement (User references)
+    if (task.assignedToId && task.assignedToId === context.userId) return true;
+    if (task.monitorId && task.monitorId === context.userId) return true;
+
+    // Task-level involvement (RiskOwner references via id OR email)
+    if (context.riskOwnerId) {
+      if (task.actionOwnerId === context.riskOwnerId) return true;
+      if (task.monitorOwnerId === context.riskOwnerId) return true;
+    }
+    if (context.userEmail) {
+      if (task.actionOwner?.email === context.userEmail) return true;
+      if (task.monitorOwner?.email === context.userEmail) return true;
+    }
+
+    // Step-level involvement
+    for (const step of task.steps || []) {
+      if (step.createdById === context.userId) return true;
+      if (step.completedById === context.userId) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Convenience wrapper that loads both the plan (with the minimum fields
+ * needed for access evaluation) and the user context, then returns a
+ * boolean. Use from single-plan routes (discussions, changelog, etc.).
  */
 export async function canAccessTreatmentPlan(
   treatmentPlanId: string,
@@ -183,39 +335,34 @@ export async function canAccessTreatmentPlan(
 ): Promise<boolean> {
   if (TREATMENT_PRIVILEGED_ROLES.has(userRole)) return true;
 
-  // Lazy import to avoid pulling prisma into all consumers at module load
   const { default: prisma } = await import('@/lib/prisma');
 
-  const plan = await prisma.treatmentPlan.findUnique({
-    where: { id: treatmentPlanId },
-    select: {
-      responsibleId: true,
-      monitorId: true,
-      riskOwner: { select: { email: true } },
-      tasks: {
-        select: {
-          assignedToId: true,
-          monitorId: true,
-          actionOwner: { select: { email: true } },
-          monitorOwner: { select: { email: true } },
+  const [context, plan] = await Promise.all([
+    getUserTreatmentAccessContext(userId, userRole, userEmail),
+    prisma.treatmentPlan.findUnique({
+      where: { id: treatmentPlanId },
+      select: {
+        monitorId: true,
+        risk: { select: { departmentId: true } },
+        tasks: {
+          select: {
+            assignedToId: true,
+            monitorId: true,
+            actionOwnerId: true,
+            monitorOwnerId: true,
+            actionOwner: { select: { email: true } },
+            monitorOwner: { select: { email: true } },
+            steps: {
+              select: { createdById: true, completedById: true },
+            },
+          },
         },
       },
-    },
-  });
+    }),
+  ]);
 
   if (!plan) return false;
-
-  if (plan.responsibleId === userId) return true;
-  if (plan.monitorId === userId) return true;
-  if (userEmail && plan.riskOwner?.email === userEmail) return true;
-
-  return (plan.tasks || []).some((task) => {
-    if (task.assignedToId === userId) return true;
-    if (task.monitorId === userId) return true;
-    if (userEmail && task.actionOwner?.email === userEmail) return true;
-    if (userEmail && task.monitorOwner?.email === userEmail) return true;
-    return false;
-  });
+  return userCanAccessTreatmentPlan(plan, context);
 }
 
 /**

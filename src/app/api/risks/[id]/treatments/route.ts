@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { getClientInfo } from '@/lib/audit';
+import {
+  requireAuth,
+  getUserTreatmentAccessContext,
+  userCanAccessTreatmentPlan,
+} from '@/lib/api-auth';
 
 // POST - إنشاء خطة معالجة جديدة
 export async function POST(
@@ -313,13 +318,28 @@ export async function POST(
   }
 }
 
-// GET - جلب خطط المعالجة للخطر
+// GET - جلب خطط المعالجة للخطر (مقيدة حسب قواعد الوصول)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id: riskId } = await params;
+
+    // Load the risk so we know its department (needed for rule 2)
+    const risk = await prisma.risk.findUnique({
+      where: { id: riskId },
+      select: { id: true, departmentId: true },
+    });
+    if (!risk) {
+      return NextResponse.json(
+        { success: false, error: 'الخطر غير موجود' },
+        { status: 404 }
+      );
+    }
 
     const treatments = await prisma.treatmentPlan.findMany({
       where: { riskId },
@@ -385,15 +405,42 @@ export async function GET(
                 email: true,
               },
             },
+            // Needed for step-level access checks (rule #5)
+            steps: {
+              select: {
+                createdById: true,
+                completedById: true,
+              },
+            },
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
 
+    // Apply access filter using the shared helper
+    const context = await getUserTreatmentAccessContext(
+      authResult.userId,
+      authResult.role,
+      authResult.session.user.email || ''
+    );
+
+    const visibleTreatments = context.isPrivileged
+      ? treatments
+      : treatments.filter((plan) =>
+          userCanAccessTreatmentPlan(
+            {
+              monitorId: plan.monitorId,
+              risk: { departmentId: risk.departmentId },
+              tasks: plan.tasks,
+            },
+            context
+          )
+        );
+
     return NextResponse.json({
       success: true,
-      data: treatments,
+      data: visibleTreatments,
     });
   } catch (error) {
     console.error('Error fetching treatment plans:', error);

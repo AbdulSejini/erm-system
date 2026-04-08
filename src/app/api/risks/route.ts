@@ -3,6 +3,10 @@ import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { createAuditLog, getClientInfo } from '@/lib/audit';
 import { checkRateLimit, getClientIP, rateLimitConfigs } from '@/lib/rate-limit';
+import {
+  getUserTreatmentAccessContext,
+  userCanAccessTreatmentPlan,
+} from '@/lib/api-auth';
 
 // GET - الحصول على جميع المخاطر مع فلترة الصلاحيات
 export async function GET(request: NextRequest) {
@@ -37,14 +41,22 @@ export async function GET(request: NextRequest) {
     const skip = limit > 0 ? (page - 1) * limit : undefined;
 
     // الحصول على الجلسة للتحقق من صلاحيات المستخدم
+    // ⚠️ Authentication is REQUIRED — this endpoint previously allowed
+    // anonymous reads which leaked the full risk register.
     const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     // دعم انتحال الصلاحيات (Impersonation) - للمدير فقط
     const impersonateUserId = request.headers.get('X-Impersonate-User-Id');
-    let effectiveUserId = session?.user?.id;
+    let effectiveUserId: string = session.user.id;
 
     // التحقق من صلاحية الانتحال
-    if (impersonateUserId && session?.user?.role === 'admin') {
+    if (impersonateUserId && session.user.role === 'admin') {
       effectiveUserId = impersonateUserId;
     }
 
@@ -252,6 +264,13 @@ export async function GET(request: NextRequest) {
                       email: true,
                     },
                   },
+                  // Needed for step-level access checks (rule #5)
+                  steps: {
+                    select: {
+                      createdById: true,
+                      completedById: true,
+                    },
+                  },
                 },
               },
             },
@@ -272,32 +291,24 @@ export async function GET(request: NextRequest) {
     const total = limit > 0 ? await prisma.risk.count({ where }) : risks.length;
 
     // تصفية خطط المعالجة حسب صلاحيات المستخدم
-    // المستخدم يرى خطة المعالجة إذا كان:
-    // 1. مسؤول عن خطة المعالجة (responsibleId)
-    // 2. مالك خطر (RiskOwner) بنفس الإيميل ومرتبط بالخطة
-    // 3. مكلف بمهمة (assignedToId أو actionOwnerId)
-    // 4. متابع لمهمة (monitorId أو monitorOwnerId)
-    // 5. admin أو riskManager أو riskAnalyst - يرون الكل
-
-    let userRiskOwner: { id: string } | null = null;
-    let effectiveUserRole = 'employee';
-    let effectiveUserEmail = '';
+    // (القواعد الكاملة موثقة في src/lib/api-auth.ts — canAccessTreatmentPlan)
+    // Resolve once per request, then apply to every risk/treatment pair below.
+    let treatmentAccessContext:
+      | Awaited<ReturnType<typeof getUserTreatmentAccessContext>>
+      | null = null;
 
     if (effectiveUserId && includeTreatments) {
       const currentUser = await prisma.user.findUnique({
         where: { id: effectiveUserId },
-        select: { id: true, role: true, email: true },
+        select: { role: true, email: true },
       });
 
       if (currentUser) {
-        effectiveUserRole = currentUser.role;
-        effectiveUserEmail = currentUser.email;
-
-        // البحث عن مالك الخطر المرتبط بهذا المستخدم عبر البريد
-        userRiskOwner = await prisma.riskOwner.findFirst({
-          where: { email: currentUser.email },
-          select: { id: true },
-        });
+        treatmentAccessContext = await getUserTreatmentAccessContext(
+          effectiveUserId,
+          currentUser.role,
+          currentUser.email || ''
+        );
       }
     }
 
@@ -308,55 +319,29 @@ export async function GET(request: NextRequest) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { treatments, ...restRisk } = risk as any;
 
-          // إذا كان المستخدم admin أو riskManager أو riskAnalyst - يرى كل خطط المعالجة
-          if (['admin', 'riskManager', 'riskAnalyst'].includes(effectiveUserRole)) {
+          // Privileged roles (admin/riskManager/riskAnalyst) see everything
+          if (!treatmentAccessContext || treatmentAccessContext.isPrivileged) {
             return {
               ...restRisk,
               treatmentPlans: treatments || [],
             };
           }
 
-          // تصفية خطط المعالجة للمستخدمين الآخرين
-          const filteredTreatments = (treatments || []).filter((treatment: {
-            responsibleId?: string;
-            riskOwnerId?: string;
-            riskOwner?: { email?: string };
-            tasks?: Array<{
-              assignedToId?: string;
-              actionOwnerId?: string;
-              monitorId?: string;
-              monitorOwnerId?: string;
-              actionOwner?: { email?: string };
-              monitorOwner?: { email?: string };
-            }>;
-          }) => {
-            // 1. المستخدم هو المسؤول عن خطة المعالجة
-            if (treatment.responsibleId === effectiveUserId) return true;
-
-            // 2. المستخدم هو مالك الخطر المرتبط بالخطة (عبر البريد)
-            if (userRiskOwner && treatment.riskOwnerId === userRiskOwner.id) return true;
-            if (treatment.riskOwner?.email === effectiveUserEmail) return true;
-
-            // 3. المستخدم مكلف أو متابع لأي مهمة في الخطة
-            const isInvolvedInTask = (treatment.tasks || []).some((task) => {
-              // مكلف بالمهمة (User)
-              if (task.assignedToId === effectiveUserId) return true;
-              // متابع للمهمة (User)
-              if (task.monitorId === effectiveUserId) return true;
-              // مكلف بالمهمة (RiskOwner عبر البريد)
-              if (userRiskOwner && task.actionOwnerId === userRiskOwner.id) return true;
-              if (task.actionOwner?.email === effectiveUserEmail) return true;
-              // متابع للمهمة (RiskOwner عبر البريد)
-              if (userRiskOwner && task.monitorOwnerId === userRiskOwner.id) return true;
-              if (task.monitorOwner?.email === effectiveUserEmail) return true;
-
-              return false;
-            });
-
-            if (isInvolvedInTask) return true;
-
-            return false;
-          });
+          // For all other users, evaluate each plan via the shared helper.
+          // We inject the parent risk's departmentId so the rule-2 "same
+          // department as the risk" check has the data it needs.
+          const filteredTreatments = (treatments || []).filter(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (treatment: any) =>
+              userCanAccessTreatmentPlan(
+                {
+                  monitorId: treatment.monitorId ?? null,
+                  risk: { departmentId: restRisk.departmentId ?? null },
+                  tasks: treatment.tasks,
+                },
+                treatmentAccessContext!
+              )
+          );
 
           return {
             ...restRisk,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { requireAuth, canAccessTreatmentPlan } from '@/lib/api-auth';
 
 // POST - إنشاء مهمة جديدة
 export async function POST(
@@ -116,13 +117,30 @@ export async function POST(
   }
 }
 
-// GET - جلب مهام خطة المعالجة
+// GET - جلب مهام خطة المعالجة (authenticated + plan-level access check)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; treatmentId: string }> }
 ) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { treatmentId } = await params;
+
+    // Plan-level access filter: only participants may list tasks
+    const canAccess = await canAccessTreatmentPlan(
+      treatmentId,
+      authResult.userId,
+      authResult.role,
+      authResult.session.user.email || ''
+    );
+    if (!canAccess) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
 
     const tasks = await prisma.treatmentTask.findMany({
       where: { treatmentPlanId: treatmentId },

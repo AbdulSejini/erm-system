@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import {
+  getUserTreatmentAccessContext,
+  userCanAccessTreatmentPlan,
+} from '@/lib/api-auth';
 
 // GET - جلب جميع بيانات المعالجة للمتابعة
 export async function GET(request: NextRequest) {
@@ -33,14 +37,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // البحث عن مالك الخطر - فقط إذا المستخدم ليس admin/riskManager/riskAnalyst
-    const needsFiltering = !['admin', 'riskManager', 'riskAnalyst'].includes(effectiveUserRole);
-    const userRiskOwner = needsFiltering
-      ? await prisma.riskOwner.findFirst({
-          where: { email: effectiveUserEmail },
-          select: { id: true },
-        })
-      : null;
+    // Resolve the shared access context once for this request
+    const accessContext = await getUserTreatmentAccessContext(
+      effectiveUserId,
+      effectiveUserRole,
+      effectiveUserEmail
+    );
 
     // جلب جميع خطط المعالجة مع التفاصيل الكاملة
     const allTreatmentPlans = await prisma.treatmentPlan.findMany({
@@ -51,6 +53,7 @@ export async function GET(request: NextRequest) {
             riskNumber: true,
             titleAr: true,
             titleEn: true,
+            departmentId: true,
             inherentLikelihood: true,
             inherentImpact: true,
             inherentScore: true,
@@ -170,6 +173,13 @@ export async function GET(request: NextRequest) {
                 email: true,
               },
             },
+            // Needed for step-level access checks (rule #5)
+            steps: {
+              select: {
+                createdById: true,
+                completedById: true,
+              },
+            },
           },
           orderBy: {
             order: 'asc',
@@ -184,40 +194,19 @@ export async function GET(request: NextRequest) {
     });
 
     // تصفية خطط المعالجة حسب صلاحيات المستخدم
-    // admin, riskManager, riskAnalyst يرون كل الخطط
-    // باقي المستخدمين يرون فقط الخطط المرتبطين بها
-    let treatmentPlans = allTreatmentPlans;
-
-    if (!['admin', 'riskManager', 'riskAnalyst'].includes(effectiveUserRole)) {
-      treatmentPlans = allTreatmentPlans.filter((plan) => {
-        // 1. المستخدم هو المسؤول عن خطة المعالجة
-        if (plan.responsibleId === effectiveUserId) return true;
-
-        // 2. المستخدم هو مالك الخطر المرتبط بالخطة (عبر البريد)
-        if (userRiskOwner && plan.riskOwnerId === userRiskOwner.id) return true;
-        if (plan.riskOwner?.email === effectiveUserEmail) return true;
-
-        // 3. المستخدم مكلف أو متابع لأي مهمة في الخطة
-        const isInvolvedInTask = (plan.tasks || []).some((task) => {
-          // مكلف بالمهمة (User)
-          if (task.assignedToId === effectiveUserId) return true;
-          // متابع للمهمة (User)
-          if (task.monitorId === effectiveUserId) return true;
-          // مكلف بالمهمة (RiskOwner عبر ID)
-          if (userRiskOwner && task.actionOwnerId === userRiskOwner.id) return true;
-          // مكلف بالمهمة (RiskOwner عبر البريد)
-          if (task.actionOwner?.email === effectiveUserEmail) return true;
-          // متابع للمهمة (RiskOwner عبر ID)
-          if (userRiskOwner && task.monitorOwnerId === userRiskOwner.id) return true;
-
-          return false;
-        });
-
-        if (isInvolvedInTask) return true;
-
-        return false;
-      });
-    }
+    // (قواعد الوصول الكاملة موثقة في src/lib/api-auth.ts)
+    const treatmentPlans = accessContext.isPrivileged
+      ? allTreatmentPlans
+      : allTreatmentPlans.filter((plan) =>
+          userCanAccessTreatmentPlan(
+            {
+              monitorId: plan.monitorId,
+              risk: { departmentId: plan.risk.departmentId },
+              tasks: plan.tasks,
+            },
+            accessContext
+          )
+        );
 
     // حساب الإحصائيات
     const stats = {

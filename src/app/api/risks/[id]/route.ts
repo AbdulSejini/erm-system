@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { createAuditLog, getClientInfo } from '@/lib/audit';
+import { requireAuth } from '@/lib/api-auth';
 
 // أسماء الحقول بالعربي
 const fieldNamesAr: Record<string, string> = {
@@ -85,6 +86,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
 
@@ -204,11 +208,16 @@ export async function GET(
   }
 }
 
-// PATCH - تحديث خطر
+// PATCH - تحديث خطر (admin/riskManager/riskAnalyst/riskChampion فقط)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, {
+    roles: ['admin', 'riskManager', 'riskAnalyst', 'riskChampion'],
+  });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -510,11 +519,16 @@ export async function PATCH(
   }
 }
 
-// DELETE - حذف ناعم للخطر (يُعلّم كمحذوف ولا يُحذف فعلياً)
+// DELETE - حذف ناعم للخطر (admin/riskManager فقط)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, {
+    roles: ['admin', 'riskManager'],
+  });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
 
