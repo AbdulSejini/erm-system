@@ -700,7 +700,8 @@ function RiskRowActions({
       >
         <MessageSquare className={iconSize} />
         {(risk.commentsCount || 0) > 0 && (
-          <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 text-[9px] sm:text-[10px] font-bold bg-[#F39200] text-white rounded-full shadow-sm">
+          // 10px badge text — fits inside the 14px/16px circular bubble.
+          <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 text-[10px] font-bold bg-[#F39200] text-white rounded-full shadow-sm">
             {(risk.commentsCount || 0) > 99 ? '99+' : risk.commentsCount}
           </span>
         )}
@@ -1803,7 +1804,7 @@ function RisksPageContent() {
             </div>
             <div className="min-w-0">
               <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.total}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
+              <p className="text-xs text-[var(--foreground-secondary)] truncate">
                 {t('dashboard.totalRisks')}
               </p>
             </div>
@@ -1830,7 +1831,7 @@ function RisksPageContent() {
             </div>
             <div className="min-w-0">
               <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.critical}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
+              <p className="text-xs text-[var(--foreground-secondary)] truncate">
                 {t('dashboard.criticalRisks')}
               </p>
             </div>
@@ -1857,7 +1858,7 @@ function RisksPageContent() {
             </div>
             <div className="min-w-0">
               <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.major}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
+              <p className="text-xs text-[var(--foreground-secondary)] truncate">
                 {t('dashboard.majorRisks')}
               </p>
             </div>
@@ -1884,7 +1885,7 @@ function RisksPageContent() {
             </div>
             <div className="min-w-0">
               <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.open}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
+              <p className="text-xs text-[var(--foreground-secondary)] truncate">
                 {isAr ? 'مخاطر مفتوحة' : 'Open Risks'}
               </p>
             </div>
@@ -1911,7 +1912,7 @@ function RisksPageContent() {
             </div>
             <div className="min-w-0">
               <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.mitigated}</p>
-              <p className="text-[10px] sm:text-xs text-[var(--foreground-secondary)] truncate">
+              <p className="text-xs text-[var(--foreground-secondary)] truncate">
                 {isAr ? 'تم التخفيف' : 'Mitigated'}
               </p>
             </div>
@@ -2062,6 +2063,8 @@ function RisksPageContent() {
               >
                 <span className="text-xs sm:text-sm">{isAr ? 'تصفية' : 'Filter'}</span>
                 {activeFiltersCount > 0 && (
+                  // 10px is intentional here — this is a 16px circular badge
+                  // and 12px would overflow the bubble.
                   <span className="absolute -top-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--status-error)] text-[10px] font-bold text-white">
                     {activeFiltersCount}
                   </span>
@@ -2359,7 +2362,7 @@ function RisksPageContent() {
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--background-secondary)]">
                     <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
                       onClick={() => handleSortChange('riskNumber')}
                     >
                       <div className="flex items-center gap-1">
@@ -2370,7 +2373,7 @@ function RisksPageContent() {
                       </div>
                     </th>
                     <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
                       onClick={() => handleSortChange('title')}
                     >
                       <div className="flex items-center gap-1">
@@ -2380,14 +2383,14 @@ function RisksPageContent() {
                         )}
                       </div>
                     </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
+                    <th className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
                       {t('risks.riskCategory')}
                     </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
+                    <th className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
                       {t('risks.issuedBy')}
                     </th>
                     <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
                       onClick={() => handleSortChange('inherentScore')}
                     >
                       <div className="flex items-center gap-1">
@@ -2398,7 +2401,7 @@ function RisksPageContent() {
                       </div>
                     </th>
                     <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
                       onClick={() => handleSortChange('residualScore')}
                     >
                       <div className="flex items-center gap-1">
@@ -2409,7 +2412,7 @@ function RisksPageContent() {
                       </div>
                     </th>
                     <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
+                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
                       onClick={() => handleSortChange('status')}
                     >
                       <div className="flex items-center gap-1">
@@ -2419,10 +2422,10 @@ function RisksPageContent() {
                         )}
                       </div>
                     </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
+                    <th className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
                       {t('risks.riskOwner')}
                     </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-center text-[10px] sm:text-xs md:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
+                    <th className="p-2 sm:p-3 md:p-4 text-center text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
                       {t('common.actions')}
                     </th>
                   </tr>
@@ -2450,7 +2453,7 @@ function RisksPageContent() {
                             </span>
                           )}
                           <code className={cn(
-                            "rounded px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-mono",
+                            "rounded px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-mono",
                             risk.isDeleted
                               ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through decoration-red-500 decoration-2"
                               : "bg-[var(--background-tertiary)]"
@@ -2458,7 +2461,7 @@ function RisksPageContent() {
                             {risk.riskNumber}
                           </code>
                           {risk.isDeleted && (
-                            <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] text-white font-bold px-1.5 py-0.5 rounded-full bg-red-500 shadow-sm animate-pulse">
+                            <span className="inline-flex items-center gap-1 text-xs text-white font-bold px-1.5 py-0.5 rounded-full bg-red-500 shadow-sm animate-pulse">
                               <X className="h-2.5 w-2.5" />
                               {isAr ? 'محذوف' : 'Deleted'}
                             </span>
@@ -2476,7 +2479,7 @@ function RisksPageContent() {
                             {isAr ? risk.titleAr : risk.titleEn}
                           </p>
                           <p className={cn(
-                            "mt-0.5 text-[10px] sm:text-xs truncate",
+                            "mt-0.5 text-xs truncate",
                             risk.isDeleted
                               ? "text-red-400/60 dark:text-red-500/60"
                               : "text-[var(--foreground-muted)]"
@@ -2486,19 +2489,19 @@ function RisksPageContent() {
                         </div>
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
-                        <span className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                        <span className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
                           {t(`risks.categories.${risk.categoryCode}`)}
                         </span>
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
-                        <span className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                        <span className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
                           {risk.issuedBy || '—'}
                         </span>
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
                         <div className="flex items-center gap-1 sm:gap-2">
-                          <span className="font-mono text-[10px] sm:text-xs md:text-sm">{risk.inherentScore}</span>
-                          <Badge variant={getRatingBadgeVariant(risk.inherentRating)} className="text-[9px] sm:text-[10px] md:text-xs px-1.5 sm:px-2">
+                          <span className="font-mono text-xs sm:text-sm">{risk.inherentScore}</span>
+                          <Badge variant={getRatingBadgeVariant(risk.inherentRating)} className="text-xs px-1.5 sm:px-2">
                             {t(`risks.ratings.${risk.inherentRating}`)}
                           </Badge>
                         </div>
@@ -2506,8 +2509,8 @@ function RisksPageContent() {
                       <td className="p-2 sm:p-3 md:p-4">
                         {risk.residualScore ? (
                           <div className="flex items-center gap-1 sm:gap-2">
-                            <span className="font-mono text-[10px] sm:text-xs md:text-sm">{risk.residualScore}</span>
-                            <Badge variant={getRatingBadgeVariant(risk.residualRating!)} className="text-[9px] sm:text-[10px] md:text-xs px-1.5 sm:px-2">
+                            <span className="font-mono text-xs sm:text-sm">{risk.residualScore}</span>
+                            <Badge variant={getRatingBadgeVariant(risk.residualRating!)} className="text-xs px-1.5 sm:px-2">
                               {t(`risks.ratings.${risk.residualRating}`)}
                             </Badge>
                           </div>
@@ -2516,11 +2519,11 @@ function RisksPageContent() {
                         )}
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
-                        <Badge variant={getStatusBadgeVariant(risk.status)} className="text-[9px] sm:text-[10px] md:text-xs px-1.5 sm:px-2">
+                        <Badge variant={getStatusBadgeVariant(risk.status)} className="text-xs px-1.5 sm:px-2">
                           {getStatusDisplayName(risk.status)}
                         </Badge>
                       </td>
-                      <td className="p-2 sm:p-3 md:p-4 text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                      <td className="p-2 sm:p-3 md:p-4 text-xs sm:text-sm text-[var(--foreground-secondary)]">
                         {isAr ? risk.ownerAr : risk.ownerEn}
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
@@ -2544,7 +2547,7 @@ function RisksPageContent() {
                 scroll the table all the way down. */}
             <div className="sticky bottom-0 z-10 flex flex-col sm:flex-row items-center justify-between border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur-sm p-2 sm:p-3 md:p-4 gap-3">
               <div className="flex items-center gap-2">
-                <p className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
+                <p className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
                   {isAr
                     ? `عرض ${paginatedRisks.length} من ${filteredRisks.length} خطر`
                     : `Showing ${paginatedRisks.length} of ${filteredRisks.length} risks`}
