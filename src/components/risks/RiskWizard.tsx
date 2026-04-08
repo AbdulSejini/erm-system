@@ -223,15 +223,22 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     fetchData();
   }, []);
 
-  // جلب رقم الخطر التالي عند تغيير تصنيف الخطر الفرعي
-  const fetchNextRiskNumber = useCallback(async (departmentId: string) => {
+  // جلب رقم الخطر التالي عند تغيير تصنيف الخطر الفرعي أو الجهة المصدرة
+  const fetchNextRiskNumber = useCallback(async (departmentId: string, sourceId: string) => {
     const dept = departments.find(d => d.id === departmentId);
     if (!dept) {
       setExpectedRiskNumber('');
       return;
     }
+    // Default to ERM when no source is selected — matches the rule applied
+    // in the renumber migration so the preview is never misleading.
+    const src = riskSources.find(s => s.id === sourceId);
+    const sourceCode = src?.code || 'ERM';
+
     try {
-      const res = await fetch(`/api/risks/next-number?deptCode=${encodeURIComponent(dept.code)}`);
+      const res = await fetch(
+        `/api/risks/next-number?deptCode=${encodeURIComponent(dept.code)}&sourceCode=${encodeURIComponent(sourceCode)}`
+      );
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -241,14 +248,14 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     } catch (error) {
       console.error('Error fetching next risk number:', error);
     }
-  }, [departments]);
+  }, [departments, riskSources]);
 
-  // تحديث الرقم عند تغيير تصنيف الخطر الفرعي
+  // تحديث الرقم عند تغيير تصنيف الخطر الفرعي أو الجهة المصدرة
   useEffect(() => {
     if (formData.departmentId && departments.length > 0) {
-      fetchNextRiskNumber(formData.departmentId);
+      fetchNextRiskNumber(formData.departmentId, formData.sourceId);
     }
-  }, [formData.departmentId, departments, fetchNextRiskNumber]);
+  }, [formData.departmentId, formData.sourceId, departments, fetchNextRiskNumber]);
 
   // Calculate risk score and rating
   const riskScore = useMemo(() =>

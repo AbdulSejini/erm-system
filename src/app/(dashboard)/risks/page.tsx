@@ -1331,22 +1331,30 @@ function RisksPageContent() {
         complianceNoteAr: string;
       };
 
-      // توليد رقم خطر تلقائي - الحصول على الرقم التسلسلي التالي من API
+      // توليد رقم خطر تلقائي - الحصول على الرقم التسلسلي العالمي من API
+      // (الصيغة: {DEPT}-{SOURCE_CHAR}-{GLOBAL_SEQ} — انظر next-number/route.ts)
       const selectedDept = allDepartments.find(d => d.id === riskData.departmentId);
-      const deptCode = selectedDept?.code || 'RISK';
-      let riskNumber = `${deptCode}-R-001`;
-      try {
-        const nextNumRes = await fetch(`/api/risks/next-number?deptCode=${encodeURIComponent(deptCode)}`);
-        if (nextNumRes.ok) {
-          const nextNumData = await nextNumRes.json();
-          if (nextNumData.success) {
-            riskNumber = nextNumData.data.nextNumber;
-          }
-        }
-      } catch {
-        // fallback to timestamp if API fails
-        riskNumber = `${deptCode}-R-${String(Date.now()).slice(-3)}`;
+      const deptCode = selectedDept?.code || 'GEN';
+      // sourceId قد لا يكون موجوداً في الـ wizard القديم — يتم افتراضه ERM
+      // في الـ API server-side لو لم يُمرَّر.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sourceCode = (riskData as any).sourceCode || 'ERM';
+
+      const nextNumRes = await fetch(
+        `/api/risks/next-number?deptCode=${encodeURIComponent(deptCode)}&sourceCode=${encodeURIComponent(sourceCode)}`
+      );
+      if (!nextNumRes.ok) {
+        throw new Error(
+          isAr
+            ? 'فشل في توليد رقم الخطر — تحقق من الاتصال وحاول مرة أخرى'
+            : 'Failed to generate risk number — please check your connection and retry'
+        );
       }
+      const nextNumData = await nextNumRes.json();
+      if (!nextNumData.success || !nextNumData.data?.nextNumber) {
+        throw new Error(nextNumData.error || 'Failed to generate risk number');
+      }
+      const riskNumber: string = nextNumData.data.nextNumber;
 
       const response = await fetch('/api/risks', {
         method: 'POST',
