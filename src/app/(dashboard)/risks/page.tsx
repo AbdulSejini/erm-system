@@ -54,6 +54,7 @@ import {
   ArrowDown,
   SortAsc,
   SortDesc,
+  MoreVertical,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { RiskDiscussion } from '@/components/RiskDiscussion';
@@ -619,6 +620,137 @@ interface APIRisk {
   _count?: {
     comments: number;
   };
+}
+
+/**
+ * Compact action menu for a single risk row.
+ *
+ * Renders the two primary actions inline (View + Discussions, both
+ * frequent + non-destructive) and tucks the secondary actions
+ * (Edit, Delete) into a click-based "⋮" overflow menu. This drops the
+ * visible-button count per row from 4 to 3 and isolates the destructive
+ * action behind an extra click.
+ *
+ * Defined inline so it has direct access to the existing handlers without
+ * having to plumb everything through props from the parent.
+ */
+interface RiskRowActionsProps {
+  risk: { id: string; commentsCount?: number };
+  isAr: boolean;
+  onView: () => void;
+  onDiscuss: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  size?: 'sm' | 'md';
+}
+
+function RiskRowActions({
+  risk,
+  isAr,
+  onView,
+  onDiscuss,
+  onEdit,
+  onDelete,
+  size = 'sm',
+}: RiskRowActionsProps) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+
+  const iconSize = size === 'md' ? 'h-4 w-4' : 'h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4';
+  const buttonSize = size === 'md' ? 'h-8 w-8' : 'h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8';
+
+  return (
+    <div className="flex items-center justify-center gap-0.5 sm:gap-1">
+      {/* Primary: View details modal */}
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        title={isAr ? 'عرض' : 'View'}
+        onClick={onView}
+        className={buttonSize}
+      >
+        <Eye className={iconSize} />
+      </Button>
+
+      {/* Primary: Open discussion page (with unread badge) */}
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        title={isAr ? 'التفاصيل والنقاش' : 'Details & Discussion'}
+        onClick={onDiscuss}
+        className={`${buttonSize} text-[var(--primary)] relative`}
+      >
+        <MessageSquare className={iconSize} />
+        {(risk.commentsCount || 0) > 0 && (
+          <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 text-[9px] sm:text-[10px] font-bold bg-[#F39200] text-white rounded-full shadow-sm">
+            {(risk.commentsCount || 0) > 99 ? '99+' : risk.commentsCount}
+          </span>
+        )}
+      </Button>
+
+      {/* Overflow menu — Edit / Delete (destructive isolated) */}
+      <div className="relative" ref={menuRef}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title={isAr ? 'المزيد' : 'More'}
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className={buttonSize}
+        >
+          <MoreVertical className={iconSize} />
+        </Button>
+        {open && (
+          <div
+            role="menu"
+            className="absolute end-0 z-20 mt-1 min-w-[160px] rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
+          >
+            <button
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+              className="flex w-full items-center gap-2 rounded-t-lg px-3 py-2 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-secondary)]"
+            >
+              <Edit className="h-4 w-4" />
+              <span>{isAr ? 'تعديل' : 'Edit'}</span>
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+              className="flex w-full items-center gap-2 rounded-b-lg border-t border-[var(--border)] px-3 py-2 text-sm text-[var(--status-error)] transition-colors hover:bg-[var(--status-error)]/10"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>{isAr ? 'حذف' : 'Delete'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function RisksPageContent() {
@@ -2151,6 +2283,73 @@ function RisksPageContent() {
             ))}
           </div>
         )
+      ) : filteredRisks.length === 0 ? (
+        /* Empty state — replaces the table/cards when there is nothing
+           to show. Branches between "register is empty" and "filters
+           hide everything". */
+        <Card className="overflow-hidden">
+          <CardContent className="p-8 sm:p-12">
+            {risks.length === 0 ? (
+              // Register genuinely empty → invite user to add the first risk
+              <div className="mx-auto max-w-md text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--primary-light)]">
+                  <BarChart3 className="h-8 w-8 text-[var(--primary)]" />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-[var(--foreground)]">
+                  {isAr ? 'سجل المخاطر فارغ' : 'Risk register is empty'}
+                </h3>
+                <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
+                  {isAr
+                    ? 'لم يتم تسجيل أي خطر بعد. ابدأ بإضافة أول خطر لتسجيله في النظام.'
+                    : 'No risks have been registered yet. Start by adding your first risk.'}
+                </p>
+                <div className="mt-6">
+                  <Button
+                    leftIcon={<Plus className="h-4 w-4" />}
+                    onClick={() => setShowWizard(true)}
+                  >
+                    {t('risks.addRisk')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // Register has data but the current filters hide everything
+              <div className="mx-auto max-w-md text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--background-secondary)]">
+                  <Search className="h-8 w-8 text-[var(--foreground-muted)]" />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-[var(--foreground)]">
+                  {isAr ? 'لا توجد نتائج مطابقة' : 'No matching results'}
+                </h3>
+                <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
+                  {isAr
+                    ? `لم نجد أي خطر يطابق معايير البحث والتصفية الحالية (${risks.length} خطر في السجل).`
+                    : `We couldn't find any risks matching the current search and filters (${risks.length} total in the register).`}
+                </p>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  {(searchQuery || activeFiltersCount > 0) && (
+                    <Button
+                      variant="outline"
+                      leftIcon={<X className="h-4 w-4" />}
+                      onClick={() => {
+                        setSearchQuery('');
+                        clearAllFilters();
+                      }}
+                    >
+                      {isAr ? 'مسح البحث والفلاتر' : 'Clear search & filters'}
+                    </Button>
+                  )}
+                  <Button
+                    leftIcon={<Plus className="h-4 w-4" />}
+                    onClick={() => setShowWizard(true)}
+                  >
+                    {t('risks.addRisk')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       ) : viewMode === 'table' ? (
         /* Table View */
         <Card>
@@ -2325,37 +2524,14 @@ function RisksPageContent() {
                         {isAr ? risk.ownerAr : risk.ownerEn}
                       </td>
                       <td className="p-2 sm:p-3 md:p-4">
-                        <div className="flex items-center justify-center gap-0.5 sm:gap-1">
-                          <Button variant="ghost" size="icon-sm" title={isAr ? 'عرض' : 'View'} onClick={() => handleViewRisk(risk)} className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8">
-                            <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            title={isAr ? 'التفاصيل والنقاش' : 'Details & Discussion'}
-                            onClick={() => router.push(`/risks/${risk.id}`)}
-                            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-[var(--primary)] relative"
-                          >
-                            <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
-                            {(risk.commentsCount || 0) > 0 && (
-                              <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 text-[9px] sm:text-[10px] font-bold bg-[#F39200] text-white rounded-full shadow-sm">
-                                {risk.commentsCount > 99 ? '99+' : risk.commentsCount}
-                              </span>
-                            )}
-                          </Button>
-                          <Button variant="ghost" size="icon-sm" title={isAr ? 'تعديل' : 'Edit'} onClick={() => handleEditRisk(risk)} className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8">
-                            <Edit className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            title={isAr ? 'حذف' : 'Delete'}
-                            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-[var(--status-error)] hover:text-[var(--status-error)]"
-                            onClick={() => handleDeleteRisk(risk)}
-                          >
-                            <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                        </div>
+                        <RiskRowActions
+                          risk={risk}
+                          isAr={isAr}
+                          onView={() => handleViewRisk(risk)}
+                          onDiscuss={() => router.push(`/risks/${risk.id}`)}
+                          onEdit={() => handleEditRisk(risk)}
+                          onDelete={() => handleDeleteRisk(risk)}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -2363,8 +2539,10 @@ function RisksPageContent() {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-[var(--border)] p-2 sm:p-3 md:p-4 gap-3">
+            {/* Pagination — sticky at the bottom of the viewport so the
+                controls remain reachable on long pages without having to
+                scroll the table all the way down. */}
+            <div className="sticky bottom-0 z-10 flex flex-col sm:flex-row items-center justify-between border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur-sm p-2 sm:p-3 md:p-4 gap-3">
               <div className="flex items-center gap-2">
                 <p className="text-[10px] sm:text-xs md:text-sm text-[var(--foreground-secondary)]">
                   {isAr
@@ -2558,26 +2736,15 @@ function RisksPageContent() {
                     <span className="font-medium">{t('risks.riskOwner')}:</span>{' '}
                     {isAr ? risk.ownerAr : risk.ownerEn}
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleViewRisk(risk)} title={isAr ? 'عرض' : 'View'}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => router.push(`/risks/${risk.id}`)}
-                      title={isAr ? 'التفاصيل والنقاش' : 'Details & Discussion'}
-                      className="text-[var(--primary)]"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleEditRisk(risk)} title={isAr ? 'تعديل' : 'Edit'}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" className="text-[var(--status-error)]" onClick={() => handleDeleteRisk(risk)} title={isAr ? 'حذف' : 'Delete'}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <RiskRowActions
+                    risk={risk}
+                    isAr={isAr}
+                    onView={() => handleViewRisk(risk)}
+                    onDiscuss={() => router.push(`/risks/${risk.id}`)}
+                    onEdit={() => handleEditRisk(risk)}
+                    onDelete={() => handleDeleteRisk(risk)}
+                    size="md"
+                  />
                 </div>
               </div>
             </Card>
@@ -2640,18 +2807,6 @@ function RisksPageContent() {
         </div>
       )}
 
-      {/* No Results */}
-      {filteredRisks.length === 0 && (
-        <Card className="p-12 text-center">
-          <AlertTriangle className="mx-auto h-12 w-12 text-[var(--foreground-muted)]" />
-          <p className="mt-4 text-lg font-medium text-[var(--foreground)]">
-            {isAr ? 'لا توجد مخاطر مطابقة' : 'No matching risks found'}
-          </p>
-          <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
-            {isAr ? 'حاول تعديل معايير البحث أو التصفية' : 'Try adjusting your search or filter criteria'}
-          </p>
-        </Card>
-      )}
 
       {/* Risk Wizard */}
       {showWizard && (
