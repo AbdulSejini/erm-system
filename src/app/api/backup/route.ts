@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { requireAuth } from '@/lib/api-auth';
 
 // الحد الأقصى للنسخ الاحتياطية المحتفظ بها
 const MAX_BACKUPS = 3;
@@ -259,10 +260,16 @@ async function createBackupData() {
   return { backup, stats };
 }
 
-// GET - تصدير نسخة احتياطية من قاعدة البيانات
+// GET - تصدير نسخة احتياطية من قاعدة البيانات (admin فقط)
+// ⚠️ CRITICAL: This endpoint exposes the ENTIRE database (users, risks,
+// treatments, compliance, etc.) — leaving it unguarded lets anyone dump
+// the whole system. Admin role is REQUIRED.
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
-    const session = await auth();
+    const session = authResult.session;
     const isAutomatic = request.nextUrl.searchParams.get('automatic') === 'true';
 
     // إنشاء بيانات النسخة الاحتياطية
@@ -277,7 +284,7 @@ export async function GET(request: NextRequest) {
         fileSize: Buffer.byteLength(jsonString, 'utf8'),
         backupType: isAutomatic ? 'automatic' : 'manual',
         status: 'completed',
-        createdById: session?.user?.id || null,
+        createdById: session.user.id,
         stats: JSON.stringify(stats),
       },
     });
@@ -318,34 +325,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - استعادة نسخة احتياطية أو إنشاء نسخة تلقائية
+// POST - استعادة نسخة احتياطية أو إنشاء نسخة تلقائية (admin فقط)
+// ⚠️ CRITICAL: Both branches (create-auto and restore) grant full database
+// mutation. Restore can OVERWRITE the entire system. Admin-only.
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const contentType = request.headers.get('content-type');
+    const session = authResult.session;
 
     // إذا كان الطلب لإنشاء نسخة تلقائية
     if (contentType === 'application/x-www-form-urlencoded' || request.nextUrl.searchParams.get('action') === 'create-auto') {
-      const session = await auth();
-
-      // التحقق من الصلاحيات - فقط admin
-      if (!session?.user?.id) {
-        return NextResponse.json(
-          { success: false, error: 'غير مصرح' },
-          { status: 401 }
-        );
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { role: true },
-      });
-
-      if (!user || user.role !== 'admin') {
-        return NextResponse.json(
-          { success: false, error: 'هذا الإجراء متاح فقط لمدير النظام' },
-          { status: 403 }
-        );
-      }
 
       // إنشاء النسخة الاحتياطية
       const { backup, stats } = await createBackupData();

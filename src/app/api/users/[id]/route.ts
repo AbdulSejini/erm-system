@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { requireAuth } from '@/lib/api-auth';
+import { createAuditLog, getClientInfo } from '@/lib/audit';
 
 // GET - الحصول على مستخدم محدد
+// أي مستخدم مسجّل يستطيع قراءة نفسه. أدوار الإدارة يرون أي مستخدم.
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
+
+    // Authorization: self OR admin/riskManager/riskAnalyst
+    const isSelf = id === authResult.userId;
+    const canViewAny = ['admin', 'riskManager', 'riskAnalyst'].includes(authResult.role);
+    if (!isSelf && !canViewAny) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -53,14 +69,26 @@ export async function GET(
   }
 }
 
-// PATCH - تحديث مستخدم
+// PATCH - تحديث مستخدم (admin فقط — يمنع privilege escalation)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
     const body = await request.json();
+
+    // Prevent an admin from accidentally locking themselves out by
+    // demoting their own role.
+    if (id === authResult.userId && body.role && body.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'لا يمكنك تغيير دورك الخاص' },
+        { status: 400 }
+      );
+    }
 
     // التحقق من وجود المستخدم
     const existingUser = await prisma.user.findUnique({
@@ -111,6 +139,18 @@ export async function PATCH(
       },
     });
 
+    // Audit log
+    const clientInfo = getClientInfo(request);
+    await createAuditLog({
+      userId: authResult.userId,
+      action: 'update',
+      entity: 'user',
+      entityId: id,
+      oldValues: { role: existingUser.role, status: existingUser.status },
+      newValues: updateData,
+      ...clientInfo,
+    });
+
     return NextResponse.json({
       success: true,
       data: user,
@@ -124,16 +164,28 @@ export async function PATCH(
   }
 }
 
-// DELETE - حذف مستخدم
+// DELETE - حذف مستخدم (admin فقط)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
 
+    // Prevent an admin from deleting themselves
+    if (id === authResult.userId) {
+      return NextResponse.json(
+        { success: false, error: 'لا يمكنك حذف حسابك الخاص' },
+        { status: 400 }
+      );
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { id },
+      select: { id: true, email: true, role: true },
     });
 
     if (!existingUser) {
@@ -145,6 +197,17 @@ export async function DELETE(
 
     await prisma.user.delete({
       where: { id },
+    });
+
+    // Audit log
+    const clientInfo = getClientInfo(request);
+    await createAuditLog({
+      userId: authResult.userId,
+      action: 'delete',
+      entity: 'user',
+      entityId: id,
+      oldValues: { email: existingUser.email, role: existingUser.role },
+      ...clientInfo,
     });
 
     return NextResponse.json({

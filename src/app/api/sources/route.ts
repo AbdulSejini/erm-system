@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 
-// GET - الحصول على جميع مصادر المخاطر
-export async function GET() {
+// GET - الحصول على جميع مصادر المخاطر (لأي مستخدم مسجّل — للـ dropdowns)
+export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const sources = await prisma.riskSource.findMany({
       include: {
@@ -26,8 +30,13 @@ export async function GET() {
   }
 }
 
-// POST - إنشاء مصدر جديد
+// POST - إنشاء مصدر جديد (admin/riskManager/riskAnalyst فقط)
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, {
+    roles: ['admin', 'riskManager', 'riskAnalyst'],
+  });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const body = await request.json();
 

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 
-// GET - الحصول على جميع الإدارات
-export async function GET() {
+// GET - الحصول على جميع الإدارات (لأي مستخدم مسجّل — مطلوب للـ dropdowns)
+export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const departments = await prisma.department.findMany({
       orderBy: { nameAr: 'asc' },
@@ -26,8 +30,11 @@ export async function GET() {
   }
 }
 
-// POST - إنشاء إدارة جديدة
+// POST - إنشاء إدارة جديدة (admin/riskManager فقط)
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin', 'riskManager'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const body = await request.json();
 

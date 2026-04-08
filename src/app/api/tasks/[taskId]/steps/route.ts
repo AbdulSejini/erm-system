@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { requireAuth, canAccessTreatmentTask } from '@/lib/api-auth';
 import { recalculateTaskStatus, recalculateTreatmentStatus } from '@/lib/treatment-status';
 
-// GET - جلب خطوات المهمة
+// GET - جلب خطوات المهمة (مقيد بمن له access للخطة الأم)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'غير مصرح' },
-        { status: 401 }
-      );
-    }
-
     const { taskId } = await params;
 
     // التحقق من وجود المهمة
@@ -30,6 +25,19 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: 'المهمة غير موجودة' },
         { status: 404 }
+      );
+    }
+
+    const canAccess = await canAccessTreatmentTask(
+      taskId,
+      authResult.userId,
+      authResult.role,
+      authResult.session.user.email || ''
+    );
+    if (!canAccess) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
       );
     }
 

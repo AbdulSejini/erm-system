@@ -660,9 +660,12 @@ function SettingsPageContent() {
       const result = await response.json();
 
       if (result.success) {
+        // NOTE: API no longer returns the plaintext password in the response
+        // body (security hardening). The default password is a well-known
+        // constant — hardcoded here so the admin can communicate it out-of-band.
         alert(isAr
-          ? `تم إعادة تعيين كلمة المرور بنجاح!\nكلمة المرور الجديدة: ${result.defaultPassword}`
-          : `Password reset successfully!\nNew password: ${result.defaultPassword}`);
+          ? 'تم إعادة تعيين كلمة المرور بنجاح!\nكلمة المرور الجديدة: Welcome@123'
+          : 'Password reset successfully!\nNew password: Welcome@123');
         setShowResetPasswordModal(false);
         setResetPasswordUserId(null);
       } else {

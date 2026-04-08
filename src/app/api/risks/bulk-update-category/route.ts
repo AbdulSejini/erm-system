@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
+import { createAuditLog, getClientInfo } from '@/lib/audit';
 
 // POST /api/risks/bulk-update-category - Update categories for multiple risks
+// (admin/riskManager only — bulk mutation)
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin', 'riskManager'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const body = await request.json();
     const { updates } = body;
@@ -46,6 +52,16 @@ export async function POST(request: NextRequest) {
         results.errors.push(`Failed to update risk ${update.riskId}: ${error}`);
       }
     }
+
+    // Audit log
+    const clientInfo = getClientInfo(request);
+    await createAuditLog({
+      userId: authResult.userId,
+      action: 'update',
+      entity: 'risk',
+      newValues: { bulkCategoryUpdate: results.updated, failed: results.failed },
+      ...clientInfo,
+    });
 
     return NextResponse.json({
       success: true,

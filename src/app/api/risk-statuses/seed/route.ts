@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 
-// POST - إنشاء الحالات الافتراضية
-export async function POST() {
+// POST - إنشاء الحالات الافتراضية (admin فقط)
+export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const defaultStatuses = [
       {

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 
 // GET - الحصول على تصنيف محدد
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
 
@@ -36,11 +40,14 @@ export async function GET(
   }
 }
 
-// PATCH - تحديث تصنيف
+// PATCH - تحديث تصنيف (admin/riskManager فقط)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, { roles: ['admin', 'riskManager'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -84,11 +91,14 @@ export async function PATCH(
   }
 }
 
-// DELETE - حذف تصنيف
+// DELETE - حذف تصنيف (admin/riskManager فقط)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, { roles: ['admin', 'riskManager'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
 

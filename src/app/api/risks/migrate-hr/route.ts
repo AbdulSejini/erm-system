@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hrRisks } from '@/data/hrRisks';
+import { requireAuth } from '@/lib/api-auth';
 
 // Helper function to calculate rating
 function calculateRating(score: number): string {
@@ -11,8 +12,11 @@ function calculateRating(score: number): string {
   return 'Negligible';
 }
 
-// POST - Migrate all HR risks to database
-export async function POST() {
+// POST - Migrate all HR risks to database (admin only)
+export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     // Get or create HR department
     let hrDepartment = await prisma.department.findFirst({

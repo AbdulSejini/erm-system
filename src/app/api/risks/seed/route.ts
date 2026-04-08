@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 
-// POST - Seed initial risks data to database
-export async function POST() {
+// POST - Seed initial risks data to database (admin only)
+export async function POST(request: NextRequest) {
+  // ⚠️ admin-only: seed endpoints should never be callable anonymously.
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     // Get departments and categories from database
     const [departments, categories, users] = await Promise.all([
@@ -16,16 +22,25 @@ export async function POST() {
     const deptByNameAr = new Map(departments.map(d => [d.nameAr, d.id]));
     const catByCode = new Map(categories.map(c => [c.code.toUpperCase(), c.id]));
 
-    // Get or create default user
-    let defaultUserId = users[0]?.id;
-    if (!defaultUserId) {
+    // Use the current admin as the default owner for seeded risks.
+    // Previously this path created a `system@erm.local` account with a
+    // plaintext password `'system'` — that has been removed. If there is
+    // no user at all we now create a locked system user with a bcrypt
+    // hash of a non-guessable random string (cannot be logged into).
+    let defaultUserId = users[0]?.id ?? authResult.userId;
+    if (!users[0]) {
+      const lockedPassword = await bcrypt.hash(
+        `locked-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        12
+      );
       const defaultUser = await prisma.user.create({
         data: {
           email: 'system@erm.local',
-          password: 'system',
+          password: lockedPassword,
           fullName: 'النظام',
           fullNameEn: 'System',
           role: 'admin',
+          status: 'inactive', // Cannot log in
         },
       });
       defaultUserId = defaultUser.id;

@@ -1,13 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
+import { createAuditLog, getClientInfo } from '@/lib/audit';
 
 // GET - الحصول على صلاحيات الوصول للإدارات لمستخدم معين
+// (المستخدم نفسه أو admin/riskManager)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
+
+    const isSelf = id === authResult.userId;
+    const canViewAny = ['admin', 'riskManager'].includes(authResult.role);
+    if (!isSelf && !canViewAny) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
 
     // التحقق من وجود المستخدم
     const user = await prisma.user.findUnique({
@@ -49,11 +64,14 @@ export async function GET(
   }
 }
 
-// POST - إضافة صلاحية وصول لإدارة
+// POST - إضافة صلاحية وصول لإدارة (admin فقط)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -140,11 +158,14 @@ export async function POST(
   }
 }
 
-// PUT - تحديث صلاحيات الوصول للإدارات (استبدال كامل)
+// PUT - تحديث صلاحيات الوصول للإدارات (استبدال كامل — admin فقط)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -210,11 +231,14 @@ export async function PUT(
   }
 }
 
-// DELETE - حذف صلاحية وصول لإدارة معينة
+// DELETE - حذف صلاحية وصول لإدارة معينة (admin فقط)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);

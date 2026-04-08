@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { requireAuth, canAccessTreatmentPlan } from '@/lib/api-auth';
 
 // GET - جلب المناقشات لخطة المعالجة
+// (مفتوح فقط للمسؤول/المتابع/المكلَّف/الأدوار المميزة)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ treatmentId: string }> }
 ) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'غير مصرح' },
-        { status: 401 }
-      );
-    }
-
     const { treatmentId } = await params;
 
     // التحقق من وجود خطة المعالجة
@@ -29,6 +25,20 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: 'خطة المعالجة غير موجودة' },
         { status: 404 }
+      );
+    }
+
+    // Access control: only people involved in the plan (or privileged roles)
+    const canAccess = await canAccessTreatmentPlan(
+      treatmentId,
+      authResult.userId,
+      authResult.role,
+      authResult.session.user.email || ''
+    );
+    if (!canAccess) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
       );
     }
 

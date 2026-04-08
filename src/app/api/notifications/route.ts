@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { requireAuth } from '@/lib/api-auth';
 
 // GET /api/notifications - Get user notifications
 export async function GET(request: NextRequest) {
@@ -62,8 +63,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/notifications - Create a notification (internal use)
+// POST /api/notifications - Create a notification
+// Only admin/riskManager can create notifications for other users. This
+// prevents phishing via spoofed notifications from arbitrary authenticated
+// accounts.
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin', 'riskManager'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const body = await request.json();
     const { userId, type, titleAr, titleEn, messageAr, messageEn, link } = body;

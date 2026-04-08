@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 
-// GET - الحصول على جميع حالات المخاطر
-export async function GET() {
+// GET - الحصول على جميع حالات المخاطر (لأي مستخدم مسجّل — للـ dropdowns)
+export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const statuses = await prisma.riskStatus.findMany({
       orderBy: { order: 'asc' },
@@ -21,8 +25,11 @@ export async function GET() {
   }
 }
 
-// POST - إنشاء حالة جديدة
+// POST - إنشاء حالة جديدة (admin/riskManager فقط)
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin', 'riskManager'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const body = await request.json();
 

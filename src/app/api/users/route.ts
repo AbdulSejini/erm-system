@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { requireAuth } from '@/lib/api-auth';
+import { createAuditLog, getClientInfo } from '@/lib/audit';
 
 // GET - الحصول على جميع المستخدمين
+// (مطلوب لأي مستخدم مسجّل — تُستخدم في dropdowns الـ treatment/risks owners)
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
@@ -68,8 +74,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - إنشاء مستخدم جديد
+// POST - إنشاء مستخدم جديد (admin فقط — يمنع escalation لحساب admin)
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(request, { roles: ['admin'] });
+  if ('error' in authResult) return authResult.error;
+
   try {
     const body = await request.json();
 
@@ -127,6 +136,17 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    // Audit log
+    const clientInfo = getClientInfo(request);
+    await createAuditLog({
+      userId: authResult.userId,
+      action: 'create',
+      entity: 'user',
+      entityId: user.id,
+      newValues: { email: user.email, role: user.role },
+      ...clientInfo,
     });
 
     return NextResponse.json({

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/api-auth';
 
 // GET - الحصول على رقم الخطر التالي بناءً على كود الوظيفة (Department)
 // مثال: GET /api/risks/next-number?deptCode=Gov → Gov-R-793
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request);
+  if ('error' in authResult) return authResult.error;
+
   try {
     const { searchParams } = new URL(request.url);
     const deptCode = searchParams.get('deptCode');
