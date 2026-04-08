@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
-import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -18,14 +17,9 @@ import {
   Download,
   Edit,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
   AlertTriangle,
   CheckCircle,
   Clock,
-  Grid3X3,
-  List,
-  X,
   FileText,
   User,
   Calendar,
@@ -45,9 +39,6 @@ import {
   Gauge,
   Flame,
   ListChecks,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { RiskDiscussion } from '@/components/RiskDiscussion';
@@ -74,6 +65,14 @@ import { RisksSkeleton } from './_components/RisksSkeleton';
 import { RiskEmptyState } from './_components/RiskEmptyState';
 import { RisksStatsCards } from './_components/RisksStatsCards';
 import { RisksPagination } from './_components/RisksPagination';
+import { RisksFilterBar } from './_components/RisksFilterBar';
+import { RisksTable } from './_components/RisksTable';
+import { RisksCardGrid } from './_components/RisksCardGrid';
+import {
+  getRatingBadgeVariant,
+  getStatusBadgeVariant,
+  makeStatusDisplayResolver,
+} from './_components/utils';
 
 import { hrRisks } from '@/data/hrRisks';
 
@@ -496,8 +495,6 @@ function RisksPageContent() {
     !!(searchParams.get('rating') || searchParams.get('category') || searchParams.get('status') || searchParams.get('department'))
   );
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const sortMenuRef = useRef<HTMLDivElement>(null);
   const [selectedRisk, setSelectedRisk] = useState<typeof mockRisks[0] | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -751,25 +748,6 @@ function RisksPageContent() {
     fetchDepartments();
     fetchRiskOwners();
   }, [fetchRisks, fetchCategories, fetchRiskStatuses, fetchDepartments, fetchRiskOwners]);
-
-  // Close the sort menu when the user clicks outside of it.
-  useEffect(() => {
-    if (!sortMenuOpen) return;
-    function onDocClick(e: MouseEvent) {
-      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
-        setSortMenuOpen(false);
-      }
-    }
-    function onEsc(e: KeyboardEvent) {
-      if (e.key === 'Escape') setSortMenuOpen(false);
-    }
-    document.addEventListener('mousedown', onDocClick);
-    document.addEventListener('keydown', onEsc);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      document.removeEventListener('keydown', onEsc);
-    };
-  }, [sortMenuOpen]);
 
   // Default to the cards view on small screens on first mount.
   // Runs once — if the user later toggles to table manually, we respect
@@ -1182,36 +1160,11 @@ function RisksPageContent() {
     }
   }, [filterRating, filterStatus]);
 
-  const getRatingBadgeVariant = (rating: RiskRating): 'critical' | 'high' | 'medium' | 'low' | 'default' => {
-    switch (rating) {
-      case 'Critical': return 'critical';
-      case 'Major': return 'high';
-      case 'Moderate': return 'medium';
-      case 'Minor': return 'low';
-      case 'Negligible': return 'default';
-      default: return 'default';
-    }
-  };
-
-  const getStatusBadgeVariant = (status: RiskStatus): 'success' | 'warning' | 'info' | 'default' => {
-    switch (status) {
-      case 'closed':
-      case 'mitigated': return 'success';
-      case 'inProgress': return 'warning';
-      case 'open': return 'info';
-      default: return 'default';
-    }
-  };
-
   // Get status display name from API or fallback to translation
-  const getStatusDisplayName = (statusCode: string): string => {
-    const statusFromDB = riskStatuses.find(s => s.code === statusCode);
-    if (statusFromDB) {
-      return isAr ? statusFromDB.nameAr : statusFromDB.nameEn;
-    }
-    // Fallback to translation
-    return t(`risks.statuses.${statusCode}`);
-  };
+  const getStatusDisplayName = useMemo(
+    () => makeStatusDisplayResolver(riskStatuses, isAr, t),
+    [riskStatuses, isAr, t]
+  );
 
   const handleSaveRisk = async (data: unknown) => {
     try {
@@ -1551,234 +1504,42 @@ function RisksPageContent() {
         </Card>
       )}
 
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="p-2 sm:p-3 md:p-4">
-          <div className="flex flex-col gap-2 sm:gap-3 md:gap-4 lg:flex-row lg:items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Input
-                  placeholder={isAr ? 'بحث برقم الخطر أو العنوان...' : 'Search by risk number or title...'}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  leftIcon={<Search className="h-4 w-4 sm:h-5 sm:w-5" />}
-                  className="text-xs sm:text-sm"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 end-0 flex items-center pe-3 text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 items-center">
-              {/* Sort Dropdown — click-based, keyboard + touch friendly */}
-              <div className="relative" ref={sortMenuRef}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<ArrowUpDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-                  rightIcon={sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                  className="min-w-[120px]"
-                  onClick={() => setSortMenuOpen((v) => !v)}
-                  aria-haspopup="menu"
-                  aria-expanded={sortMenuOpen}
-                >
-                  <span className="text-xs sm:text-sm truncate">
-                    {sortOptions.find(opt => opt.value === sortField)?.label}
-                  </span>
-                </Button>
-                {sortMenuOpen && (
-                  <div
-                    role="menu"
-                    className="absolute top-full mt-1 end-0 z-50 min-w-[200px] rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
-                  >
-                    <div className="p-1">
-                      <div className="px-2 py-1.5 text-xs font-medium text-[var(--foreground-secondary)]">
-                        {isAr ? 'ترتيب حسب' : 'Sort by'}
-                      </div>
-                      {sortOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          role="menuitem"
-                          onClick={() => {
-                            handleSortChange(option.value as SortField);
-                            setSortMenuOpen(false);
-                          }}
-                          className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortField === option.value ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
-                        >
-                          <span>{option.label}</span>
-                          {sortField === option.value && (
-                            sortDirection === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="border-t border-[var(--border)] p-1">
-                      <div className="px-2 py-1.5 text-xs font-medium text-[var(--foreground-secondary)]">
-                        {isAr ? 'اتجاه الترتيب' : 'Direction'}
-                      </div>
-                      <button
-                        role="menuitem"
-                        onClick={() => {
-                          setSortDirection('asc');
-                          setSortMenuOpen(false);
-                        }}
-                        className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortDirection === 'asc' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                        <span>{isAr ? 'تصاعدي' : 'Ascending'}</span>
-                      </button>
-                      <button
-                        role="menuitem"
-                        onClick={() => {
-                          setSortDirection('desc');
-                          setSortMenuOpen(false);
-                        }}
-                        className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-[var(--background-secondary)] ${sortDirection === 'desc' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" />
-                        <span>{isAr ? 'تنازلي' : 'Descending'}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Filter Button */}
-              <Button
-                variant={showFilters ? 'primary' : 'outline'}
-                size="sm"
-                leftIcon={<Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-                onClick={() => setShowFilters(!showFilters)}
-                className="relative"
-              >
-                <span className="text-xs sm:text-sm">{isAr ? 'تصفية' : 'Filter'}</span>
-                {activeFiltersCount > 0 && (
-                  // 10px is intentional here — this is a 16px circular badge
-                  // and 12px would overflow the bubble.
-                  <span className="absolute -top-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--status-error)] text-[10px] font-bold text-white">
-                    {activeFiltersCount}
-                  </span>
-                )}
-              </Button>
-              {activeFiltersCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllFilters}
-                  className="text-xs text-[var(--status-error)] hover:text-[var(--status-error)]"
-                >
-                  {isAr ? 'مسح الكل' : 'Clear all'}
-                </Button>
-              )}
-
-              {/* View Mode Toggle */}
-              <div className="flex rounded-lg border border-[var(--border)]">
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`rounded-s-lg p-1.5 sm:p-2 transition-colors ${viewMode === 'table' ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-secondary)]'}`}
-                >
-                  <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('cards')}
-                  className={`rounded-e-lg p-1.5 sm:p-2 transition-colors ${viewMode === 'cards' ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground-secondary)] hover:bg-[var(--background-secondary)]'}`}
-                >
-                  <Grid3X3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Filters & Sort Tags */}
-          {(activeFiltersCount > 0 || sortField !== 'inherentScore' || sortDirection !== 'desc') && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {filterRating && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
-                  {t(`risks.ratings.${filterRating}`)}
-                  <button onClick={() => setFilterRating('')} className="hover:text-[var(--status-error)]">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {filterCategory && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
-                  {categoryOptions.find(c => c.value === filterCategory)?.label}
-                  <button onClick={() => setFilterCategory('')} className="hover:text-[var(--status-error)]">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {filterStatus && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
-                  {statusOptions.find(s => s.value === filterStatus)?.label}
-                  <button onClick={() => setFilterStatus('')} className="hover:text-[var(--status-error)]">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {filterDepartment && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)]/10 px-2.5 py-1 text-xs text-[var(--primary)]">
-                  {departmentOptions.find(d => d.value === filterDepartment)?.label}
-                  <button onClick={() => setFilterDepartment('')} className="hover:text-[var(--status-error)]">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {/* Sort Tag */}
-              {(sortField !== 'inherentScore' || sortDirection !== 'desc') && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--secondary)]/10 px-2.5 py-1 text-xs text-[var(--secondary)]">
-                  {sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                  {sortOptions.find(opt => opt.value === sortField)?.label}
-                  <button
-                    onClick={() => {
-                      setSortField('inherentScore');
-                      setSortDirection('desc');
-                    }}
-                    className="hover:text-[var(--status-error)]"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Filter Panel */}
-          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showFilters ? 'mt-3 sm:mt-4 max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-            <div className="grid gap-2 sm:gap-3 md:gap-4 border-t border-[var(--border)] pt-3 sm:pt-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              <Select
-                label={t('risks.riskRating')}
-                options={ratingOptions}
-                value={filterRating}
-                onChange={setFilterRating}
-              />
-              <Select
-                label={t('risks.riskCategory')}
-                options={categoryOptions}
-                value={filterCategory}
-                onChange={setFilterCategory}
-              />
-              <Select
-                label={t('risks.riskStatus')}
-                options={statusOptions}
-                value={filterStatus}
-                onChange={setFilterStatus}
-              />
-              <Select
-                label={isAr ? 'الإدارة' : 'Department'}
-                options={departmentOptions}
-                value={filterDepartment}
-                onChange={setFilterDepartment}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Search + Sort + Filters + View toggle */}
+      <RisksFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        sortOptions={sortOptions}
+        onSortFieldChange={handleSortChange}
+        onSortDirectionChange={setSortDirection}
+        filterRating={filterRating}
+        filterCategory={filterCategory}
+        filterStatus={filterStatus}
+        filterDepartment={filterDepartment}
+        onFilterRatingChange={setFilterRating}
+        onFilterCategoryChange={setFilterCategory}
+        onFilterStatusChange={setFilterStatus}
+        onFilterDepartmentChange={setFilterDepartment}
+        ratingOptions={ratingOptions}
+        categoryOptions={categoryOptions}
+        statusOptions={statusOptions}
+        departmentOptions={departmentOptions}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        activeFiltersCount={activeFiltersCount}
+        onClearAllFilters={clearAllFilters}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        isAr={isAr}
+        ratingChipLabel={filterRating ? t(`risks.ratings.${filterRating}`) : ''}
+        labels={{
+          riskRating: t('risks.riskRating'),
+          riskCategory: t('risks.riskCategory'),
+          riskStatus: t('risks.riskStatus'),
+          department: isAr ? 'الإدارة' : 'Department',
+        }}
+      />
 
       {/* Risks Display */}
       {isLoading ? (
@@ -1797,389 +1558,49 @@ function RisksPageContent() {
           }}
         />
       ) : viewMode === 'table' ? (
-        /* Table View */
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px]">
-                <thead>
-                  <tr className="border-b border-[var(--border)] bg-[var(--background-secondary)]">
-                    <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
-                      onClick={() => handleSortChange('riskNumber')}
-                    >
-                      <div className="flex items-center gap-1">
-                        {t('risks.riskNumber')}
-                        {sortField === 'riskNumber' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
-                      onClick={() => handleSortChange('title')}
-                    >
-                      <div className="flex items-center gap-1">
-                        {t('risks.riskTitle')}
-                        {sortField === 'title' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                        )}
-                      </div>
-                    </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
-                      {t('risks.riskCategory')}
-                    </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
-                      {t('risks.issuedBy')}
-                    </th>
-                    <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
-                      onClick={() => handleSortChange('inherentScore')}
-                    >
-                      <div className="flex items-center gap-1">
-                        {t('risks.inherentRisk')}
-                        {sortField === 'inherentScore' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
-                      onClick={() => handleSortChange('residualScore')}
-                    >
-                      <div className="flex items-center gap-1">
-                        {t('risks.residualRisk')}
-                        {sortField === 'residualScore' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap cursor-pointer hover:bg-[var(--background-tertiary)] transition-colors"
-                      onClick={() => handleSortChange('status')}
-                    >
-                      <div className="flex items-center gap-1">
-                        {t('common.status')}
-                        {sortField === 'status' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                        )}
-                      </div>
-                    </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-start text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
-                      {t('risks.riskOwner')}
-                    </th>
-                    <th className="p-2 sm:p-3 md:p-4 text-center text-xs sm:text-sm font-medium text-[var(--foreground-secondary)] whitespace-nowrap">
-                      {t('common.actions')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedRisks.map((risk) => (
-                    <tr
-                      key={risk.id}
-                      className={cn(
-                        "border-b border-[var(--border)] transition-all duration-300 hover:bg-[var(--background-secondary)]",
-                        risk.isDeleted && [
-                          "bg-gradient-to-r from-red-50/80 via-red-50/40 to-transparent",
-                          "dark:from-red-950/40 dark:via-red-950/20 dark:to-transparent",
-                          "border-l-4 border-l-red-500",
-                          "opacity-70 hover:opacity-90"
-                        ]
-                      )}
-                    >
-                      <td className="p-2 sm:p-3 md:p-4">
-                        <div className="flex items-center gap-1.5">
-                          {/* أيقونة تحذير للمخاطر المحذوفة */}
-                          {risk.isDeleted && (
-                            <span className="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-100 dark:bg-red-900/50 animate-pulse">
-                              <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-red-500" />
-                            </span>
-                          )}
-                          <code className={cn(
-                            "rounded px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-mono",
-                            risk.isDeleted
-                              ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through decoration-red-500 decoration-2"
-                              : "bg-[var(--background-tertiary)]"
-                          )}>
-                            {risk.riskNumber}
-                          </code>
-                          {risk.isDeleted && (
-                            <span className="inline-flex items-center gap-1 text-xs text-white font-bold px-1.5 py-0.5 rounded-full bg-red-500 shadow-sm animate-pulse">
-                              <X className="h-2.5 w-2.5" />
-                              {isAr ? 'محذوف' : 'Deleted'}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-2 sm:p-3 md:p-4">
-                        <div className="max-w-[200px] sm:max-w-[250px] md:max-w-[300px]">
-                          <p className={cn(
-                            "font-medium text-xs sm:text-sm truncate",
-                            risk.isDeleted
-                              ? "text-red-600/70 dark:text-red-400/70 line-through decoration-red-400"
-                              : "text-[var(--foreground)]"
-                          )}>
-                            {isAr ? risk.titleAr : risk.titleEn}
-                          </p>
-                          <p className={cn(
-                            "mt-0.5 text-xs truncate",
-                            risk.isDeleted
-                              ? "text-red-400/60 dark:text-red-500/60"
-                              : "text-[var(--foreground-muted)]"
-                          )}>
-                            {isAr ? risk.departmentAr : risk.departmentEn} • {isAr ? risk.processAr : risk.processEn}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-2 sm:p-3 md:p-4">
-                        <span className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                          {t(`risks.categories.${risk.categoryCode}`)}
-                        </span>
-                      </td>
-                      <td className="p-2 sm:p-3 md:p-4">
-                        <span className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                          {risk.issuedBy || '—'}
-                        </span>
-                      </td>
-                      <td className="p-2 sm:p-3 md:p-4">
-                        <div className="flex items-center gap-1 sm:gap-2">
-                          <span className="font-mono text-xs sm:text-sm">{risk.inherentScore}</span>
-                          <Badge variant={getRatingBadgeVariant(risk.inherentRating)} className="text-xs px-1.5 sm:px-2">
-                            {t(`risks.ratings.${risk.inherentRating}`)}
-                          </Badge>
-                        </div>
-                      </td>
-                      <td className="p-2 sm:p-3 md:p-4">
-                        {risk.residualScore ? (
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <span className="font-mono text-xs sm:text-sm">{risk.residualScore}</span>
-                            <Badge variant={getRatingBadgeVariant(risk.residualRating!)} className="text-xs px-1.5 sm:px-2">
-                              {t(`risks.ratings.${risk.residualRating}`)}
-                            </Badge>
-                          </div>
-                        ) : (
-                          <span className="text-xs sm:text-sm text-[var(--foreground-muted)]">-</span>
-                        )}
-                      </td>
-                      <td className="p-2 sm:p-3 md:p-4">
-                        <Badge variant={getStatusBadgeVariant(risk.status)} className="text-xs px-1.5 sm:px-2">
-                          {getStatusDisplayName(risk.status)}
-                        </Badge>
-                      </td>
-                      <td className="p-2 sm:p-3 md:p-4 text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                        {isAr ? risk.ownerAr : risk.ownerEn}
-                      </td>
-                      <td className="p-2 sm:p-3 md:p-4">
-                        <RiskRowActions
-                          risk={risk}
-                          isAr={isAr}
-                          onView={() => handleViewRisk(risk)}
-                          onDiscuss={() => router.push(`/risks/${risk.id}`)}
-                          onEdit={() => handleEditRisk(risk)}
-                          onDelete={() => handleDeleteRisk(risk)}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <RisksPagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              itemsPerPage={itemsPerPage}
-              visibleCount={paginatedRisks.length}
-              totalCount={filteredRisks.length}
-              isAr={isAr}
-              onPageChange={setCurrentPage}
-              onItemsPerPageChange={(n) => {
-                setItemsPerPage(n);
-                setCurrentPage(1);
-              }}
-            />
-          </CardContent>
-        </Card>
+        <RisksTable
+          risks={paginatedRisks}
+          filteredCount={filteredRisks.length}
+          isAr={isAr}
+          t={t}
+          getStatusDisplayName={getStatusDisplayName}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSortChange={handleSortChange}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(n) => {
+            setItemsPerPage(n);
+            setCurrentPage(1);
+          }}
+          onViewRisk={handleViewRisk}
+          onDiscussRisk={(r) => router.push(`/risks/${r.id}`)}
+          onEditRisk={handleEditRisk}
+          onDeleteRisk={handleDeleteRisk}
+        />
       ) : (
-        /* Card View */
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {paginatedRisks.map((risk) => (
-            <Card key={risk.id} hover className={cn(
-              "overflow-hidden relative",
-              risk.isDeleted && [
-                "opacity-75 hover:opacity-90",
-                "border-2 border-red-300 dark:border-red-700/70",
-                "bg-gradient-to-br from-red-50/50 to-transparent dark:from-red-950/30 dark:to-transparent"
-              ]
-            )}>
-              {/* خط مائل للمخاطر المحذوفة */}
-              {risk.isDeleted && (
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-full bg-[repeating-linear-gradient(135deg,transparent,transparent_10px,rgba(239,68,68,0.1)_10px,rgba(239,68,68,0.1)_20px)]" />
-                </div>
-              )}
-              <div className="p-4 relative">
-                {/* Deleted Banner - محسّن */}
-                {risk.isDeleted && (
-                  <div className="mb-3 -mx-4 -mt-4 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md">
-                    <Trash2 className="h-3.5 w-3.5 animate-pulse" />
-                    {isAr ? 'خطر محذوف' : 'Deleted Risk'}
-                    <Trash2 className="h-3.5 w-3.5 animate-pulse" />
-                  </div>
-                )}
-                {/* Header */}
-                <div className="mb-3 flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    {risk.isDeleted && (
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/50">
-                        <X className="h-3.5 w-3.5 text-red-500" />
-                      </span>
-                    )}
-                    <code className={cn(
-                      "rounded px-2 py-1 text-xs font-mono",
-                      risk.isDeleted
-                        ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through decoration-2"
-                        : "bg-[var(--background-tertiary)]"
-                    )}>
-                      {risk.riskNumber}
-                    </code>
-                  </div>
-                  <Badge variant={getStatusBadgeVariant(risk.status)}>
-                    {getStatusDisplayName(risk.status)}
-                  </Badge>
-                </div>
-
-                {/* Title */}
-                <h3 className={cn(
-                  "mb-2 font-semibold",
-                  risk.isDeleted
-                    ? "line-through decoration-red-400 decoration-2 text-red-600/70 dark:text-red-400/70"
-                    : "text-[var(--foreground)]"
-                )}>
-                  {isAr ? risk.titleAr : risk.titleEn}
-                </h3>
-                <p className="mb-4 text-sm text-[var(--foreground-secondary)] line-clamp-2">
-                  {isAr ? risk.descriptionAr : risk.descriptionEn}
-                </p>
-
-                {/* Category, Issued By & Department */}
-                <div className="mb-4 flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-full bg-[var(--background-secondary)] px-2 py-1">
-                    {t(`risks.categories.${risk.categoryCode}`)}
-                  </span>
-                  {risk.issuedBy && (
-                    <span className="rounded-full bg-[var(--background-secondary)] px-2 py-1">
-                      {t('risks.issuedBy')}: {risk.issuedBy}
-                    </span>
-                  )}
-                  <span className="rounded-full bg-[var(--background-secondary)] px-2 py-1">
-                    {isAr ? risk.departmentAr : risk.departmentEn}
-                  </span>
-                </div>
-
-                {/* Risk Scores */}
-                <div className="mb-4 grid grid-cols-2 gap-4 rounded-lg bg-[var(--background-secondary)] p-3">
-                  <div>
-                    <p className="text-xs text-[var(--foreground-secondary)]">
-                      {t('risks.inherentRisk')}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="text-lg font-bold">{risk.inherentScore}</span>
-                      <Badge variant={getRatingBadgeVariant(risk.inherentRating)} className="text-xs">
-                        {t(`risks.ratings.${risk.inherentRating}`)}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--foreground-secondary)]">
-                      {t('risks.residualRisk')}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="text-lg font-bold">{risk.residualScore || '-'}</span>
-                      {risk.residualRating && (
-                        <Badge variant={getRatingBadgeVariant(risk.residualRating)} className="text-xs">
-                          {t(`risks.ratings.${risk.residualRating}`)}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between border-t border-[var(--border)] pt-4">
-                  <div className="text-sm text-[var(--foreground-secondary)]">
-                    <span className="font-medium">{t('risks.riskOwner')}:</span>{' '}
-                    {isAr ? risk.ownerAr : risk.ownerEn}
-                  </div>
-                  <RiskRowActions
-                    risk={risk}
-                    isAr={isAr}
-                    onView={() => handleViewRisk(risk)}
-                    onDiscuss={() => router.push(`/risks/${risk.id}`)}
-                    onEdit={() => handleEditRisk(risk)}
-                    onDelete={() => handleDeleteRisk(risk)}
-                    size="md"
-                  />
-                </div>
-              </div>
-            </Card>
-          ))}
-
-          {/* Cards View Pagination */}
-          {totalPages > 1 && (
-            <div className="col-span-full">
-              <Card>
-                <CardContent className="p-3">
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-[var(--foreground-secondary)]">
-                        {isAr
-                          ? `عرض ${paginatedRisks.length} من ${filteredRisks.length} خطر`
-                          : `Showing ${paginatedRisks.length} of ${filteredRisks.length} risks`}
-                      </p>
-                      <Select
-                        options={[
-                          { value: '6', label: '6' },
-                          { value: '12', label: '12' },
-                          { value: '24', label: '24' },
-                        ]}
-                        value={String(itemsPerPage)}
-                        onChange={(val) => {
-                          setItemsPerPage(parseInt(val, 10));
-                          setCurrentPage(1);
-                        }}
-                        className="w-16 h-8 text-xs"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                      >
-                        {isAr ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                        <span className="ms-1">{isAr ? 'السابق' : 'Previous'}</span>
-                      </Button>
-                      <span className="text-sm text-[var(--foreground)]">
-                        {currentPage} / {totalPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage >= totalPages}
-                      >
-                        <span className="me-1">{isAr ? 'التالي' : 'Next'}</span>
-                        {isAr ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
+        <RisksCardGrid
+          risks={paginatedRisks}
+          filteredCount={filteredRisks.length}
+          isAr={isAr}
+          t={t}
+          getStatusDisplayName={getStatusDisplayName}
+          getDescription={(r) => (isAr ? r.descriptionAr : r.descriptionEn)}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(n) => {
+            setItemsPerPage(n);
+            setCurrentPage(1);
+          }}
+          onViewRisk={handleViewRisk}
+          onDiscussRisk={(r) => router.push(`/risks/${r.id}`)}
+          onEditRisk={handleEditRisk}
+          onDeleteRisk={handleDeleteRisk}
+        />
       )}
 
 
