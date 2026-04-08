@@ -81,79 +81,120 @@ export async function GET(request: NextRequest) {
     }
 
     // تطبيق فلترة الصلاحيات حسب دور المستخدم
-    let where = baseWhere;
+    let where: Record<string, unknown> = baseWhere;
 
-    if (filterByAccess && effectiveUserId) {
-      const user = await prisma.user.findUnique({
-        where: { id: effectiveUserId },
-        include: {
-          accessibleDepartments: {
-            select: { departmentId: true },
+    // Load the effective user once — needed both for role-based department
+    // filtering AND for the approval-status governance filter below.
+    const effectiveUser = effectiveUserId
+      ? await prisma.user.findUnique({
+          where: { id: effectiveUserId },
+          include: {
+            accessibleDepartments: {
+              select: { departmentId: true },
+            },
           },
-        },
-      });
+        })
+      : null;
 
-      if (user) {
-        // المسؤول ومدير المخاطر ومحلل المخاطر والتنفيذي يرون كل المخاطر
-        if (!['admin', 'riskManager', 'riskAnalyst', 'executive'].includes(user.role)) {
-          // بناء قائمة الإدارات المسموح بها
-          const allowedDepartmentIds = [
-            user.departmentId, // الإدارة الأساسية للمستخدم
-            ...user.accessibleDepartments.map(a => a.departmentId), // الإدارات الإضافية
-          ].filter(Boolean) as string[];
+    if (filterByAccess && effectiveUser) {
+      const user = effectiveUser;
+      // المسؤول ومدير المخاطر ومحلل المخاطر والتنفيذي يرون كل المخاطر
+      if (!['admin', 'riskManager', 'riskAnalyst', 'executive'].includes(user.role)) {
+        // بناء قائمة الإدارات المسموح بها
+        const allowedDepartmentIds = [
+          user.departmentId, // الإدارة الأساسية للمستخدم
+          ...user.accessibleDepartments.map(a => a.departmentId), // الإدارات الإضافية
+        ].filter(Boolean) as string[];
 
-          // إذا كان المستخدم موظف (employee) - يرى المخاطر حسب الإدارات المحددة له
-          if (user.role === 'employee') {
-            // التحقق من وجود RiskOwner مرتبط بهذا المستخدم عبر البريد
-            const riskOwner = await prisma.riskOwner.findFirst({
-              where: { email: user.email },
-            });
+        // إذا كان المستخدم موظف (employee) - يرى المخاطر حسب الإدارات المحددة له
+        if (user.role === 'employee') {
+          // التحقق من وجود RiskOwner مرتبط بهذا المستخدم عبر البريد
+          const riskOwner = await prisma.riskOwner.findFirst({
+            where: { email: user.email },
+          });
 
-            // بناء شروط الوصول
-            const accessConditions: Record<string, unknown>[] = [
-              { ownerId: user.id }, // مالك الخطر (User)
-              { championId: user.id }, // رائد الخطر
-            ];
+          // بناء شروط الوصول
+          const accessConditions: Record<string, unknown>[] = [
+            { ownerId: user.id }, // مالك الخطر (User)
+            { championId: user.id }, // رائد الخطر
+          ];
 
-            // إضافة المخاطر حسب RiskOwner إن وجد
-            if (riskOwner) {
-              accessConditions.push({ riskOwnerId: riskOwner.id });
-            }
+          // إضافة المخاطر حسب RiskOwner إن وجد
+          if (riskOwner) {
+            accessConditions.push({ riskOwnerId: riskOwner.id });
+          }
 
-            // إضافة المخاطر حسب الإدارات المسموح بها
-            if (allowedDepartmentIds.length > 0) {
-              accessConditions.push({ departmentId: { in: allowedDepartmentIds } });
-            }
+          // إضافة المخاطر حسب الإدارات المسموح بها
+          if (allowedDepartmentIds.length > 0) {
+            accessConditions.push({ departmentId: { in: allowedDepartmentIds } });
+          }
 
+          where = {
+            ...baseWhere,
+            OR: accessConditions,
+          };
+        }
+        // إذا كان رائد مخاطر - يرى مخاطر إداراته فقط
+        else if (user.role === 'riskChampion') {
+          if (allowedDepartmentIds.length > 0) {
             where = {
               ...baseWhere,
-              OR: accessConditions,
+              OR: [
+                { departmentId: { in: allowedDepartmentIds } }, // مخاطر الإدارات المسموح بها
+                { championId: user.id }, // أو المخاطر التي هو رائدها
+                { ownerId: user.id }, // أو المخاطر التي هو مالكها
+              ],
             };
-          }
-          // إذا كان رائد مخاطر - يرى مخاطر إداراته فقط
-          else if (user.role === 'riskChampion') {
-            if (allowedDepartmentIds.length > 0) {
-              where = {
-                ...baseWhere,
-                OR: [
-                  { departmentId: { in: allowedDepartmentIds } }, // مخاطر الإدارات المسموح بها
-                  { championId: user.id }, // أو المخاطر التي هو رائدها
-                  { ownerId: user.id }, // أو المخاطر التي هو مالكها
-                ],
-              };
-            } else {
-              // إذا لم يكن لديه إدارات، يرى فقط المخاطر المرتبطة به مباشرة
-              where = {
-                ...baseWhere,
-                OR: [
-                  { championId: user.id },
-                  { ownerId: user.id },
-                ],
-              };
-            }
+          } else {
+            // إذا لم يكن لديه إدارات، يرى فقط المخاطر المرتبطة به مباشرة
+            where = {
+              ...baseWhere,
+              OR: [
+                { championId: user.id },
+                { ownerId: user.id },
+              ],
+            };
           }
         }
       }
+    }
+
+    // =========================================================================
+    // Approval-status governance filter
+    // =========================================================================
+    // A newly-created risk is saved with approvalStatus="Draft" and a
+    // RiskApprovalRequest (pending) is sent to the Risk Manager. Until the
+    // request is approved, the risk must NOT appear in the public register.
+    //
+    // Visibility rules:
+    //   - admin / riskManager: see EVERYTHING (they need drafts to review)
+    //   - everyone else: see "Approved" risks only, PLUS anything they
+    //     created or own personally (so authors can track their own pending
+    //     submissions from the risks list).
+    //
+    // Applied AFTER role-based access filtering so it narrows, never widens.
+    // -------------------------------------------------------------------------
+    const canSeeAllApprovalStatuses =
+      effectiveUser && ['admin', 'riskManager'].includes(effectiveUser.role);
+
+    if (!canSeeAllApprovalStatuses) {
+      const approvalFilter: Record<string, unknown> = effectiveUserId
+        ? {
+            OR: [
+              { approvalStatus: 'Approved' },
+              { createdById: effectiveUserId },
+              { ownerId: effectiveUserId },
+            ],
+          }
+        : {
+            // No session (filterByAccess=false without auth) → public
+            // consumers only ever see approved risks.
+            approvalStatus: 'Approved',
+          };
+
+      where = Object.keys(where).length > 0
+        ? { AND: [where, approvalFilter] }
+        : approvalFilter;
     }
 
     const risks = await prisma.risk.findMany({

@@ -195,6 +195,21 @@ export async function GET(
       );
     }
 
+    // Approval-status governance: unapproved risks are only visible to
+    // admin/riskManager (reviewers) and to the creator or owner themselves.
+    // Returning 404 (not 403) avoids leaking the existence of pending risks.
+    if (risk.approvalStatus !== 'Approved') {
+      const isPrivileged = ['admin', 'riskManager'].includes(authResult.role);
+      const isCreator = risk.createdById === authResult.userId;
+      const isOwner = risk.ownerId === authResult.userId;
+      if (!isPrivileged && !isCreator && !isOwner) {
+        return NextResponse.json(
+          { success: false, error: 'الخطر غير موجود' },
+          { status: 404 }
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: risk,
