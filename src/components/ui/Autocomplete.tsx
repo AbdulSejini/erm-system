@@ -33,13 +33,20 @@ export function Autocomplete({
   noResultsText = 'No results found',
 }: AutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Find the selected option to display its label
   const selectedOption = options.find(opt => opt.id === value);
+
+  // Search term is derived from the external `value` prop — when value changes,
+  // we reset searchTerm by tracking the previous value (React 19 "reset on prop change" pattern).
+  const [searchTerm, setSearchTerm] = useState(selectedOption?.label ?? '');
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setSearchTerm(selectedOption?.label ?? '');
+  }
 
   // Filter options based on search term
   const filteredOptions = options.filter(option => {
@@ -49,6 +56,14 @@ export function Autocomplete({
       (option.labelSecondary && option.labelSecondary.toLowerCase().includes(search))
     );
   });
+
+  // Reset highlighted index when filtered options list changes (derived from render state).
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [prevFilteredLength, setPrevFilteredLength] = useState(filteredOptions.length);
+  if (filteredOptions.length !== prevFilteredLength) {
+    setPrevFilteredLength(filteredOptions.length);
+    setHighlightedIndex(0);
+  }
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -67,20 +82,6 @@ export function Autocomplete({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedOption]);
-
-  // Set initial search term when value changes
-  useEffect(() => {
-    if (selectedOption) {
-      setSearchTerm(selectedOption.label);
-    } else {
-      setSearchTerm('');
-    }
-  }, [value, selectedOption]);
-
-  // Reset highlighted index when filtered options change
-  useEffect(() => {
-    setHighlightedIndex(0);
-  }, [filteredOptions.length]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);

@@ -203,7 +203,7 @@ export async function POST() {
         }
 
         // Find department ID
-        let departmentId = deptByCode.get(risk.categoryCode) ||
+        const departmentId = deptByCode.get(risk.categoryCode) ||
                           deptByNameAr.get(risk.departmentAr) ||
                           defaultDeptId;
 

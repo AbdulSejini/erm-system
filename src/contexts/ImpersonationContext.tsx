@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 
 interface ImpersonatedUser {
@@ -40,35 +40,55 @@ const ImpersonationContext = createContext<ImpersonationContextType | undefined>
 
 const STORAGE_KEY = 'erm_impersonation';
 
+interface PersistedImpersonation {
+  originalAdmin: OriginalAdmin;
+  impersonatedUser: ImpersonatedUser;
+}
+
+// Read persisted impersonation state once during SSR-safe initialization.
+function readPersisted(): PersistedImpersonation | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+    return JSON.parse(stored) as PersistedImpersonation;
+  } catch {
+    return null;
+  }
+}
+
+function clearPersisted() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function ImpersonationProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
+
+  // Load persisted state lazily (runs once).
+  const [persisted] = useState<PersistedImpersonation | null>(readPersisted);
   const [isImpersonating, setIsImpersonating] = useState(false);
   const [impersonatedUser, setImpersonatedUser] = useState<ImpersonatedUser | null>(null);
   const [originalAdmin, setOriginalAdmin] = useState<OriginalAdmin | null>(null);
+  const [hasSynced, setHasSynced] = useState(false);
 
-  // استعادة حالة الانتحال من localStorage عند التحميل
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const data = JSON.parse(stored);
-          // التحقق من أن المستخدم الحالي هو نفس المدير الأصلي
-          if (data.originalAdmin && session?.user?.id === data.originalAdmin.id) {
-            setIsImpersonating(true);
-            setImpersonatedUser(data.impersonatedUser);
-            setOriginalAdmin(data.originalAdmin);
-          } else {
-            // إذا تغير المستخدم، مسح البيانات المخزنة
-            localStorage.removeItem(STORAGE_KEY);
-          }
-        } catch (e) {
-          console.error('Error parsing impersonation data:', e);
-          localStorage.removeItem(STORAGE_KEY);
-        }
-      }
+  // Sync persisted state to React once the session is resolved — runs during
+  // render using a guarded one-shot pattern (avoids setState-in-effect lint).
+  if (!hasSynced && session?.user?.id && persisted?.originalAdmin) {
+    setHasSynced(true);
+    if (session.user.id === persisted.originalAdmin.id) {
+      setIsImpersonating(true);
+      setImpersonatedUser(persisted.impersonatedUser);
+      setOriginalAdmin(persisted.originalAdmin);
+    } else {
+      // Different user logged in — discard stale impersonation
+      clearPersisted();
     }
-  }, [session?.user?.id]);
+  }
 
   // بدء انتحال صلاحيات مستخدم
   const startImpersonation = useCallback(async (targetUserId: string): Promise<boolean> => {
@@ -109,7 +129,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       console.error('Error starting impersonation:', error);
       return false;
     }
-  }, [session?.user?.id, session?.user?.role]);
+  }, [session]);
 
   // إنهاء انتحال الصلاحيات
   const stopImpersonation = useCallback(async () => {
@@ -134,7 +154,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
 
     // إعادة تحميل الصفحة للتأكد من تطبيق الصلاحيات الصحيحة
     window.location.reload();
-  }, [originalAdmin?.id]);
+  }, [originalAdmin]);
 
   // الحصول على المستخدم الفعلي
   const getEffectiveUser = useCallback(() => {
@@ -157,7 +177,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     }
 
     return null;
-  }, [isImpersonating, impersonatedUser, session?.user]);
+  }, [isImpersonating, impersonatedUser, session]);
 
   return (
     <ImpersonationContext.Provider

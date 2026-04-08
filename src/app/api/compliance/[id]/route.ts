@@ -116,7 +116,7 @@ export async function PATCH(
     const clientInfo = getClientInfo(request);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let updateData: any = {};
+    const updateData: any = {};
 
     const fields = [
       'titleAr', 'titleEn',

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useTranslation, useLanguage } from '@/contexts/LanguageContext';
@@ -582,10 +583,13 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] text-sm font-semibold text-white shadow-sm">
               {user.avatar ? (
-                <img
+                <Image
                   src={user.avatar}
                   alt={user.name}
+                  width={36}
+                  height={36}
                   className="h-full w-full rounded-xl object-cover"
+                  unoptimized
                 />
               ) : (
                 user.name.charAt(0)

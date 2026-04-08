@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -92,7 +92,7 @@ interface RiskApprovalRequest {
   } | null;
 }
 
-export default function RiskApprovalsPage() {
+function RiskApprovalsContent() {
   const { t, language } = useTranslation();
   const isAr = language === 'ar';
   const searchParams = useSearchParams();
@@ -624,5 +624,19 @@ export default function RiskApprovalsPage() {
         </ModalFooter>
       </Modal>
     </div>
+  );
+}
+
+export default function RiskApprovalsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+        </div>
+      }
+    >
+      <RiskApprovalsContent />
+    </Suspense>
   );
 }

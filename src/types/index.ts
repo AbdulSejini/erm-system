@@ -89,6 +89,7 @@ export interface Risk {
   id: string;
   riskNumber: string; // مثل FIN-R-001
   issuedBy?: string; // الجهة المصدرة (KPMG, Internal, etc.)
+  sourceId?: string; // ربط بنموذج RiskSource
 
   // المعلومات الأساسية
   titleAr: string;
@@ -103,6 +104,8 @@ export interface Risk {
   department?: Department;
   processId?: string;
   process?: Process;
+  processText?: string; // نص حر للعملية
+  subProcessText?: string; // نص حر للعملية الفرعية
 
   // تفاصيل الخطر
   potentialCauseAr?: string;
@@ -142,11 +145,19 @@ export interface Risk {
 
   // الحالة والمتابعة
   status: RiskStatus;
+  statusId?: string; // ربط مع جدول RiskStatus
+  approvalStatus?: string; // Approved, Draft, Future, N/A, Sent, Under Discussing
   followUpDate?: Date;
+
+  // الحذف الناعم
+  isDeleted?: boolean;
+  deletedAt?: Date;
 
   // المسؤولين
   ownerId: string;
   owner?: User;
+  riskOwnerId?: string; // مالك الخطر (RiskOwner الجديد)
+  riskOwner?: RiskOwner;
   championId?: string;
   champion?: User;
 
@@ -185,9 +196,24 @@ export interface RiskAssessment {
   createdAt: Date;
 }
 
+// Risk Owner Types (ملاك المخاطر — منفصل عن User)
+export interface RiskOwner {
+  id: string;
+  fullName: string;
+  fullNameEn?: string;
+  email?: string;
+  phone?: string;
+  departmentId?: string;
+  department?: Department;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Treatment Plan Types
 export type TreatmentStrategy = 'avoid' | 'reduce' | 'transfer' | 'accept';
 export type TreatmentStatus = 'notStarted' | 'inProgress' | 'completed' | 'overdue' | 'cancelled';
+export type TreatmentPriority = 'high' | 'medium' | 'low';
 
 export interface TreatmentPlan {
   id: string;
@@ -199,13 +225,29 @@ export interface TreatmentPlan {
   descriptionEn: string;
   strategy: TreatmentStrategy;
   status: TreatmentStatus;
+  priority?: TreatmentPriority;
   responsibleId: string;
   responsible?: User;
+  riskOwnerId?: string; // صاحب الخطر من RiskOwner
+  riskOwner?: RiskOwner;
+  monitorId?: string;
+  monitor?: User;
   startDate: Date;
   dueDate: Date;
   completionDate?: Date;
   progress: number;
   cost?: number;
+
+  // تبرير/مسببات خطة المعالجة
+  justificationAr?: string;
+  justificationEn?: string;
+
+  // الخطر المتبقي المتوقع بعد المعالجة
+  expectedResidualLikelihood?: number;
+  expectedResidualImpact?: number;
+  expectedResidualScore?: number;
+  expectedResidualRating?: RiskRating;
+
   tasks?: TreatmentTask[];
   createdById: string;
   createdBy?: User;
@@ -222,11 +264,32 @@ export interface TreatmentTask {
   descriptionAr?: string;
   descriptionEn?: string;
   status: TreatmentStatus;
+  priority?: TreatmentPriority;
+
+  // المكلف بالتنفيذ (User للتوافق القديم، RiskOwner الجديد)
   assignedToId?: string;
   assignedTo?: User;
+  actionOwnerId?: string;
+  actionOwner?: RiskOwner;
+
+  // المتابع (User للتوافق القديم، RiskOwner الجديد)
+  monitorId?: string;
+  monitor?: User;
+  monitorOwnerId?: string;
+  monitorOwner?: RiskOwner;
+
+  // مؤشر الإنجاز
+  successIndicatorAr?: string;
+  successIndicatorEn?: string;
+
   dueDate?: Date;
   completionDate?: Date;
   order: number;
+
+  // مرفقات OneDrive/SharePoint
+  oneDriveUrl?: string;
+  oneDriveFileName?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -452,6 +515,30 @@ export const getRiskRatingColor = (rating: RiskRating): string => {
     case 'Negligible': return '#3B82F6'; // blue
     default: return '#6B7280'; // gray
   }
+};
+
+/**
+ * Normalize a rating value from the API/DB into the canonical RiskRating enum.
+ *
+ * Impact Criteria Level 5 is labeled "Catastrophic" in the UI criteria table,
+ * but the Risk Rating enum only contains Critical/Major/Moderate/Minor/Negligible.
+ * Legacy data may still surface "Catastrophic" as a rating — map it to "Critical".
+ *
+ * Falls back to "Moderate" for unknown/null values.
+ */
+export const normalizeRiskRating = (rating: string | null | undefined): RiskRating => {
+  if (!rating) return 'Moderate';
+  if (rating === 'Catastrophic') return 'Critical';
+  if (
+    rating === 'Critical' ||
+    rating === 'Major' ||
+    rating === 'Moderate' ||
+    rating === 'Minor' ||
+    rating === 'Negligible'
+  ) {
+    return rating;
+  }
+  return 'Moderate';
 };
 
 // Default Risk Categories (فئات المخاطر الافتراضية)
@@ -681,7 +768,7 @@ export interface ImportedRisk {
   residualImpact?: number;
   residualScore?: number;
   residualRating?: RiskRating;
-  status: 'Open' | 'In Progress' | 'Closed';
+  status: RiskStatus; // unified with main Risk.status enum
   championId?: string;
   championName?: string;
   createdAt: Date;

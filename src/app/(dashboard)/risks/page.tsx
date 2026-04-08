@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
@@ -186,7 +186,7 @@ const convertedHRRisks = hrRisks.map((hr) => ({
   descriptionAr: hr.descriptionAr,
   descriptionEn: hr.descriptionEn,
   categoryCode: 'HR' as const,
-  status: (hr.status === 'Open' ? 'open' : hr.status === 'In Progress' ? 'inProgress' : 'closed') as RiskStatus,
+  status: hr.status as RiskStatus,
   departmentId: '',
   departmentAr: hr.departmentAr,
   departmentEn: hr.department,
@@ -621,7 +621,7 @@ interface APIRisk {
   };
 }
 
-export default function RisksPage() {
+function RisksPageContent() {
   const { t, language } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -3761,5 +3761,19 @@ export default function RisksPage() {
         </ModalFooter>
       </Modal>
     </div>
+  );
+}
+
+export default function RisksPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+        </div>
+      }
+    >
+      <RisksPageContent />
+    </Suspense>
   );
 }

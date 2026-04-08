@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useTransition, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useTransition, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { useImpersonation } from '@/contexts/ImpersonationContext';
@@ -349,7 +349,7 @@ const ratingColors: Record<RiskRating, string> = {
 // Main Component
 // ============================================
 
-export default function TreatmentPage() {
+function TreatmentPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, language } = useTranslation();
@@ -2644,5 +2644,19 @@ Risk Management Team`;
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function TreatmentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+        </div>
+      }
+    >
+      <TreatmentPageContent />
+    </Suspense>
   );
 }

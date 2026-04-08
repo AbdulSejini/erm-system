@@ -103,7 +103,7 @@ export async function POST() {
             descriptionEn: hrRisk.descriptionEn,
             categoryId: hrCategory.id,
             departmentId: hrDepartment.id,
-            status: hrRisk.status === 'Open' ? 'open' : hrRisk.status === 'In Progress' ? 'inProgress' : 'closed',
+            status: hrRisk.status,
             inherentLikelihood: hrRisk.likelihood,
             inherentImpact: hrRisk.impact,
             inherentScore: inherentScore,

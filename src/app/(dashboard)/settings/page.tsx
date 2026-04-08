@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from '@/contexts/LanguageContext';
@@ -46,6 +46,7 @@ import {
   DownloadCloud,
   AlertTriangle,
   Clock,
+  Loader2,
 } from 'lucide-react';
 import { hrRisks, hrRisksSummary } from '@/data/hrRisks';
 import RiskEditor from '@/components/RiskEditor';
@@ -274,7 +275,7 @@ const statusIcons = [
   { value: 'Flag', label: 'علم / Flag' },
 ];
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const { data: session } = useSession();
   const { t, language } = useTranslation();
   const { isImpersonating, impersonatedUser } = useImpersonation();
@@ -4460,5 +4461,19 @@ export default function SettingsPage() {
         </ModalFooter>
       </Modal>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+        </div>
+      }
+    >
+      <SettingsPageContent />
+    </Suspense>
   );
 }

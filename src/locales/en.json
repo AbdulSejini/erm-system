@@ -43,7 +43,9 @@
     "helpTip": "Tip",
     "learnMore": "Learn more",
     "viewAll": "View all",
-    "viewDetails": "View details"
+    "viewDetails": "View details",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode"
   },
   "auth": {
     "login": "Login",
@@ -129,6 +131,7 @@
     "residualRisk": "Residual Risk",
     "likelihood": "Likelihood",
     "impact": "Impact",
+    "score": "Score",
     "riskScore": "Risk Score",
     "riskLevel": "Risk Level",
     "riskRating": "Risk Rating",
@@ -276,7 +279,10 @@
       "major": "Major",
       "moderate": "Moderate",
       "minor": "Minor",
-      "negligible": "Negligible"
+      "negligible": "Negligible",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
     },
     "levelDesc": {
       "critical": "Requires immediate senior management attention",

@@ -630,7 +630,7 @@ async function handleBulkImport(
       const deptCode = String(riskData.Department_Code || riskData['Department Code'] || '').toLowerCase().trim();
       const deptName = String(riskData.Department || '').toLowerCase().trim();
 
-      let departmentId = deptMapCode.get(deptCode) || deptMap.get(deptName) || deptMapEn.get(deptName) || defaultDeptId;
+      const departmentId = deptMapCode.get(deptCode) || deptMap.get(deptName) || deptMapEn.get(deptName) || defaultDeptId;
 
       // تحديد الفئة (بالاسم أو الرمز) - دعم أسماء الأعمدة المختلفة
       const catCode = String(riskData.Category_Code || riskData['Category Code'] || '').toLowerCase().trim();

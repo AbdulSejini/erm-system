@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/Button';
 import {
@@ -235,10 +236,13 @@ export function RiskDiscussion({ riskId, currentUserId, currentUserRole }: RiskD
           {/* Avatar */}
           <div className="flex-shrink-0">
             {comment.author.avatar ? (
-              <img
+              <Image
                 src={comment.author.avatar}
                 alt={comment.author.fullName}
+                width={40}
+                height={40}
                 className="w-10 h-10 rounded-full object-cover"
+                unoptimized
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-[var(--primary-light)] flex items-center justify-center">

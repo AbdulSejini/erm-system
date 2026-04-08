@@ -43,7 +43,9 @@
     "helpTip": "نصيحة",
     "learnMore": "اعرف المزيد",
     "viewAll": "عرض الكل",
-    "viewDetails": "عرض التفاصيل"
+    "viewDetails": "عرض التفاصيل",
+    "darkMode": "الوضع الداكن",
+    "lightMode": "الوضع الفاتح"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -129,6 +131,7 @@
     "residualRisk": "الخطر المتبقي",
     "likelihood": "الاحتمالية",
     "impact": "التأثير",
+    "score": "الدرجة",
     "riskScore": "درجة الخطر",
     "riskLevel": "مستوى الخطر",
     "riskRating": "تصنيف الخطر",
@@ -276,7 +279,10 @@
       "major": "كبير",
       "moderate": "متوسط",
       "minor": "طفيف",
-      "negligible": "ضئيل"
+      "negligible": "ضئيل",
+      "high": "عالي",
+      "medium": "متوسط",
+      "low": "منخفض"
     },
     "levelDesc": {
       "critical": "يتطلب اهتماماً فورياً من الإدارة العليا",
