@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } fr
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
@@ -16,14 +16,11 @@ import {
   Search,
   Filter,
   Download,
-  Eye,
   Edit,
   Trash2,
   ChevronLeft,
   ChevronRight,
-  BarChart3,
   AlertTriangle,
-  TrendingUp,
   CheckCircle,
   Clock,
   Grid3X3,
@@ -36,7 +33,6 @@ import {
   Shield,
   RefreshCw,
   MessageSquare,
-  ExternalLink,
   History,
   Activity,
   ArrowRight,
@@ -52,129 +48,32 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  SortAsc,
-  SortDesc,
-  MoreVertical,
 } from 'lucide-react';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { RiskDiscussion } from '@/components/RiskDiscussion';
 import {
   type RiskRating,
   type RiskStatus,
-  calculateRiskScore,
   getRiskRating,
 } from '@/types';
 
-// Interface for API category data
-interface APICategory {
-  id: string;
-  code: string;
-  nameAr: string;
-  nameEn: string;
-  descriptionAr?: string | null;
-  descriptionEn?: string | null;
-  color?: string | null;
-  isActive: boolean;
-}
-
-interface APIRiskStatus {
-  id: string;
-  code: string;
-  nameAr: string;
-  nameEn: string;
-  descriptionAr?: string | null;
-  descriptionEn?: string | null;
-  color?: string | null;
-  icon?: string | null;
-  isDefault: boolean;
-  isActive: boolean;
-  order: number;
-}
-
-interface ChangeLogEntry {
-  id: string;
-  changeType: string;
-  changeCategory: string;
-  fieldName: string | null;
-  fieldNameAr: string | null;
-  oldValue: string | null;
-  newValue: string | null;
-  description: string | null;
-  descriptionAr: string | null;
-  relatedEntityId: string | null;
-  createdAt: string;
-  user: {
-    id: string;
-    fullName: string;
-    fullNameEn: string | null;
-    avatar: string | null;
-    role: string;
-  };
-}
-
-interface TreatmentTask {
-  id: string;
-  titleAr: string;
-  titleEn: string;
-  status: string;
-  dueDate: string;
-  completedDate: string | null;
-}
-
-interface TreatmentPlan {
-  id: string;
-  titleAr: string;
-  titleEn: string;
-  descriptionAr: string;
-  descriptionEn: string;
-  strategy: string;
-  status: string;
-  startDate: string;
-  dueDate: string;
-  completionDate: string | null;
-  progress: number;
-  cost: number | null;
-  responsible?: {
-    id: string;
-    fullName: string;
-    fullNameEn: string | null;
-  };
-  tasks: TreatmentTask[];
-}
-
-interface RiskAssessment {
-  id: string;
-  assessmentType: string;
-  likelihood: number;
-  impact: number;
-  score: number;
-  rating: string;
-  notesAr: string | null;
-  notesEn: string | null;
-  assessmentDate: string;
-  assessedBy?: {
-    id: string;
-    fullName: string;
-    fullNameEn: string | null;
-  };
-}
-
-interface Incident {
-  id: string;
-  incidentNumber: string;
-  titleAr: string;
-  titleEn: string;
-  descriptionAr: string;
-  descriptionEn: string;
-  status: string;
-  severity: string;
-  occurredAt: string;
-  reportedBy?: {
-    id: string;
-    fullName: string;
-    fullNameEn: string | null;
-  };
-}
+// Shared types live in ./_components/types.ts
+import type {
+  APICategory,
+  APIRiskStatus,
+  ChangeLogEntry,
+  TreatmentPlan,
+  RiskAssessment,
+  Incident,
+  APIRisk,
+  SortField,
+  SortDirection,
+} from './_components/types';
+import { RiskRowActions } from './_components/RiskRowActions';
+import { RisksSkeleton } from './_components/RisksSkeleton';
+import { RiskEmptyState } from './_components/RiskEmptyState';
+import { RisksStatsCards } from './_components/RisksStatsCards';
+import { RisksPagination } from './_components/RisksPagination';
 
 import { hrRisks } from '@/data/hrRisks';
 
@@ -572,198 +471,12 @@ const mockRisks = [
 // Combined all risks (fallback data)
 const allRisks = mockRisks;
 
-// Risk type for API response
-interface APIRisk {
-  id: string;
-  riskNumber: string;
-  titleAr: string;
-  titleEn: string;
-  descriptionAr: string;
-  descriptionEn: string;
-  categoryId: string | null;
-  departmentId: string;
-  inherentLikelihood: number;
-  inherentImpact: number;
-  inherentScore: number;
-  inherentRating: RiskRating;
-  residualLikelihood: number | null;
-  residualImpact: number | null;
-  residualScore: number | null;
-  residualRating: string | null;
-  status: string;
-  issuedBy: string | null;
-  approvalStatus: string | null;
-  mitigationActionsAr: string | null;
-  mitigationActionsEn: string | null;
-  potentialCauseAr: string | null;
-  potentialCauseEn: string | null;
-  potentialImpactAr: string | null;
-  potentialImpactEn: string | null;
-  layersOfProtectionAr: string | null;
-  layersOfProtectionEn: string | null;
-  krisAr: string | null;
-  krisEn: string | null;
-  processText: string | null;
-  subProcessText: string | null;
-  followUpDate: string | null;
-  nextReviewDate: string | null;
-  identifiedDate: string;
-  category?: { id: string; code: string; nameAr: string; nameEn: string } | null;
-  department?: { id: string; code: string; nameAr: string; nameEn: string };
-  source?: { id: string; code: string; nameAr: string; nameEn: string } | null;
-  owner?: { id: string; fullName: string; fullNameEn: string | null };
-  champion?: { id: string; fullName: string; fullNameEn: string | null };
-  riskOwner?: { id: string; fullName: string; fullNameEn: string | null };
-  riskOwnerId?: string | null;
-  isDeleted?: boolean;
-  deletedAt?: string | null;
-  _count?: {
-    comments: number;
-  };
-}
-
-/**
- * Compact action menu for a single risk row.
- *
- * Renders the two primary actions inline (View + Discussions, both
- * frequent + non-destructive) and tucks the secondary actions
- * (Edit, Delete) into a click-based "⋮" overflow menu. This drops the
- * visible-button count per row from 4 to 3 and isolates the destructive
- * action behind an extra click.
- *
- * Defined inline so it has direct access to the existing handlers without
- * having to plumb everything through props from the parent.
- */
-interface RiskRowActionsProps {
-  risk: { id: string; commentsCount?: number };
-  isAr: boolean;
-  onView: () => void;
-  onDiscuss: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  size?: 'sm' | 'md';
-}
-
-function RiskRowActions({
-  risk,
-  isAr,
-  onView,
-  onDiscuss,
-  onEdit,
-  onDelete,
-  size = 'sm',
-}: RiskRowActionsProps) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onEsc(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('mousedown', onDocClick);
-    document.addEventListener('keydown', onEsc);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      document.removeEventListener('keydown', onEsc);
-    };
-  }, [open]);
-
-  const iconSize = size === 'md' ? 'h-4 w-4' : 'h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4';
-  const buttonSize = size === 'md' ? 'h-8 w-8' : 'h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8';
-
-  return (
-    <div className="flex items-center justify-center gap-0.5 sm:gap-1">
-      {/* Primary: View details modal */}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        title={isAr ? 'عرض' : 'View'}
-        onClick={onView}
-        className={buttonSize}
-      >
-        <Eye className={iconSize} />
-      </Button>
-
-      {/* Primary: Open discussion page (with unread badge) */}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        title={isAr ? 'التفاصيل والنقاش' : 'Details & Discussion'}
-        onClick={onDiscuss}
-        className={`${buttonSize} text-[var(--primary)] relative`}
-      >
-        <MessageSquare className={iconSize} />
-        {(risk.commentsCount || 0) > 0 && (
-          // 10px badge text — fits inside the 14px/16px circular bubble.
-          <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 text-[10px] font-bold bg-[#F39200] text-white rounded-full shadow-sm">
-            {(risk.commentsCount || 0) > 99 ? '99+' : risk.commentsCount}
-          </span>
-        )}
-      </Button>
-
-      {/* Overflow menu — Edit / Delete (destructive isolated) */}
-      <div className="relative" ref={menuRef}>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title={isAr ? 'المزيد' : 'More'}
-          onClick={() => setOpen((v) => !v)}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          className={buttonSize}
-        >
-          <MoreVertical className={iconSize} />
-        </Button>
-        {open && (
-          <div
-            role="menu"
-            className="absolute end-0 z-20 mt-1 min-w-[160px] rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
-          >
-            <button
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onEdit();
-              }}
-              className="flex w-full items-center gap-2 rounded-t-lg px-3 py-2 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-secondary)]"
-            >
-              <Edit className="h-4 w-4" />
-              <span>{isAr ? 'تعديل' : 'Edit'}</span>
-            </button>
-            <button
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-              className="flex w-full items-center gap-2 rounded-b-lg border-t border-[var(--border)] px-3 py-2 text-sm text-[var(--status-error)] transition-colors hover:bg-[var(--status-error)]/10"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>{isAr ? 'حذف' : 'Delete'}</span>
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function RisksPageContent() {
   const { t, language } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const isAr = language === 'ar';
-
-  // Sort options type
-  type SortField = 'riskNumber' | 'title' | 'inherentScore' | 'residualScore' | 'status' | 'identifiedDate';
-  type SortDirection = 'asc' | 'desc';
 
   // Ref to track if this is the initial load (to prevent resetting page on mount)
   const isInitialMount = useRef(true);
@@ -1783,142 +1496,24 @@ function RisksPageContent() {
       </div>
 
       {/* Statistics Cards (clickable quick filters) */}
-      <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-        {/* Total — clears all rating/status filters */}
-        <button
-          type="button"
-          onClick={() => toggleStatFilter('total')}
-          aria-pressed={!filterRating && !filterStatus}
-          className={cn(
-            'rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
-            'hover:shadow-md hover:-translate-y-0.5',
-            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
-            !filterRating && !filterStatus
-              ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]'
-              : 'border-[var(--border)]'
-          )}
-        >
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--primary-light)] shrink-0">
-              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--primary)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.total}</p>
-              <p className="text-xs text-[var(--foreground-secondary)] truncate">
-                {t('dashboard.totalRisks')}
-              </p>
-            </div>
-          </div>
-        </button>
-
-        {/* Critical rating filter */}
-        <button
-          type="button"
-          onClick={() => toggleStatFilter('critical')}
-          aria-pressed={filterRating === 'Critical'}
-          className={cn(
-            'rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
-            'hover:shadow-md hover:-translate-y-0.5',
-            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
-            filterRating === 'Critical'
-              ? 'border-[var(--risk-critical)] ring-1 ring-[var(--risk-critical)]'
-              : 'border-[var(--border)]'
-          )}
-        >
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--risk-critical-bg)] shrink-0">
-              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--risk-critical)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.critical}</p>
-              <p className="text-xs text-[var(--foreground-secondary)] truncate">
-                {t('dashboard.criticalRisks')}
-              </p>
-            </div>
-          </div>
-        </button>
-
-        {/* Major rating filter */}
-        <button
-          type="button"
-          onClick={() => toggleStatFilter('major')}
-          aria-pressed={filterRating === 'Major'}
-          className={cn(
-            'rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
-            'hover:shadow-md hover:-translate-y-0.5',
-            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
-            filterRating === 'Major'
-              ? 'border-[var(--risk-high)] ring-1 ring-[var(--risk-high)]'
-              : 'border-[var(--border)]'
-          )}
-        >
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--risk-high-bg)] shrink-0">
-              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--risk-high)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.major}</p>
-              <p className="text-xs text-[var(--foreground-secondary)] truncate">
-                {t('dashboard.majorRisks')}
-              </p>
-            </div>
-          </div>
-        </button>
-
-        {/* Open status filter */}
-        <button
-          type="button"
-          onClick={() => toggleStatFilter('open')}
-          aria-pressed={filterStatus === 'open'}
-          className={cn(
-            'rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
-            'hover:shadow-md hover:-translate-y-0.5',
-            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
-            filterStatus === 'open'
-              ? 'border-[var(--status-warning)] ring-1 ring-[var(--status-warning)]'
-              : 'border-[var(--border)]'
-          )}
-        >
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--status-warning)]/10 shrink-0">
-              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--status-warning)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.open}</p>
-              <p className="text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'مخاطر مفتوحة' : 'Open Risks'}
-              </p>
-            </div>
-          </div>
-        </button>
-
-        {/* Mitigated status filter */}
-        <button
-          type="button"
-          onClick={() => toggleStatFilter('mitigated')}
-          aria-pressed={filterStatus === 'mitigated'}
-          className={cn(
-            'col-span-2 sm:col-span-1 rounded-xl border bg-[var(--card)] p-2 sm:p-3 md:p-4 text-start transition-all',
-            'hover:shadow-md hover:-translate-y-0.5',
-            'focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2',
-            filterStatus === 'mitigated'
-              ? 'border-[var(--status-success)] ring-1 ring-[var(--status-success)]'
-              : 'border-[var(--border)]'
-          )}
-        >
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 items-center justify-center rounded-lg bg-[var(--status-success)]/10 shrink-0">
-              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--status-success)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--foreground)]">{stats.mitigated}</p>
-              <p className="text-xs text-[var(--foreground-secondary)] truncate">
-                {isAr ? 'تم التخفيف' : 'Mitigated'}
-              </p>
-            </div>
-          </div>
-        </button>
-      </div>
+      <RisksStatsCards
+        stats={stats}
+        active={{
+          total: !filterRating && !filterStatus,
+          critical: filterRating === 'Critical',
+          major: filterRating === 'Major',
+          open: filterStatus === 'open',
+          mitigated: filterStatus === 'mitigated',
+        }}
+        labels={{
+          total: t('dashboard.totalRisks'),
+          critical: t('dashboard.criticalRisks'),
+          major: t('dashboard.majorRisks'),
+          open: isAr ? 'مخاطر مفتوحة' : 'Open Risks',
+          mitigated: isAr ? 'تم التخفيف' : 'Mitigated',
+        }}
+        onToggle={toggleStatFilter}
+      />
 
       {/* Warning Banner for Fallback Data */}
       {isUsingFallbackData && !isLoading && (
@@ -2187,172 +1782,20 @@ function RisksPageContent() {
 
       {/* Risks Display */}
       {isLoading ? (
-        /* Skeleton Loading — matches the final layout so there's no
-           layout shift when real data arrives. Shows 8 shimmering rows
-           for the table view and 6 placeholder cards for the cards view. */
-        viewMode === 'table' ? (
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px]">
-                  <thead>
-                    <tr className="border-b border-[var(--border)] bg-[var(--background-secondary)]">
-                      {Array.from({ length: 9 }).map((_, i) => (
-                        <th key={i} className="p-2 sm:p-3 md:p-4">
-                          <div className="h-3 w-16 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.from({ length: 8 }).map((_, rowIdx) => (
-                      <tr key={rowIdx} className="border-b border-[var(--border)]">
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="h-5 w-20 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                        </td>
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="space-y-1.5">
-                            <div className="h-3 w-48 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                            <div className="h-2.5 w-32 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                          </div>
-                        </td>
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="h-3 w-20 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                        </td>
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="h-3 w-16 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                        </td>
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="h-5 w-20 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
-                        </td>
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="h-5 w-20 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
-                        </td>
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="h-5 w-16 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
-                        </td>
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="h-3 w-24 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                        </td>
-                        <td className="p-2 sm:p-3 md:p-4">
-                          <div className="flex items-center justify-center gap-1">
-                            <div className="h-6 w-6 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                            <div className="h-6 w-6 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                            <div className="h-6 w-6 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Card key={i} className="p-4">
-                <div className="mb-3 flex items-start justify-between">
-                  <div className="h-5 w-24 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                  <div className="h-5 w-16 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
-                </div>
-                <div className="mb-2 h-4 w-3/4 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                <div className="mb-4 space-y-1.5">
-                  <div className="h-3 w-full animate-pulse rounded bg-[var(--background-tertiary)]" />
-                  <div className="h-3 w-5/6 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                </div>
-                <div className="mb-4 flex flex-wrap gap-2">
-                  <div className="h-6 w-20 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
-                  <div className="h-6 w-24 animate-pulse rounded-full bg-[var(--background-tertiary)]" />
-                </div>
-                <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg bg-[var(--background-secondary)] p-3">
-                  <div className="space-y-1.5">
-                    <div className="h-3 w-16 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                    <div className="h-5 w-12 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="h-3 w-16 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                    <div className="h-5 w-12 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between border-t border-[var(--border)] pt-4">
-                  <div className="h-3 w-24 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                  <div className="flex gap-1">
-                    <div className="h-7 w-7 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                    <div className="h-7 w-7 animate-pulse rounded bg-[var(--background-tertiary)]" />
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )
+        <RisksSkeleton viewMode={viewMode} />
       ) : filteredRisks.length === 0 ? (
-        /* Empty state — replaces the table/cards when there is nothing
-           to show. Branches between "register is empty" and "filters
-           hide everything". */
-        <Card className="overflow-hidden">
-          <CardContent className="p-8 sm:p-12">
-            {risks.length === 0 ? (
-              // Register genuinely empty → invite user to add the first risk
-              <div className="mx-auto max-w-md text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--primary-light)]">
-                  <BarChart3 className="h-8 w-8 text-[var(--primary)]" />
-                </div>
-                <h3 className="mt-5 text-lg font-semibold text-[var(--foreground)]">
-                  {isAr ? 'سجل المخاطر فارغ' : 'Risk register is empty'}
-                </h3>
-                <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? 'لم يتم تسجيل أي خطر بعد. ابدأ بإضافة أول خطر لتسجيله في النظام.'
-                    : 'No risks have been registered yet. Start by adding your first risk.'}
-                </p>
-                <div className="mt-6">
-                  <Button
-                    leftIcon={<Plus className="h-4 w-4" />}
-                    onClick={() => setShowWizard(true)}
-                  >
-                    {t('risks.addRisk')}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              // Register has data but the current filters hide everything
-              <div className="mx-auto max-w-md text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--background-secondary)]">
-                  <Search className="h-8 w-8 text-[var(--foreground-muted)]" />
-                </div>
-                <h3 className="mt-5 text-lg font-semibold text-[var(--foreground)]">
-                  {isAr ? 'لا توجد نتائج مطابقة' : 'No matching results'}
-                </h3>
-                <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? `لم نجد أي خطر يطابق معايير البحث والتصفية الحالية (${risks.length} خطر في السجل).`
-                    : `We couldn't find any risks matching the current search and filters (${risks.length} total in the register).`}
-                </p>
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-                  {(searchQuery || activeFiltersCount > 0) && (
-                    <Button
-                      variant="outline"
-                      leftIcon={<X className="h-4 w-4" />}
-                      onClick={() => {
-                        setSearchQuery('');
-                        clearAllFilters();
-                      }}
-                    >
-                      {isAr ? 'مسح البحث والفلاتر' : 'Clear search & filters'}
-                    </Button>
-                  )}
-                  <Button
-                    leftIcon={<Plus className="h-4 w-4" />}
-                    onClick={() => setShowWizard(true)}
-                  >
-                    {t('risks.addRisk')}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <RiskEmptyState
+          totalRiskCount={risks.length}
+          hasSearchQuery={!!searchQuery}
+          activeFiltersCount={activeFiltersCount}
+          addRiskLabel={t('risks.addRisk')}
+          isAr={isAr}
+          onAddRisk={() => setShowWizard(true)}
+          onClearSearchAndFilters={() => {
+            setSearchQuery('');
+            clearAllFilters();
+          }}
+        />
       ) : viewMode === 'table' ? (
         /* Table View */
         <Card>
@@ -2542,90 +1985,19 @@ function RisksPageContent() {
               </table>
             </div>
 
-            {/* Pagination — sticky at the bottom of the viewport so the
-                controls remain reachable on long pages without having to
-                scroll the table all the way down. */}
-            <div className="sticky bottom-0 z-10 flex flex-col sm:flex-row items-center justify-between border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur-sm p-2 sm:p-3 md:p-4 gap-3">
-              <div className="flex items-center gap-2">
-                <p className="text-xs sm:text-sm text-[var(--foreground-secondary)]">
-                  {isAr
-                    ? `عرض ${paginatedRisks.length} من ${filteredRisks.length} خطر`
-                    : `Showing ${paginatedRisks.length} of ${filteredRisks.length} risks`}
-                </p>
-                <Select
-                  options={[
-                    { value: '5', label: '5' },
-                    { value: '10', label: '10' },
-                    { value: '20', label: '20' },
-                    { value: '50', label: '50' },
-                  ]}
-                  value={String(itemsPerPage)}
-                  onChange={(val) => {
-                    setItemsPerPage(parseInt(val, 10));
-                    setCurrentPage(1);
-                  }}
-                  className="w-16 h-8 text-xs"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  title={isAr ? 'الصفحة الأولى' : 'First page'}
-                >
-                  {isAr ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                  {isAr ? <ChevronRight className="h-4 w-4 -ms-2" /> : <ChevronLeft className="h-4 w-4 -ms-2" />}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  title={isAr ? 'الصفحة السابقة' : 'Previous page'}
-                >
-                  {isAr ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                </Button>
-                <div className="flex items-center gap-1 px-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={totalPages || 1}
-                    value={currentPage}
-                    onChange={(e) => {
-                      const page = parseInt(e.target.value, 10);
-                      if (page >= 1 && page <= totalPages) {
-                        setCurrentPage(page);
-                      }
-                    }}
-                    className="w-12 h-8 text-center text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
-                  />
-                  <span className="text-sm text-[var(--foreground-secondary)]">
-                    / {totalPages || 1}
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage >= totalPages}
-                  title={isAr ? 'الصفحة التالية' : 'Next page'}
-                >
-                  {isAr ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage >= totalPages}
-                  title={isAr ? 'الصفحة الأخيرة' : 'Last page'}
-                >
-                  {isAr ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  {isAr ? <ChevronLeft className="h-4 w-4 -ms-2" /> : <ChevronRight className="h-4 w-4 -ms-2" />}
-                </Button>
-              </div>
-            </div>
+            <RisksPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              itemsPerPage={itemsPerPage}
+              visibleCount={paginatedRisks.length}
+              totalCount={filteredRisks.length}
+              isAr={isAr}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={(n) => {
+                setItemsPerPage(n);
+                setCurrentPage(1);
+              }}
+            />
           </CardContent>
         </Card>
       ) : (
