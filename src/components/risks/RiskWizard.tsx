@@ -257,6 +257,26 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
     }
   }, [formData.departmentId, formData.sourceId, departments, fetchNextRiskNumber]);
 
+  // Escape-to-close for the drawer. Registered once for the wizard's
+  // lifetime — it's always mounted when visible, so no conditional wrap.
+  useEffect(() => {
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onEsc);
+    return () => document.removeEventListener('keydown', onEsc);
+  }, [onClose]);
+
+  // Lock background scroll while the drawer is open so the user doesn't
+  // accidentally scroll the risks page behind it.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
   // Calculate risk score and rating
   const riskScore = useMemo(() =>
     calculateRiskScore(formData.inherentLikelihood, formData.inherentImpact),
@@ -1009,8 +1029,26 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-[var(--card)] shadow-xl">
+    <>
+      {/* Backdrop — translucent scrim. Click-to-close dismisses the
+          drawer while keeping the underlying risks page visible behind it. */}
+      <div
+        className="fixed inset-0 z-40 bg-black/30 animate-backdropIn"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Side drawer — anchored to the "end" (right in LTR, left in RTL)
+          so the form slides in from the direction of reading flow. The
+          user can still see ~30-40% of the risks list behind the backdrop
+          which preserves spatial context. Mobile falls back to full
+          width. */}
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('risks.wizard.title')}
+        className="fixed end-0 top-0 bottom-0 z-50 flex w-full max-w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex-col bg-[var(--card)] shadow-2xl animate-drawerIn"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border)] p-6">
           <div>
@@ -1114,8 +1152,8 @@ export function RiskWizard({ onClose, onSave }: RiskWizardProps) {
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </aside>
+    </>
   );
 }
 

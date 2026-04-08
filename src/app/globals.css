@@ -254,6 +254,45 @@ body {
   }
 }
 
+/* Drawer animations — direction-aware using [dir] selectors so a single
+   class works in both LTR and RTL. LTR drawers are anchored to the
+   right (inset end-0 with ltr direction), so they slide in FROM the
+   right (+100%). RTL drawers are anchored to the left, so they slide
+   in from the left (-100%). */
+@keyframes drawerInLtr {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawerInRtl {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-drawerIn {
+  animation: drawerInLtr 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[dir="rtl"] .animate-drawerIn {
+  animation: drawerInRtl 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-backdropIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
 /* Card Styles */
 .card-hover {
   transition: all 0.15s ease;
