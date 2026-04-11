@@ -360,7 +360,7 @@ export async function GET(request: NextRequest) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { treatments, ...restRisk } = risk as any;
 
-          // Privileged roles (admin/riskManager/riskAnalyst) see everything
+          // Risk Management dept members see everything (resolved in context)
           if (!treatmentAccessContext || treatmentAccessContext.isPrivileged) {
             return {
               ...restRisk,
@@ -369,14 +369,12 @@ export async function GET(request: NextRequest) {
           }
 
           // For all other users, evaluate each plan via the shared helper.
-          // We inject the parent risk's departmentId so the rule-2 "same
-          // department as the risk" check has the data it needs.
           const filteredTreatments = (treatments || []).filter(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (treatment: any) =>
               userCanAccessTreatmentPlan(
                 {
-                  monitorId: treatment.monitorId ?? null,
+                  responsibleId: treatment.responsibleId ?? null,
                   risk: { departmentId: restRisk.departmentId ?? null },
                   tasks: treatment.tasks,
                 },

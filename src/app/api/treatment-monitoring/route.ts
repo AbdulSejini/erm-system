@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
       : allTreatmentPlans.filter((plan) =>
           userCanAccessTreatmentPlan(
             {
-              monitorId: plan.monitorId,
+              responsibleId: plan.responsibleId ?? null,
               risk: { departmentId: plan.risk.departmentId },
               tasks: plan.tasks,
             },

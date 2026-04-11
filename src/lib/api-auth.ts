@@ -159,29 +159,15 @@ export function isAuthError(
 //
 // Rules (must mirror between the helper and any inline filter logic):
 //
-//   1. Privileged roles (admin / riskManager / riskAnalyst) see everything.
-//   2. Any user from the SAME DEPARTMENT as the risk that the plan treats.
+//   1. All members of the Risk Management department (nameEn contains "risk"
+//      or nameAr contains "مخاطر") can see every treatment plan.
+//   2. The plan's responsible person (responsibleId).
+//   3. Any user from the SAME DEPARTMENT as the risk that the plan treats.
 //      "Same department" includes both the user's primary departmentId and
 //      any departments granted via UserDepartmentAccess (canView).
-//   3. The plan's monitor.
-//   4. Anyone assigned to or monitoring a task under the plan (via User id
-//      OR RiskOwner id OR RiskOwner email).
-//   5. Anyone who participated in a task STEP under the plan — either
-//      created the step or marked it completed.
-//
-// Note: the previous rules included "responsible user" and "risk owner via
-// email" as independent conditions. Those have been removed in favor of
-// rule #2 (department membership) per the refined requirements.
+//   4. Anyone assigned to a task (actionOwnerId) or step participant
+//      (createdById / completedById) under the plan.
 // -----------------------------------------------------------------------------
-
-/**
- * Roles that can see any treatment plan regardless of assignment.
- */
-const TREATMENT_PRIVILEGED_ROLES: ReadonlySet<string> = new Set([
-  'admin',
-  'riskManager',
-  'riskAnalyst',
-]);
 
 /**
  * Minimum shape a TreatmentPlan record must have to be evaluated for access.
@@ -189,15 +175,11 @@ const TREATMENT_PRIVILEGED_ROLES: ReadonlySet<string> = new Set([
  * here are consulted.
  */
 export interface TreatmentPlanAccessShape {
-  monitorId: string | null;
+  responsibleId?: string | null;
   risk: { departmentId: string | null } | null;
   tasks?: Array<{
-    assignedToId?: string | null;
-    monitorId?: string | null;
     actionOwnerId?: string | null;
-    monitorOwnerId?: string | null;
     actionOwner?: { email: string | null } | null;
-    monitorOwner?: { email: string | null } | null;
     steps?: Array<{
       createdById: string;
       completedById: string | null;
@@ -207,8 +189,8 @@ export interface TreatmentPlanAccessShape {
 
 /**
  * Resolved per-user context reused across access checks — fetched once and
- * then applied to many plans in memory. For privileged roles we short-circuit
- * to `{ isPrivileged: true }` so callers can skip the DB lookup entirely.
+ * then applied to many plans in memory. For Risk Management department
+ * members we short-circuit to `{ isPrivileged: true }`.
  */
 export type TreatmentAccessContext =
   | { isPrivileged: true }
@@ -229,33 +211,39 @@ export type TreatmentAccessContext =
  */
 export async function getUserTreatmentAccessContext(
   userId: string,
-  userRole: string,
+  _userRole: string,
   userEmail: string
 ): Promise<TreatmentAccessContext> {
-  if (TREATMENT_PRIVILEGED_ROLES.has(userRole)) {
+  const { default: prisma } = await import('@/lib/prisma');
+
+  // Rule 1: members of Risk Management department see everything
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      departmentId: true,
+      department: { select: { nameAr: true, nameEn: true } },
+      accessibleDepartments: {
+        where: { canView: true },
+        select: { departmentId: true },
+      },
+    },
+  });
+
+  const isRiskMgmtDept =
+    user?.department?.nameEn?.toLowerCase().includes('risk') ||
+    user?.department?.nameAr?.includes('مخاطر') ||
+    false;
+
+  if (isRiskMgmtDept) {
     return { isPrivileged: true };
   }
 
-  const { default: prisma } = await import('@/lib/prisma');
-
-  const [user, riskOwner] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        departmentId: true,
-        accessibleDepartments: {
-          where: { canView: true },
-          select: { departmentId: true },
-        },
-      },
-    }),
-    userEmail
-      ? prisma.riskOwner.findFirst({
-          where: { email: userEmail },
-          select: { id: true },
-        })
-      : Promise.resolve(null),
-  ]);
+  const riskOwner = userEmail
+    ? await prisma.riskOwner.findFirst({
+        where: { email: userEmail },
+        select: { id: true },
+      })
+    : null;
 
   const departmentIds = new Set<string>();
   if (user?.departmentId) departmentIds.add(user.departmentId);
@@ -283,33 +271,28 @@ export function userCanAccessTreatmentPlan(
   plan: TreatmentPlanAccessShape,
   context: TreatmentAccessContext
 ): boolean {
+  // Rule 1: Risk Management department (resolved in context)
   if (context.isPrivileged) return true;
 
-  // Rule 2: same-department membership
+  // Rule 2: plan responsible person
+  if (plan.responsibleId && plan.responsibleId === context.userId) {
+    return true;
+  }
+
+  // Rule 3: same-department membership
   const riskDeptId = plan.risk?.departmentId ?? null;
   if (riskDeptId && context.departmentIds.has(riskDeptId)) {
     return true;
   }
 
-  // Rule 3: plan monitor
-  if (plan.monitorId && plan.monitorId === context.userId) {
-    return true;
-  }
-
-  // Rules 4 & 5: task involvement or step involvement
+  // Rule 4: task actionOwner or step participant
   for (const task of plan.tasks || []) {
-    // Task-level involvement (User references)
-    if (task.assignedToId && task.assignedToId === context.userId) return true;
-    if (task.monitorId && task.monitorId === context.userId) return true;
-
-    // Task-level involvement (RiskOwner references via id OR email)
-    if (context.riskOwnerId) {
-      if (task.actionOwnerId === context.riskOwnerId) return true;
-      if (task.monitorOwnerId === context.riskOwnerId) return true;
+    // Task-level: actionOwner (RiskOwner references via id OR email)
+    if (context.riskOwnerId && task.actionOwnerId === context.riskOwnerId) {
+      return true;
     }
-    if (context.userEmail) {
-      if (task.actionOwner?.email === context.userEmail) return true;
-      if (task.monitorOwner?.email === context.userEmail) return true;
+    if (context.userEmail && task.actionOwner?.email === context.userEmail) {
+      return true;
     }
 
     // Step-level involvement
@@ -333,8 +316,6 @@ export async function canAccessTreatmentPlan(
   userRole: string,
   userEmail: string
 ): Promise<boolean> {
-  if (TREATMENT_PRIVILEGED_ROLES.has(userRole)) return true;
-
   const { default: prisma } = await import('@/lib/prisma');
 
   const [context, plan] = await Promise.all([
@@ -342,16 +323,12 @@ export async function canAccessTreatmentPlan(
     prisma.treatmentPlan.findUnique({
       where: { id: treatmentPlanId },
       select: {
-        monitorId: true,
+        responsibleId: true,
         risk: { select: { departmentId: true } },
         tasks: {
           select: {
-            assignedToId: true,
-            monitorId: true,
             actionOwnerId: true,
-            monitorOwnerId: true,
             actionOwner: { select: { email: true } },
-            monitorOwner: { select: { email: true } },
             steps: {
               select: { createdById: true, completedById: true },
             },
@@ -375,8 +352,6 @@ export async function canAccessTreatmentTask(
   userRole: string,
   userEmail: string
 ): Promise<boolean> {
-  if (TREATMENT_PRIVILEGED_ROLES.has(userRole)) return true;
-
   const { default: prisma } = await import('@/lib/prisma');
   const task = await prisma.treatmentTask.findUnique({
     where: { id: taskId },

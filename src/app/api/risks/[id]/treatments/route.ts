@@ -430,7 +430,7 @@ export async function GET(
       : treatments.filter((plan) =>
           userCanAccessTreatmentPlan(
             {
-              monitorId: plan.monitorId,
+              responsibleId: plan.responsibleId ?? null,
               risk: { departmentId: risk.departmentId },
               tasks: plan.tasks,
             },
