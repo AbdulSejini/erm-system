@@ -1117,48 +1117,23 @@ Risk Management Team`;
         </Button>
       </div>
 
-      {/* Stats Cards - تصميم مثل صفحة التقارير */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {[
-          { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, icon: ListChecks, color: 'text-[#F39200]', bg: 'bg-orange-50 dark:bg-[#F39200]/10', iconBg: 'bg-[#F39200]', border: 'border-[#F39200]/20' },
-          { label: isAr ? 'مكتمل' : 'Completed', value: stats.completed, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', iconBg: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-700/50' },
-          { label: isAr ? 'قيد التنفيذ' : 'In Progress', value: stats.inProgress, icon: Play, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20', iconBg: 'bg-sky-500', border: 'border-sky-200 dark:border-sky-700/50' },
-          { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20', iconBg: 'bg-rose-500', border: 'border-rose-200 dark:border-rose-700/50' },
-          { label: isAr ? 'لم يبدأ' : 'Not Started', value: stats.notStarted, icon: CircleDot, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-800/50', iconBg: 'bg-gray-500 dark:bg-gray-600', border: 'border-gray-200 dark:border-gray-600' },
-        ].map((stat, i) => (
-          <Card key={i} className={`overflow-hidden hover:shadow-md transition-all duration-300 border rounded-xl bg-[#FFFFFF] dark:bg-[#1E293B] ${stat.border}`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{stat.label}</p>
-                  <p className={`text-3xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-                </div>
-                <div className={`p-2.5 rounded-lg ${stat.iconBg}`}>
-                  <stat.icon className="h-5 w-5 text-white" />
-                </div>
+      {/* Compact Stats Bar */}
+      <Card className="p-0 overflow-hidden">
+        <CardContent className="p-0">
+          <div className="grid grid-cols-3 sm:grid-cols-6 divide-x divide-[var(--border)] rtl:divide-x-reverse">
+            {[
+              { label: isAr ? 'الإجمالي' : 'Total', value: stats.total, color: 'text-[#F39200]' },
+              { label: isAr ? 'مكتمل' : 'Done', value: stats.completed, color: 'text-emerald-600' },
+              { label: isAr ? 'قيد التنفيذ' : 'Active', value: stats.inProgress, color: 'text-sky-600' },
+              { label: isAr ? 'متأخر' : 'Overdue', value: stats.overdue, color: 'text-rose-600' },
+              { label: isAr ? 'لم يبدأ' : 'Pending', value: stats.notStarted, color: 'text-gray-500' },
+              { label: isAr ? 'متوسط الإنجاز' : 'Avg Progress', value: `${avgProgress}%`, color: 'text-[#F39200]' },
+            ].map((stat, i) => (
+              <div key={i} className="p-3 text-center">
+                <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
+                <p className="text-xs text-[var(--foreground-secondary)]">{stat.label}</p>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Progress Overview - تصميم مثل صفحة التقارير */}
-      <Card className="overflow-hidden border border-[#F39200]/20 dark:border-[#F39200]/30 rounded-xl bg-[#FFFFFF] dark:bg-[#1E293B]">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-[#F39200]">
-                <Activity className="h-5 w-5 text-white" />
-              </div>
-              <span className="font-semibold text-lg text-gray-800 dark:text-gray-200">{isAr ? 'متوسط التقدم' : 'Average Progress'}</span>
-            </div>
-            <span className="text-3xl font-bold text-[#F39200]">{avgProgress}%</span>
-          </div>
-          <div className="h-3 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-[#F39200] transition-all duration-500"
-              style={{ width: `${avgProgress}%` }}
-            />
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -1264,155 +1239,47 @@ Risk Management Team`;
             return (
               <Card
                 key={treatment.id}
-                className={`overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border border-gray-100 dark:border-gray-700 rounded-xl bg-[#FFFFFF] dark:bg-[#1E293B] border-s-4 ${statusBorderColor} ${statusHoverGlow} hover:-translate-y-1`}
-                style={{ animationDelay: `${index * 80}ms`, animation: 'fadeSlideUp 0.5s ease-out forwards', opacity: 0 }}
+                className={`overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group border-s-4 ${statusBorderColor}`}
                 onClick={() => router.push(`/treatment/${treatment.id}`)}
               >
-                {/* Card Header with Strategy Color */}
-                <div className={`h-1 ${strategyConf.bgClass}`} />
-
                 <CardContent className="p-4 space-y-3">
-                  {/* Top Row: Risk Number & Status */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${ratingColors[treatment.inherentRating]}`} />
-                      <span className="text-sm font-mono font-semibold text-gray-700 dark:text-gray-200">
-                        {treatment.riskNumber}
-                      </span>
-                    </div>
-                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConf.bgClass} ${statusConf.colorClass} ${treatment.status === 'overdue' ? 'animate-pulse' : ''}`}>
+                  {/* Row 1: Risk Number + Status */}
+                  <div className="flex items-center justify-between">
+                    <code className="text-xs font-mono font-semibold text-[var(--foreground-secondary)] bg-[var(--background-tertiary)] px-1.5 py-0.5 rounded">
+                      {treatment.riskNumber}
+                    </code>
+                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConf.bgClass} ${statusConf.colorClass}`}>
                       <StatusIcon className="h-3 w-3" />
                       <span>{isAr ? statusConf.labelAr : statusConf.labelEn}</span>
                     </div>
                   </div>
 
-                  {/* Title */}
-                  <div>
-                    <h3 className="font-semibold text-gray-800 dark:text-gray-100 line-clamp-2 group-hover:text-[#F39200] transition-colors text-sm">
-                      {isAr ? treatment.riskTitleAr : treatment.riskTitleEn}
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {isAr ? treatment.departmentAr : treatment.departmentEn}
-                    </p>
-                  </div>
+                  {/* Row 2: Title */}
+                  <h3 className="text-sm font-semibold text-[var(--foreground)] line-clamp-2 group-hover:text-[#F39200] transition-colors">
+                    {isAr ? treatment.riskTitleAr : treatment.riskTitleEn}
+                  </h3>
 
-                  {/* Strategy Badge */}
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md ${strategyConf.bgClass}`}>
-                    <StrategyIcon className={`h-3.5 w-3.5 ${strategyConf.colorClass}`} />
-                    <span className={`text-xs font-semibold ${strategyConf.colorClass}`}>
-                      {isAr ? strategyConf.labelAr : strategyConf.labelEn}
+                  {/* Row 3: Progress */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-[var(--background-tertiary)]">
+                      <div className={`h-full rounded-full ${progressBarColor} transition-all`} style={{ width: `${treatment.progress}%` }} />
+                    </div>
+                    <span className={`text-xs font-semibold min-w-[32px] text-end ${treatment.status === 'completed' ? 'text-emerald-600' : treatment.status === 'overdue' ? 'text-rose-600' : 'text-[#F39200]'}`}>
+                      {treatment.progress}%
                     </span>
-                  </div>
-
-                  {/* Tasks Mini Summary */}
-                  {treatment.tasks.length > 0 && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="flex -space-x-1 rtl:space-x-reverse">
-                        {['completed', 'inProgress', 'notStarted'].map((s) => {
-                          const count = treatment.tasks.filter(t => t.status === s).length;
-                          if (count === 0) return null;
-                          const dotColor = s === 'completed' ? 'bg-emerald-400' : s === 'inProgress' ? 'bg-sky-400' : 'bg-gray-300';
-                          return (
-                            <div key={s} className={`w-4 h-4 rounded-full ${dotColor} border-2 border-white dark:border-gray-800 flex items-center justify-center`}>
-                              <span className="text-[8px] font-bold text-white">{count}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <span className="text-gray-400">
-                        {treatment.tasks.filter(t => t.status === 'completed').length}/{treatment.tasks.length} {isAr ? 'مهام' : 'tasks'}
+                    {treatment.tasks.length > 0 && (
+                      <span className="text-xs text-[var(--foreground-muted)]">
+                        {treatment.tasks.filter(t => t.status === 'completed').length}/{treatment.tasks.length}
                       </span>
-                    </div>
-                  )}
-
-                  {/* Progress Bar */}
-                  <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-gray-500 dark:text-gray-400">{isAr ? 'التقدم' : 'Progress'}</span>
-                      <span className={`font-semibold ${treatment.status === 'completed' ? 'text-emerald-600' : treatment.status === 'overdue' ? 'text-rose-600' : 'text-[#F39200]'}`}>{treatment.progress}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${progressBarColor} transition-all duration-1000 ease-out`}
-                        style={{ width: `${treatment.progress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Footer: Responsible & Due Date */}
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                      <Users className="h-3.5 w-3.5" />
-                      <span className="truncate max-w-[90px]">
-                        {isAr ? treatment.responsibleAr : treatment.responsibleEn}
-                      </span>
-                    </div>
-                    <div className={`flex items-center gap-1.5 text-xs ${treatment.status === 'overdue' ? 'text-rose-500 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { month: 'short', day: 'numeric' })}</span>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openViewModal(treatment);
-                      }}
-                    >
-                      <Eye className="h-3.5 w-3.5 me-1" />
-                      {isAr ? 'عرض' : 'View'}
-                    </Button>
-                    {/* زر التعديل - متاح للأدوار المصرح لها أو المسؤول/المكلف/المتابع */}
-                    {canEditTreatment(treatment) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs border-[#F39200]/30 text-[#F39200] hover:bg-[#F39200]/5"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // فتح مودال التعديل
-                          setSelectedTreatment(treatment);
-                          setFormData({
-                            riskId: treatment.riskId,
-                            strategy: treatment.strategy,
-                            titleAr: treatment.titleAr,
-                            titleEn: treatment.titleEn,
-                            responsibleId: treatment.responsibleId || '',
-                            priority: treatment.priority as 'high' | 'medium' | 'low',
-                            startDate: treatment.startDate.split('T')[0],
-                            dueDate: treatment.dueDate.split('T')[0],
-                            justificationAr: treatment.justificationAr || '',
-                            justificationEn: treatment.justificationEn || '',
-                            residualLikelihood: treatment.expectedResidualLikelihood || null,
-                            residualImpact: treatment.expectedResidualImpact || null,
-                            updateResidualRisk: !!(treatment.expectedResidualLikelihood && treatment.expectedResidualImpact),
-                            tasks: treatment.tasks.map(t => ({
-                              id: t.id,
-                              titleAr: t.titleAr,
-                              titleEn: t.titleEn,
-                              dueDate: t.dueDate ? t.dueDate.split('T')[0] : '',
-                              priority: (t.priority || 'medium') as 'high' | 'medium' | 'low',
-                              assignedTo: t.actionOwnerId || '',
-                              followedBy: t.monitorOwnerId || '',
-                              description: t.descriptionAr || t.descriptionEn || '',
-                              status: t.status,
-                              oneDriveUrl: t.oneDriveUrl || '',
-                              oneDriveFileName: t.oneDriveFileName || '',
-                            })),
-                          });
-                          setWizardStep(2);
-                          setShowAddModal(true);
-                        }}
-                      >
-                        <Pencil className="h-3.5 w-3.5 me-1" />
-                        {isAr ? 'تعديل' : 'Edit'}
-                      </Button>
                     )}
+                  </div>
+
+                  {/* Row 4: Footer */}
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--border)] text-xs text-[var(--foreground-secondary)]">
+                    <span className="truncate max-w-[120px]">{isAr ? treatment.responsibleAr : treatment.responsibleEn}</span>
+                    <span className={treatment.status === 'overdue' ? 'text-rose-500 font-semibold' : ''}>
+                      {new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US', { month: 'short', day: 'numeric' })}
+                    </span>
                   </div>
                 </CardContent>
               </Card>

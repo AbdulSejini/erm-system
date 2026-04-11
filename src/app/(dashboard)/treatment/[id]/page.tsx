@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { useImpersonation } from '@/contexts/ImpersonationContext';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
@@ -60,12 +61,9 @@ import {
   History,
   Paperclip,
   ListOrdered,
-  MoreVertical,
   MessageCircle,
   ClipboardList,
   Reply,
-  CheckSquare,
-  Eye,
 } from 'lucide-react';
 import OneDrivePicker from '@/components/OneDrivePicker';
 import type { TreatmentStatus, TreatmentStrategy, RiskRating } from '@/types';
@@ -392,12 +390,8 @@ export default function TreatmentDetailPage() {
     tasks: [] as Task[],
   });
 
-  // Scroll refs for sections
-  const overviewRef = useRef<HTMLDivElement>(null);
-  const tasksRef = useRef<HTMLDivElement>(null);
-  const riskRef = useRef<HTMLDivElement>(null);
-  const discussionsRef = useRef<HTMLDivElement>(null);
-  const changeLogRef = useRef<HTMLDivElement>(null);
+  // Tab navigation (replaces scroll-based navigation)
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'risk' | 'discussions' | 'log'>('overview');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -917,10 +911,6 @@ export default function TreatmentDetailPage() {
     progress_change: { ar: 'تغيير التقدم', en: 'Progress Changed', icon: TrendingUp, color: 'text-amber-500' },
   };
 
-  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
-    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -957,264 +947,229 @@ export default function TreatmentDetailPage() {
   const statusConf = statusConfig[treatment.status];
   const StrategyIcon = strategyConf.icon;
   const StatusIcon = statusConf.icon;
-  const ratingConf = ratingColors[treatment.risk.inherentRating] || ratingColors.Moderate;
-  const residualRatingConf = treatment.risk.residualRating ? ratingColors[treatment.risk.residualRating] : null;
+  const completedTasksCount = treatment.tasks.filter(t => t.status === 'completed').length;
+
+  const tabs = [
+    { id: 'overview' as const, labelAr: 'نظرة عامة', labelEn: 'Overview', icon: Target, count: 0 },
+    { id: 'tasks' as const, labelAr: 'المهام', labelEn: 'Tasks', icon: ListChecks, count: treatment.tasks.length },
+    { id: 'risk' as const, labelAr: 'الخطر', labelEn: 'Risk', icon: ShieldAlert, count: 0 },
+    { id: 'discussions' as const, labelAr: 'المناقشات', labelEn: 'Discussions', icon: MessageCircle, count: discussions.length },
+    { id: 'log' as const, labelAr: 'السجل', labelEn: 'Log', icon: History, count: changeLogs.length },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 print-container">
-      {/* Sticky Navigation */}
-      <div className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 print:hidden">
-        <div className="max-w-[1800px] mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push('/treatment')}
-                className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                {isAr ? <ArrowRight className="h-4 w-4 me-2" /> : <ArrowLeft className="h-4 w-4 me-2" />}
-                {isAr ? 'العودة' : 'Back'}
-              </Button>
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
-              <span className="font-mono text-sm font-bold text-[#F39200]">{treatment.risk.riskNumber}</span>
+    <div className="min-h-screen bg-[var(--background)] print-container">
+      {/* ═══════ Compact Header + Tabs ═══════ */}
+      <div className="sticky top-0 z-50 bg-[var(--background)]/95 backdrop-blur-sm border-b border-[var(--border)] print:hidden">
+        <div className="max-w-5xl mx-auto px-4">
+          {/* Row 1: Back + Title + Status + Progress + Actions */}
+          <div className="flex items-center gap-3 py-3">
+            <Button variant="ghost" size="sm" onClick={() => router.push('/treatment')} className="shrink-0">
+              {isAr ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
+            </Button>
+            <code className="shrink-0 text-xs font-mono font-bold text-[#F39200] bg-[#F39200]/10 px-2 py-0.5 rounded">
+              {treatment.risk.riskNumber}
+            </code>
+            <h1 className="text-sm font-semibold truncate flex-1 text-[var(--foreground)]">
+              {isAr ? treatment.titleAr : treatment.titleEn}
+            </h1>
+            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium shrink-0 ${statusConf.bgClass} ${statusConf.colorClass}`}>
+              <StatusIcon className="h-3.5 w-3.5" />
+              {isAr ? statusConf.labelAr : statusConf.labelEn}
             </div>
-
-            {/* Quick Navigation */}
-            <div className="hidden md:flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-              <button
-                onClick={() => scrollToSection(overviewRef)}
-                className="px-3 py-1.5 text-sm rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors"
-              >
-                {isAr ? 'نظرة عامة' : 'Overview'}
-              </button>
-              <button
-                onClick={() => scrollToSection(tasksRef)}
-                className="px-3 py-1.5 text-sm rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors"
-              >
-                {isAr ? 'المهام' : 'Tasks'}
-              </button>
-              <button
-                onClick={() => scrollToSection(riskRef)}
-                className="px-3 py-1.5 text-sm rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors"
-              >
-                {isAr ? 'الخطر' : 'Risk'}
-              </button>
-              <button
-                onClick={() => scrollToSection(discussionsRef)}
-                className="px-3 py-1.5 text-sm rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors"
-              >
-                {isAr ? 'المناقشات' : 'Discussions'}
-              </button>
-              <button
-                onClick={() => scrollToSection(changeLogRef)}
-                className="px-3 py-1.5 text-sm rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors"
-              >
-                {isAr ? 'السجل' : 'Log'}
-              </button>
+            <div className="hidden md:flex items-center gap-2 min-w-[100px] shrink-0">
+              <div className="flex-1 h-1.5 rounded-full bg-[var(--background-tertiary)]">
+                <div className="h-full rounded-full bg-[#F39200] transition-all" style={{ width: `${treatment.progress}%` }} />
+              </div>
+              <span className="text-xs font-bold text-[#F39200] w-8">{treatment.progress}%</span>
             </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => window.print()} className="text-red-600 border-red-300">
-                <FileDown className="h-4 w-4 me-1" />
-                PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowEmailModal(true)} className="text-sky-600 border-sky-300">
-                <Mail className="h-4 w-4 me-1" />
-                {isAr ? 'بريد' : 'Email'}
-              </Button>
-              {/* أزرار التعديل والحذف - متاحة فقط لمدير النظام ومدير المخاطر */}
+            <div className="flex items-center gap-1 shrink-0">
+              <Button variant="ghost" size="sm" onClick={() => window.print()} title="PDF"><FileDown className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowEmailModal(true)} title={isAr ? 'بريد' : 'Email'}><Mail className="h-4 w-4" /></Button>
               {!isEditing ? (
                 canDelete && (
                   <>
-                    <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="text-[#F39200] border-[#F39200]/50">
-                      <Pencil className="h-4 w-4 me-1" />
-                      {isAr ? 'تعديل' : 'Edit'}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setShowDeleteModal(true)} className="text-rose-600 border-rose-300">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} title={isAr ? 'تعديل' : 'Edit'}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => setShowDeleteModal(true)} className="text-rose-500" title={isAr ? 'حذف' : 'Delete'}><Trash2 className="h-4 w-4" /></Button>
                   </>
                 )
               ) : (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
-                    <X className="h-4 w-4 me-1" />
-                    {isAr ? 'إلغاء' : 'Cancel'}
-                  </Button>
-                  <Button size="sm" onClick={handleSave} disabled={saving} className="bg-[#F39200] hover:bg-[#e08600]">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin me-1" /> : <Save className="h-4 w-4 me-1" />}
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}><X className="h-4 w-4" /></Button>
+                  <Button size="sm" onClick={handleSave} disabled={saving} className="bg-[#F39200] hover:bg-[#e08600] text-white">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 me-1" />}
                     {isAr ? 'حفظ' : 'Save'}
                   </Button>
                 </>
               )}
             </div>
           </div>
+          {/* Row 2: Tab Navigation */}
+          <div className="flex gap-0 -mb-px overflow-x-auto">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                  activeTab === tab.id
+                    ? 'border-[#F39200] text-[#F39200]'
+                    : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
+                )}
+              >
+                <tab.icon className="h-4 w-4" />
+                {isAr ? tab.labelAr : tab.labelEn}
+                {tab.count > 0 && (
+                  <span className="text-xs bg-[var(--background-tertiary)] px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="max-w-[1800px] mx-auto p-4 md:p-6 space-y-10">
-        {/* Hero Section */}
-        <div ref={overviewRef} className="relative overflow-hidden rounded-3xl bg-white dark:bg-gray-800 shadow-xl animate-fadeIn">
-          <div className={`absolute inset-0 opacity-5 ${strategyConf.bgClass}`} />
-          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#F39200] via-amber-400 to-[#F39200]" />
+      {/* ═══════ Tab Content ═══════ */}
+      <div className="max-w-5xl mx-auto p-4 md:p-6">
 
-          <div className="relative p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left Column - Main Info */}
-              <div className="lg:col-span-2 space-y-6">
-                <div className="flex items-start gap-5">
-                  <div className={`shrink-0 w-20 h-20 rounded-2xl ${strategyConf.bgClass} flex items-center justify-center shadow-xl transform hover:scale-105 transition-transform duration-300`}>
-                    <StrategyIcon className="h-10 w-10 text-white" />
+        {/* ── Overview Tab ── */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* Key Metrics */}
+            <Card className="p-0 overflow-hidden">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-[var(--border)] rtl:divide-x-reverse">
+                {/* Strategy */}
+                <div className="p-4 text-center">
+                  <div className={`mx-auto w-10 h-10 rounded-lg ${strategyConf.bgClass} flex items-center justify-center mb-2`}>
+                    <StrategyIcon className="h-5 w-5 text-white" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-3 mb-3">
-                      <Badge className={`${ratingConf.bg} ${ratingConf.text} ${ratingConf.border} border text-sm px-3 py-1`}>
-                        {isAr ? ratingConf.label.ar : ratingConf.label.en}
-                      </Badge>
-                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${statusConf.bgClass} ${statusConf.colorClass}`}>
-                        <StatusIcon className="h-4 w-4" />
-                        <span>{isAr ? statusConf.labelAr : statusConf.labelEn}</span>
-                      </div>
-                      <Badge variant="outline" className="text-sm">
-                        {isAr ? strategyConf.labelAr : strategyConf.labelEn}
-                      </Badge>
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100 mb-3 leading-tight">
-                      {isAr ? treatment.titleAr : treatment.titleEn}
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400 text-lg">
-                      {isAr ? treatment.risk.titleAr : treatment.risk.titleEn}
-                    </p>
-                  </div>
+                  <p className="text-xs text-[var(--foreground-secondary)]">{isAr ? 'الاستراتيجية' : 'Strategy'}</p>
+                  <p className="text-sm font-semibold">{isAr ? strategyConf.labelAr : strategyConf.labelEn}</p>
                 </div>
-
-                {/* Meta Info */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {treatment.risk.department && (
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50">
-                      <Building2 className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="text-xs text-gray-500">{isAr ? 'الإدارة' : 'Department'}</p>
-                        <p className="font-medium text-sm">{isAr ? treatment.risk.department.nameAr : treatment.risk.department.nameEn}</p>
-                      </div>
-                    </div>
-                  )}
-                  {treatment.responsible && (
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50">
-                      <User className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="text-xs text-gray-500">{isAr ? 'المسؤول' : 'Responsible'}</p>
-                        <p className="font-medium text-sm">{isAr ? treatment.responsible.fullName : treatment.responsible.fullNameEn || treatment.responsible.fullName}</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50">
-                    <Calendar className="h-5 w-5 text-gray-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">{isAr ? 'تاريخ البدء' : 'Start Date'}</p>
-                      <p className="font-medium text-sm">{new Date(treatment.startDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</p>
-                    </div>
+                {/* Status */}
+                <div className="p-4 text-center">
+                  <div className={`mx-auto w-10 h-10 rounded-lg ${statusConf.bgClass} flex items-center justify-center mb-2`}>
+                    <StatusIcon className={`h-5 w-5 ${statusConf.colorClass}`} />
                   </div>
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50">
-                    <Clock className="h-5 w-5 text-gray-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">{isAr ? 'الموعد النهائي' : 'Due Date'}</p>
-                      <p className="font-medium text-sm">{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</p>
-                    </div>
-                  </div>
+                  <p className="text-xs text-[var(--foreground-secondary)]">{isAr ? 'الحالة' : 'Status'}</p>
+                  <p className="text-sm font-semibold">{isAr ? statusConf.labelAr : statusConf.labelEn}</p>
                 </div>
-
-                {/* Justification */}
-                {(treatment.justificationAr || treatment.justificationEn) && (
-                  <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Info className="h-5 w-5 text-amber-600" />
-                      <h4 className="font-semibold text-amber-800 dark:text-amber-300">{isAr ? 'التبرير' : 'Justification'}</h4>
-                    </div>
-                    <p className="text-amber-900 dark:text-amber-200">{isAr ? treatment.justificationAr : treatment.justificationEn}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column - Stats */}
-              <div className="space-y-4">
                 {/* Progress */}
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-[#F39200]/10 to-amber-100/50 dark:from-[#F39200]/20 dark:to-amber-900/30 border border-[#F39200]/20">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{isAr ? 'نسبة الإنجاز' : 'Progress'}</span>
-                    <span className="text-4xl font-bold text-[#F39200]">{treatment.progress}%</span>
+                <div className="p-4 text-center">
+                  <p className="text-2xl font-bold text-[#F39200] mb-1">{treatment.progress}%</p>
+                  <div className="h-1.5 rounded-full bg-[var(--background-tertiary)] mx-auto max-w-[80px]">
+                    <div className="h-full rounded-full bg-[#F39200]" style={{ width: `${treatment.progress}%` }} />
                   </div>
-                  <div className="h-4 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#F39200] to-amber-400 transition-all duration-1000"
-                      style={{ width: `${treatment.progress}%` }}
-                    />
-                  </div>
+                  <p className="text-xs text-[var(--foreground-secondary)] mt-1">{isAr ? 'الإنجاز' : 'Progress'}</p>
                 </div>
+                {/* Tasks */}
+                <div className="p-4 text-center cursor-pointer hover:bg-[var(--background-secondary)] transition-colors" onClick={() => setActiveTab('tasks')}>
+                  <p className="text-2xl font-bold text-sky-600">{completedTasksCount}<span className="text-base text-[var(--foreground-muted)]">/{treatment.tasks.length}</span></p>
+                  <p className="text-xs text-[var(--foreground-secondary)] mt-1">{isAr ? 'المهام المكتملة' : 'Tasks Done'}</p>
+                </div>
+                {/* Inherent */}
+                <div className="p-4 text-center">
+                  <p className="text-2xl font-bold text-rose-600">{treatment.risk.inherentScore}</p>
+                  <p className="text-xs text-rose-500">{treatment.risk.inherentLikelihood} × {treatment.risk.inherentImpact}</p>
+                  <p className="text-xs text-[var(--foreground-secondary)] mt-1">{isAr ? 'الكامن' : 'Inherent'}</p>
+                </div>
+                {/* Residual */}
+                <div className="p-4 text-center">
+                  <p className="text-2xl font-bold text-emerald-600">{treatment.risk.residualScore || '-'}</p>
+                  {treatment.risk.residualLikelihood && treatment.risk.residualImpact && (
+                    <p className="text-xs text-emerald-500">{treatment.risk.residualLikelihood} × {treatment.risk.residualImpact}</p>
+                  )}
+                  <p className="text-xs text-[var(--foreground-secondary)] mt-1">{isAr ? 'المتبقي' : 'Residual'}</p>
+                </div>
+              </div>
+            </Card>
 
-                {/* Risk Scores */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Flame className="h-5 w-5 text-rose-500" />
-                      <span className="text-xs text-rose-600 dark:text-rose-400">{isAr ? 'الكامن' : 'Inherent'}</span>
-                    </div>
-                    <p className="text-3xl font-bold text-rose-600 dark:text-rose-400">{treatment.risk.inherentScore}</p>
-                    <p className="text-xs text-rose-500 mt-1">{treatment.risk.inherentLikelihood} × {treatment.risk.inherentImpact}</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Shield className="h-5 w-5 text-emerald-500" />
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400">{isAr ? 'المتبقي' : 'Residual'}</span>
-                    </div>
-                    <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{treatment.risk.residualScore || '-'}</p>
-                    {treatment.risk.residualLikelihood && treatment.risk.residualImpact && (
-                      <p className="text-xs text-emerald-500 mt-1">{treatment.risk.residualLikelihood} × {treatment.risk.residualImpact}</p>
+            {/* Details Grid */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Plan Details */}
+              <Card>
+                <CardContent>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">{isAr ? 'تفاصيل الخطة' : 'Plan Details'}</h3>
+                  <div className="space-y-3">
+                    {treatment.risk.department && (
+                      <div className="flex items-center justify-between py-2 border-b border-[var(--border)]">
+                        <span className="text-sm text-[var(--foreground-secondary)] flex items-center gap-2"><Building2 className="h-4 w-4" />{isAr ? 'الإدارة' : 'Department'}</span>
+                        <span className="text-sm font-medium">{isAr ? treatment.risk.department.nameAr : treatment.risk.department.nameEn}</span>
+                      </div>
                     )}
+                    {treatment.responsible && (
+                      <div className="flex items-center justify-between py-2 border-b border-[var(--border)]">
+                        <span className="text-sm text-[var(--foreground-secondary)] flex items-center gap-2"><User className="h-4 w-4" />{isAr ? 'المسؤول' : 'Responsible'}</span>
+                        <span className="text-sm font-medium">{isAr ? treatment.responsible.fullName : treatment.responsible.fullNameEn || treatment.responsible.fullName}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between py-2 border-b border-[var(--border)]">
+                      <span className="text-sm text-[var(--foreground-secondary)] flex items-center gap-2"><Calendar className="h-4 w-4" />{isAr ? 'تاريخ البدء' : 'Start Date'}</span>
+                      <span className="text-sm font-medium">{new Date(treatment.startDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-sm text-[var(--foreground-secondary)] flex items-center gap-2"><Clock className="h-4 w-4" />{isAr ? 'الموعد النهائي' : 'Due Date'}</span>
+                      <span className="text-sm font-medium">{new Date(treatment.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
+                    </div>
                   </div>
-                </div>
+                </CardContent>
+              </Card>
 
-                {/* Tasks Summary */}
-                <div className="p-4 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ListChecks className="h-5 w-5 text-sky-500" />
-                      <span className="font-medium text-sky-700 dark:text-sky-300">{isAr ? 'المهام' : 'Tasks'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold text-sky-600">{treatment.tasks.filter(t => t.status === 'completed').length}</span>
-                      <span className="text-gray-400">/</span>
-                      <span className="text-lg text-gray-500">{treatment.tasks.length}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Risk Info */}
+              <Card>
+                <CardContent>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">{isAr ? 'الخطر المرتبط' : 'Linked Risk'}</h3>
+                  <p className="text-sm font-medium text-[var(--foreground)] mb-2">{isAr ? treatment.risk.titleAr : treatment.risk.titleEn}</p>
+                  {(treatment.risk.descriptionAr || treatment.risk.descriptionEn) && (
+                    <p className="text-sm text-[var(--foreground-secondary)] mb-4 line-clamp-3">{isAr ? treatment.risk.descriptionAr : treatment.risk.descriptionEn}</p>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab('risk')} className="w-full">
+                    <ShieldAlert className="h-4 w-4 me-2" />
+                    {isAr ? 'عرض تفاصيل الخطر' : 'View Risk Details'}
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        </div>
 
-        {/* Tasks Section */}
-        <div ref={tasksRef} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 animate-slideUp">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-[#F39200]/20">
-                <ListChecks className="h-6 w-6 text-[#F39200]" />
-              </div>
-              {isAr ? 'المهام' : 'Tasks'}
-              <Badge className="bg-[#F39200] text-white">{treatment.tasks.length}</Badge>
-              {treatment.tasks.length > 0 && (
-                <span className="text-sm font-normal text-gray-500 ms-2">
-                  ({treatment.tasks.filter(t => t.status === 'completed').length}/{treatment.tasks.length} {isAr ? 'مكتمل' : 'completed'})
-                </span>
-              )}
-            </h2>
+            {/* Justification */}
+            {(treatment.justificationAr || treatment.justificationEn) && (
+              <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+                <CardContent>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">{isAr ? 'التبرير' : 'Justification'}</h3>
+                  </div>
+                  <p className="text-sm text-amber-900 dark:text-amber-200">{isAr ? treatment.justificationAr : treatment.justificationEn}</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
+        )}
 
-          <div className="p-6">
-          {treatment.tasks.length > 0 ? (
-            <div className="space-y-6">
+        {/* ── Tasks Tab ── */}
+        {activeTab === 'tasks' && (
+          <div className="space-y-4">
+            {/* Tasks Summary Bar */}
+            {treatment.tasks.length > 0 && (
+              <Card className="p-0">
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <ListChecks className="h-5 w-5 text-[#F39200]" />
+                    <span className="text-sm font-medium">{completedTasksCount}/{treatment.tasks.length} {isAr ? 'مكتمل' : 'completed'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 min-w-[150px]">
+                    <div className="flex-1 h-2 rounded-full bg-[var(--background-tertiary)]">
+                      <div className="h-full rounded-full bg-[#F39200] transition-all" style={{ width: `${treatment.tasks.length > 0 ? (completedTasksCount / treatment.tasks.length) * 100 : 0}%` }} />
+                    </div>
+                    <span className="text-xs font-bold text-[#F39200]">{treatment.tasks.length > 0 ? Math.round((completedTasksCount / treatment.tasks.length) * 100) : 0}%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {treatment.tasks.length > 0 ? (
+            <div className="space-y-4">
               {treatment.tasks.map((task, index) => {
                 const taskStatus = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.notStarted;
                 const TaskStatusIcon = taskStatus.icon;
@@ -1222,7 +1177,6 @@ export default function TreatmentDetailPage() {
                 const updates = taskUpdates[task.id] || [];
                 const completedSteps = steps.filter(s => s.status === 'completed').length;
 
-                // لون الشريط الجانبي حسب حالة المهمة
                 const taskBorderColor = {
                   completed: 'border-s-emerald-500',
                   inProgress: 'border-s-sky-500',
@@ -1232,54 +1186,39 @@ export default function TreatmentDetailPage() {
                 }[task.status] || 'border-s-gray-300';
 
                 return (
-                  <div
+                  <Card
                     key={task.id}
-                    className={`rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 border-s-4 ${taskBorderColor} hover:shadow-md transition-all duration-300 bg-gray-50 dark:bg-gray-700/30`}
+                    className={`p-0 overflow-hidden border-s-4 ${taskBorderColor}`}
                   >
                     {/* Task Header */}
-                    <div className="p-5">
-                      <div className="flex items-start gap-4">
-                        <div className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-[#F39200] to-amber-500 flex items-center justify-center text-white font-bold text-base shadow-md">
+                    <div className="p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="shrink-0 w-8 h-8 rounded-lg bg-[var(--background-tertiary)] flex items-center justify-center text-sm font-bold text-[var(--foreground-secondary)]">
                           {index + 1}
-                        </div>
+                        </span>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-1.5">
-                            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-sm font-semibold text-[var(--foreground)] truncate">
                               {isAr ? task.titleAr : task.titleEn}
                             </h3>
-                            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${taskStatus.bgClass} ${taskStatus.colorClass}`}>
-                              <TaskStatusIcon className="h-3.5 w-3.5" />
+                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${taskStatus.bgClass} ${taskStatus.colorClass}`}>
+                              <TaskStatusIcon className="h-3 w-3" />
                               <span>{isAr ? taskStatus.labelAr : taskStatus.labelEn}</span>
                             </div>
                           </div>
                           {(task.descriptionAr || task.descriptionEn) && (
-                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 leading-relaxed">
-                              {isAr ? task.descriptionAr : task.descriptionEn}
-                            </p>
+                            <p className="text-xs text-[var(--foreground-secondary)] mb-2 line-clamp-2">{isAr ? task.descriptionAr : task.descriptionEn}</p>
                           )}
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--foreground-secondary)]">
                             {(task.actionOwner || task.assignedTo) && (
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4" />
-                                <span>{isAr ? (task.actionOwner?.fullName || task.assignedTo?.fullName) : (task.actionOwner?.fullNameEn || task.assignedTo?.fullNameEn || task.actionOwner?.fullName || task.assignedTo?.fullName)}</span>
-                              </div>
+                              <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{isAr ? (task.actionOwner?.fullName || task.assignedTo?.fullName) : (task.actionOwner?.fullNameEn || task.assignedTo?.fullNameEn || task.actionOwner?.fullName || task.assignedTo?.fullName)}</span>
                             )}
                             {task.dueDate && (
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
-                                <span>{new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
-                              </div>
+                              <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
                             )}
                             {task.oneDriveUrl && (
-                              <a
-                                href={task.oneDriveUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-sky-600 hover:text-sky-700"
-                              >
-                                <Paperclip className="h-4 w-4" />
-                                <span>{isAr ? 'مرفق' : 'Attachment'}</span>
-                                <ExternalLink className="h-3 w-3" />
+                              <a href={task.oneDriveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sky-600 hover:text-sky-700">
+                                <Paperclip className="h-3.5 w-3.5" />{isAr ? 'مرفق' : 'Attachment'}<ExternalLink className="h-3 w-3" />
                               </a>
                             )}
                           </div>
@@ -1287,28 +1226,28 @@ export default function TreatmentDetailPage() {
                       </div>
                     </div>
 
-                    {/* Task Actions - عمود واحد بعرض كامل */}
-                    <div className="flex flex-col border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/50">
+                    {/* Expandable Sections */}
+                    <div className="border-t border-[var(--border)]">
                       {/* Workflow Steps */}
-                      <div className="p-5">
+                      <div className="p-3">
                         <button
                           onClick={() => toggleStepsExpanded(task.id)}
-                          className="w-full flex items-center justify-between p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors"
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--background-secondary)] transition-colors"
                         >
-                          <div className="flex items-center gap-3">
-                            <ListOrdered className="h-5 w-5 text-emerald-600" />
-                            <span className="font-semibold text-emerald-700 dark:text-emerald-300">{isAr ? 'خطوات سير العمل' : 'Workflow Steps'}</span>
+                          <div className="flex items-center gap-2">
+                            <ListOrdered className="h-4 w-4 text-emerald-600" />
+                            <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{isAr ? 'خطوات سير العمل' : 'Workflow Steps'}</span>
                             {steps.length > 0 && (
-                              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-800 dark:text-emerald-300">
+                              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">
                                 {completedSteps}/{steps.length}
-                              </Badge>
+                              </span>
                             )}
                           </div>
-                          {expandedSteps[task.id] ? <ChevronUp className="h-5 w-5 text-emerald-600" /> : <ChevronDown className="h-5 w-5 text-emerald-600" />}
+                          {expandedSteps[task.id] ? <ChevronUp className="h-4 w-4 text-[var(--foreground-secondary)]" /> : <ChevronDown className="h-4 w-4 text-[var(--foreground-secondary)]" />}
                         </button>
 
                         {expandedSteps[task.id] && (
-                          <div className="mt-4 space-y-3 animate-slideDown">
+                          <div className="mt-2 space-y-2 px-3">
                             {loadingSteps[task.id] ? (
                               <div className="flex justify-center py-4">
                                 <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
@@ -1470,23 +1409,23 @@ export default function TreatmentDetailPage() {
                       </div>
 
                       {/* Updates */}
-                      <div className="p-5 border-t border-gray-200 dark:border-gray-600">
+                      <div className="p-3 border-t border-[var(--border)]">
                         <button
                           onClick={() => toggleTaskExpanded(task.id)}
-                          className="w-full flex items-center justify-between p-4 rounded-xl bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--background-secondary)] transition-colors"
                         >
-                          <div className="flex items-center gap-3">
-                            <MessageSquare className="h-5 w-5 text-sky-600" />
-                            <span className="font-semibold text-sky-700 dark:text-sky-300">{isAr ? 'التحديثات' : 'Updates'}</span>
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4 text-sky-600" />
+                            <span className="text-sm font-medium text-sky-700 dark:text-sky-300">{isAr ? 'التحديثات' : 'Updates'}</span>
                             {updates.length > 0 && (
-                              <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-800 dark:text-sky-300">{updates.length}</Badge>
+                              <span className="text-xs bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded">{updates.length}</span>
                             )}
                           </div>
-                          {expandedTasks[task.id] ? <ChevronUp className="h-5 w-5 text-sky-600" /> : <ChevronDown className="h-5 w-5 text-sky-600" />}
+                          {expandedTasks[task.id] ? <ChevronUp className="h-4 w-4 text-[var(--foreground-secondary)]" /> : <ChevronDown className="h-4 w-4 text-[var(--foreground-secondary)]" />}
                         </button>
 
                         {expandedTasks[task.id] && (
-                          <div className="mt-4 space-y-3 animate-slideDown">
+                          <div className="mt-2 space-y-2 px-3">
                             {loadingUpdates[task.id] ? (
                               <div className="flex justify-center py-4">
                                 <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
@@ -1570,321 +1509,296 @@ export default function TreatmentDetailPage() {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
             </div>
           ) : (
-            <div className="p-12 text-center">
-              <ListChecks className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">{isAr ? 'لا توجد مهام حتى الآن' : 'No tasks yet'}</p>
+            <div className="py-12 text-center">
+              <ListChecks className="h-12 w-12 text-[var(--foreground-muted)] mx-auto mb-3" />
+              <p className="text-sm text-[var(--foreground-secondary)]">{isAr ? 'لا توجد مهام حتى الآن' : 'No tasks yet'}</p>
             </div>
           )}
           </div>
-        </div>
+        )}
 
-        {/* Risk Details Section */}
-        <div ref={riskRef} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 animate-slideUp">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-rose-50 to-orange-50 dark:from-rose-900/20 dark:to-orange-900/20">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-900/30">
-                <ShieldAlert className="h-6 w-6 text-rose-600" />
-              </div>
-              {isAr ? 'تفاصيل الخطر' : 'Risk Details'}
-            </h2>
-          </div>
-
-          <div className="p-6 space-y-6">
+        {/* ── Risk Details Tab ── */}
+        {activeTab === 'risk' && (
+          <div className="space-y-6">
             {/* Risk Description */}
             {(treatment.risk.descriptionAr || treatment.risk.descriptionEn) && (
-              <div>
-                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-gray-500" />
-                  {isAr ? 'وصف الخطر' : 'Risk Description'}
-                </h4>
-                <p className="text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl">
-                  {isAr ? treatment.risk.descriptionAr : treatment.risk.descriptionEn}
-                </p>
-              </div>
+              <Card>
+                <CardContent>
+                  <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-[var(--foreground-secondary)]" />
+                    {isAr ? 'وصف الخطر' : 'Risk Description'}
+                  </h3>
+                  <p className="text-sm text-[var(--foreground-secondary)] leading-relaxed">
+                    {isAr ? treatment.risk.descriptionAr : treatment.risk.descriptionEn}
+                  </p>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Two Column Layout */}
+            {/* Cause & Impact */}
             <div className="grid md:grid-cols-2 gap-6">
-              {/* Potential Cause */}
               {(treatment.risk.potentialCauseAr || treatment.risk.potentialCauseEn) && (
-                <div>
-                  <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    {isAr ? 'السبب المحتمل' : 'Potential Cause'}
-                  </h4>
-                  <p className="text-gray-600 dark:text-gray-400 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800">
-                    {isAr ? treatment.risk.potentialCauseAr : treatment.risk.potentialCauseEn}
-                  </p>
-                </div>
+                <Card className="border-amber-200 dark:border-amber-800">
+                  <CardContent>
+                    <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-3 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      {isAr ? 'السبب المحتمل' : 'Potential Cause'}
+                    </h3>
+                    <p className="text-sm text-[var(--foreground-secondary)] leading-relaxed">
+                      {isAr ? treatment.risk.potentialCauseAr : treatment.risk.potentialCauseEn}
+                    </p>
+                  </CardContent>
+                </Card>
               )}
-
-              {/* Potential Impact */}
               {(treatment.risk.potentialImpactAr || treatment.risk.potentialImpactEn) && (
-                <div>
-                  <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-rose-500" />
-                    {isAr ? 'التأثير المحتمل' : 'Potential Impact'}
-                  </h4>
-                  <p className="text-gray-600 dark:text-gray-400 bg-rose-50 dark:bg-rose-900/20 p-4 rounded-xl border border-rose-200 dark:border-rose-800">
-                    {isAr ? treatment.risk.potentialImpactAr : treatment.risk.potentialImpactEn}
-                  </p>
-                </div>
+                <Card className="border-rose-200 dark:border-rose-800">
+                  <CardContent>
+                    <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300 mb-3 flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      {isAr ? 'التأثير المحتمل' : 'Potential Impact'}
+                    </h3>
+                    <p className="text-sm text-[var(--foreground-secondary)] leading-relaxed">
+                      {isAr ? treatment.risk.potentialImpactAr : treatment.risk.potentialImpactEn}
+                    </p>
+                  </CardContent>
+                </Card>
               )}
             </div>
 
             {/* Existing Controls */}
             {(treatment.risk.layersOfProtectionAr || treatment.risk.layersOfProtectionEn) && (
-              <div>
-                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-emerald-500" />
-                  {isAr ? 'الضوابط الحالية' : 'Existing Controls'}
-                </h4>
-                <p className="text-gray-600 dark:text-gray-400 bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                  {isAr ? treatment.risk.layersOfProtectionAr : treatment.risk.layersOfProtectionEn}
-                </p>
-              </div>
+              <Card className="border-emerald-200 dark:border-emerald-800">
+                <CardContent>
+                  <h3 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-3 flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {isAr ? 'الضوابط الحالية' : 'Existing Controls'}
+                  </h3>
+                  <p className="text-sm text-[var(--foreground-secondary)] leading-relaxed">
+                    {isAr ? treatment.risk.layersOfProtectionAr : treatment.risk.layersOfProtectionEn}
+                  </p>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Risk Matrix */}
-            <div className="grid md:grid-cols-2 gap-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-              <div className="p-6 rounded-xl bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/30 dark:to-rose-800/30 border border-rose-200 dark:border-rose-700">
-                <h4 className="font-semibold text-rose-700 dark:text-rose-300 mb-4 flex items-center gap-2">
-                  <Flame className="h-5 w-5" />
-                  {isAr ? 'الخطر الكامن' : 'Inherent Risk'}
-                </h4>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-xs text-rose-600 dark:text-rose-400 mb-1">{isAr ? 'الاحتمالية' : 'Likelihood'}</p>
-                    <p className="text-2xl font-bold text-rose-700 dark:text-rose-300">{treatment.risk.inherentLikelihood}</p>
+            {/* Risk Scores */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card className="border-rose-200 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-950/20">
+                <CardContent>
+                  <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300 mb-4 flex items-center gap-2">
+                    <Flame className="h-4 w-4" />
+                    {isAr ? 'الخطر الكامن' : 'Inherent Risk'}
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xs text-rose-600 dark:text-rose-400 mb-1">{isAr ? 'الاحتمالية' : 'Likelihood'}</p>
+                      <p className="text-2xl font-bold text-rose-700 dark:text-rose-300">{treatment.risk.inherentLikelihood}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-rose-600 dark:text-rose-400 mb-1">{isAr ? 'التأثير' : 'Impact'}</p>
+                      <p className="text-2xl font-bold text-rose-700 dark:text-rose-300">{treatment.risk.inherentImpact}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-rose-600 dark:text-rose-400 mb-1">{isAr ? 'الدرجة' : 'Score'}</p>
+                      <p className="text-2xl font-bold text-rose-700 dark:text-rose-300">{treatment.risk.inherentScore}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-rose-600 dark:text-rose-400 mb-1">{isAr ? 'التأثير' : 'Impact'}</p>
-                    <p className="text-2xl font-bold text-rose-700 dark:text-rose-300">{treatment.risk.inherentImpact}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+                <CardContent>
+                  <h3 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-4 flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {isAr ? 'الخطر المتبقي' : 'Residual Risk'}
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">{isAr ? 'الاحتمالية' : 'Likelihood'}</p>
+                      <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{treatment.risk.residualLikelihood || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">{isAr ? 'التأثير' : 'Impact'}</p>
+                      <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{treatment.risk.residualImpact || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">{isAr ? 'الدرجة' : 'Score'}</p>
+                      <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{treatment.risk.residualScore || '-'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-rose-600 dark:text-rose-400 mb-1">{isAr ? 'الدرجة' : 'Score'}</p>
-                    <p className="text-2xl font-bold text-rose-700 dark:text-rose-300">{treatment.risk.inherentScore}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 border border-emerald-200 dark:border-emerald-700">
-                <h4 className="font-semibold text-emerald-700 dark:text-emerald-300 mb-4 flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  {isAr ? 'الخطر المتبقي' : 'Residual Risk'}
-                </h4>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">{isAr ? 'الاحتمالية' : 'Likelihood'}</p>
-                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{treatment.risk.residualLikelihood || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">{isAr ? 'التأثير' : 'Impact'}</p>
-                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{treatment.risk.residualImpact || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">{isAr ? 'الدرجة' : 'Score'}</p>
-                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{treatment.risk.residualScore || '-'}</p>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Discussions Section */}
-        <div ref={discussionsRef} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 animate-slideUp">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-900/30">
-                <MessageCircle className="h-6 w-6 text-purple-600" />
-              </div>
-              {isAr ? 'المناقشات' : 'Discussions'}
-              {discussions.length > 0 && <Badge className="bg-purple-500 text-white">{discussions.length}</Badge>}
-            </h2>
-          </div>
-
-          <div className="p-6 space-y-6">
+        {/* ── Discussions Tab ── */}
+        {activeTab === 'discussions' && (
+          <div className="space-y-4">
             {/* New Discussion Input */}
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-300 font-bold">
-                <User className="h-5 w-5" />
-              </div>
-              <div className="flex-1">
-                <textarea
-                  value={newDiscussionContent}
-                  onChange={(e) => setNewDiscussionContent(e.target.value)}
-                  placeholder={isAr ? 'اكتب تعليقاً أو سؤالاً...' : 'Write a comment or question...'}
-                  className="w-full p-4 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  rows={3}
-                />
-                <div className="flex justify-end mt-2">
-                  <Button
-                    onClick={() => submitDiscussion()}
-                    disabled={submittingDiscussion || !newDiscussionContent.trim()}
-                    className="bg-purple-500 hover:bg-purple-600"
-                  >
-                    {submittingDiscussion ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : <Send className="h-4 w-4 me-2" />}
-                    {isAr ? 'إرسال' : 'Send'}
-                  </Button>
+            <Card>
+              <CardContent>
+                <div className="flex gap-3">
+                  <div className="shrink-0 w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-300 font-bold text-sm">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1">
+                    <textarea
+                      value={newDiscussionContent}
+                      onChange={(e) => setNewDiscussionContent(e.target.value)}
+                      placeholder={isAr ? 'اكتب تعليقاً أو سؤالاً...' : 'Write a comment or question...'}
+                      className="w-full p-3 border border-[var(--border)] rounded-lg bg-[var(--background-secondary)] resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                      rows={3}
+                    />
+                    <div className="flex justify-end mt-2">
+                      <Button
+                        size="sm"
+                        onClick={() => submitDiscussion()}
+                        disabled={submittingDiscussion || !newDiscussionContent.trim()}
+                        className="bg-purple-500 hover:bg-purple-600"
+                      >
+                        {submittingDiscussion ? <Loader2 className="h-4 w-4 animate-spin me-1" /> : <Send className="h-4 w-4 me-1" />}
+                        {isAr ? 'إرسال' : 'Send'}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Discussions List */}
             {loadingDiscussions ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-              </div>
+              <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-purple-500" /></div>
             ) : discussions.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {discussions.map((discussion) => (
-                  <div key={discussion.id} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-300 font-bold">
-                        {discussion.author.fullName.charAt(0)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-semibold">{isAr ? discussion.author.fullName : discussion.author.fullNameEn || discussion.author.fullName}</span>
-                          <span className="text-xs text-gray-500">{formatTimeAgo(discussion.createdAt)}</span>
-                          {discussion.type === 'question' && (
-                            <Badge className="bg-amber-100 text-amber-700">{isAr ? 'سؤال' : 'Question'}</Badge>
+                  <Card key={discussion.id}>
+                    <CardContent>
+                      <div className="flex items-start gap-3">
+                        <div className="shrink-0 w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-300 font-bold text-sm">
+                          {discussion.author.fullName.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold">{isAr ? discussion.author.fullName : discussion.author.fullNameEn || discussion.author.fullName}</span>
+                            <span className="text-xs text-[var(--foreground-muted)]">{formatTimeAgo(discussion.createdAt)}</span>
+                            {discussion.type === 'question' && (
+                              <Badge className="bg-amber-100 text-amber-700 text-xs">{isAr ? 'سؤال' : 'Question'}</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-[var(--foreground-secondary)] mb-2">{discussion.content}</p>
+
+                          {/* Replies */}
+                          {discussion.replies && discussion.replies.length > 0 && (
+                            <div className="space-y-2 mt-3 pt-3 border-t border-[var(--border)]">
+                              {discussion.replies.map((reply) => (
+                                <div key={reply.id} className="flex items-start gap-2 ps-4">
+                                  <div className="shrink-0 w-7 h-7 rounded-full bg-[var(--background-tertiary)] flex items-center justify-center text-[var(--foreground-secondary)] font-bold text-xs">
+                                    {reply.author.fullName.charAt(0)}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <span className="text-xs font-medium">{isAr ? reply.author.fullName : reply.author.fullNameEn || reply.author.fullName}</span>
+                                      <span className="text-xs text-[var(--foreground-muted)]">{formatTimeAgo(reply.createdAt)}</span>
+                                    </div>
+                                    <p className="text-xs text-[var(--foreground-secondary)]">{reply.content}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Reply */}
+                          {replyingTo === discussion.id ? (
+                            <div className="flex gap-2 mt-2">
+                              <Input
+                                value={replyContent}
+                                onChange={(e) => setReplyContent(e.target.value)}
+                                placeholder={isAr ? 'اكتب رداً...' : 'Write a reply...'}
+                                className="flex-1 text-sm"
+                                onKeyPress={(e) => e.key === 'Enter' && submitDiscussion(discussion.id)}
+                              />
+                              <Button size="sm" onClick={() => submitDiscussion(discussion.id)} disabled={submittingDiscussion || !replyContent.trim()} className="bg-purple-500 hover:bg-purple-600">
+                                {submittingDiscussion ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setReplyingTo(null)}><X className="h-3.5 w-3.5" /></Button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setReplyingTo(discussion.id)} className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 mt-1">
+                              <Reply className="h-3.5 w-3.5" />{isAr ? 'رد' : 'Reply'}
+                            </button>
                           )}
                         </div>
-                        <p className="text-gray-700 dark:text-gray-300 mb-3">{discussion.content}</p>
-
-                        {/* Replies */}
-                        {discussion.replies && discussion.replies.length > 0 && (
-                          <div className="space-y-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-                            {discussion.replies.map((reply) => (
-                              <div key={reply.id} className="flex items-start gap-3 ps-6">
-                                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-gray-600 dark:text-gray-300 font-bold text-sm">
-                                  {reply.author.fullName.charAt(0)}
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium text-sm">{isAr ? reply.author.fullName : reply.author.fullNameEn || reply.author.fullName}</span>
-                                    <span className="text-xs text-gray-500">{formatTimeAgo(reply.createdAt)}</span>
-                                  </div>
-                                  <p className="text-sm text-gray-700 dark:text-gray-300">{reply.content}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Reply Input */}
-                        {replyingTo === discussion.id ? (
-                          <div className="flex gap-2 mt-3">
-                            <Input
-                              value={replyContent}
-                              onChange={(e) => setReplyContent(e.target.value)}
-                              placeholder={isAr ? 'اكتب رداً...' : 'Write a reply...'}
-                              className="flex-1"
-                              onKeyPress={(e) => e.key === 'Enter' && submitDiscussion(discussion.id)}
-                            />
-                            <Button size="sm" onClick={() => submitDiscussion(discussion.id)} disabled={submittingDiscussion || !replyContent.trim()} className="bg-purple-500 hover:bg-purple-600">
-                              {submittingDiscussion ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => setReplyingTo(null)}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setReplyingTo(discussion.id)}
-                            className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 mt-2"
-                          >
-                            <Reply className="h-4 w-4" />
-                            {isAr ? 'رد' : 'Reply'}
-                          </button>
-                        )}
                       </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <MessageCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">{isAr ? 'لا توجد مناقشات بعد' : 'No discussions yet'}</p>
+              <div className="text-center py-12">
+                <MessageCircle className="h-12 w-12 text-[var(--foreground-muted)] mx-auto mb-3" />
+                <p className="text-sm text-[var(--foreground-secondary)]">{isAr ? 'لا توجد مناقشات بعد' : 'No discussions yet'}</p>
               </div>
             )}
           </div>
-        </div>
+        )}
 
-        {/* Change Log Section */}
-        <div ref={changeLogRef} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 animate-slideUp">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-900/20 dark:to-gray-900/20">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900/30">
-                <History className="h-6 w-6 text-slate-600" />
-              </div>
-              {isAr ? 'سجل التعديلات' : 'Change Log'}
-              {changeLogs.length > 0 && <Badge className="bg-slate-500 text-white">{changeLogs.length}</Badge>}
-            </h2>
-          </div>
-
-          <div className="p-6">
+        {/* ── Change Log Tab ── */}
+        {activeTab === 'log' && (
+          <div>
             {loadingChangeLogs ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
-              </div>
+              <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-[var(--foreground-secondary)]" /></div>
             ) : changeLogs.length > 0 ? (
-              <div className="relative">
-                <div className="absolute top-0 bottom-0 start-5 w-0.5 bg-gray-200 dark:bg-gray-700" />
-                <div className="space-y-4">
+              <div className="relative ps-8">
+                <div className="absolute top-0 bottom-0 start-3 w-0.5 bg-[var(--border)]" />
+                <div className="space-y-3">
                   {changeLogs.map((log) => {
                     const changeConf = changeTypeLabels[log.changeType] || { ar: log.changeType, en: log.changeType, icon: History, color: 'text-gray-500' };
                     const ChangeIcon = changeConf.icon;
                     return (
-                      <div key={log.id} className="relative flex items-start gap-4 ps-12">
-                        <div className={`absolute start-3 w-5 h-5 rounded-full flex items-center justify-center bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700`}>
-                          <ChangeIcon className={`h-3 w-3 ${changeConf.color}`} />
+                      <div key={log.id} className="relative">
+                        <div className="absolute -start-8 top-4 w-5 h-5 rounded-full flex items-center justify-center bg-[var(--background)] border-2 border-[var(--border)]">
+                          <ChangeIcon className={`h-2.5 w-2.5 ${changeConf.color}`} />
                         </div>
-                        <div className="flex-1 p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{isAr ? log.user.fullName : log.user.fullNameEn || log.user.fullName}</span>
-                              <Badge className={`${changeConf.color} bg-transparent border`}>
-                                {isAr ? changeConf.ar : changeConf.en}
-                              </Badge>
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{isAr ? log.user.fullName : log.user.fullNameEn || log.user.fullName}</span>
+                                <span className={`text-xs ${changeConf.color}`}>{isAr ? changeConf.ar : changeConf.en}</span>
+                              </div>
+                              <span className="text-xs text-[var(--foreground-muted)]">{formatTimeAgo(log.createdAt)}</span>
                             </div>
-                            <span className="text-xs text-gray-500">{formatTimeAgo(log.createdAt)}</span>
-                          </div>
-                          {(log.descriptionAr || log.description) && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {isAr ? log.descriptionAr : log.description}
-                            </p>
-                          )}
-                          {log.fieldNameAr && log.oldValue && log.newValue && (
-                            <div className="mt-2 text-xs text-gray-500">
-                              <span className="font-medium">{isAr ? log.fieldNameAr : log.fieldName}:</span>
-                              <span className="text-rose-500 line-through mx-2">{log.oldValue}</span>
-                              <span>→</span>
-                              <span className="text-emerald-500 mx-2">{log.newValue}</span>
-                            </div>
-                          )}
-                        </div>
+                            {(log.descriptionAr || log.description) && (
+                              <p className="text-xs text-[var(--foreground-secondary)]">{isAr ? log.descriptionAr : log.description}</p>
+                            )}
+                            {log.fieldNameAr && log.oldValue && log.newValue && (
+                              <div className="mt-1 text-xs text-[var(--foreground-muted)]">
+                                <span className="font-medium">{isAr ? log.fieldNameAr : log.fieldName}:</span>
+                                <span className="text-rose-500 line-through mx-1">{log.oldValue}</span>
+                                <span>→</span>
+                                <span className="text-emerald-500 mx-1">{log.newValue}</span>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
                       </div>
                     );
                   })}
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <History className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">{isAr ? 'لا توجد تعديلات مسجلة' : 'No changes recorded'}</p>
+              <div className="text-center py-12">
+                <History className="h-12 w-12 text-[var(--foreground-muted)] mx-auto mb-3" />
+                <p className="text-sm text-[var(--foreground-secondary)]">{isAr ? 'لا توجد تعديلات مسجلة' : 'No changes recorded'}</p>
               </div>
             )}
           </div>
-        </div>
+        )}
+
       </div>
 
       {/* Delete Modal */}
