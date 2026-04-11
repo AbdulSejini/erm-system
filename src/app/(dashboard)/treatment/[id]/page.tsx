@@ -58,6 +58,7 @@ import {
   Send,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   History,
   Paperclip,
   ListOrdered,
@@ -392,6 +393,8 @@ export default function TreatmentDetailPage() {
 
   // Tab navigation (replaces scroll-based navigation)
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'risk' | 'discussions' | 'log'>('overview');
+  // Selected task in split-panel layout
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1036,7 +1039,7 @@ export default function TreatmentDetailPage() {
       </div>
 
       {/* ═══════ Tab Content ═══════ */}
-      <div className="max-w-5xl mx-auto p-4 md:p-6">
+      <div className={cn('mx-auto p-4 md:p-6', activeTab === 'tasks' ? 'max-w-7xl' : 'max-w-5xl')}>
 
         {/* ── Overview Tab ── */}
         {activeTab === 'overview' && (
@@ -1069,7 +1072,7 @@ export default function TreatmentDetailPage() {
                   <p className="text-xs text-[var(--foreground-secondary)] mt-1">{isAr ? 'الإنجاز' : 'Progress'}</p>
                 </div>
                 {/* Tasks */}
-                <div className="p-4 text-center cursor-pointer hover:bg-[var(--background-secondary)] transition-colors" onClick={() => setActiveTab('tasks')}>
+                <div className="p-4 text-center cursor-pointer hover:bg-[var(--background-secondary)] transition-colors" onClick={() => { setActiveTab('tasks'); if (treatment.tasks.length > 0 && !selectedTaskId) setSelectedTaskId(treatment.tasks[0].id); }}>
                   <p className="text-2xl font-bold text-sky-600">{completedTasksCount}<span className="text-base text-[var(--foreground-muted)]">/{treatment.tasks.length}</span></p>
                   <p className="text-xs text-[var(--foreground-secondary)] mt-1">{isAr ? 'المهام المكتملة' : 'Tasks Done'}</p>
                 </div>
@@ -1152,7 +1155,7 @@ export default function TreatmentDetailPage() {
           </div>
         )}
 
-        {/* ── Tasks Tab ── */}
+        {/* ── Tasks Tab — Split layout: task list + detail panel ── */}
         {activeTab === 'tasks' && (
           <div className="space-y-4">
             {/* Tasks Summary Bar */}
@@ -1174,349 +1177,287 @@ export default function TreatmentDetailPage() {
             )}
 
             {treatment.tasks.length > 0 ? (
-            <div className="space-y-4">
-              {treatment.tasks.map((task, index) => {
-                const taskStatus = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.notStarted;
-                const TaskStatusIcon = taskStatus.icon;
-                const steps = taskSteps[task.id] || [];
-                const updates = taskUpdates[task.id] || [];
-                const completedSteps = steps.filter(s => s.status === 'completed').length;
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+              {/* Task List (left side) */}
+              <div className="lg:col-span-2 space-y-2">
+                {treatment.tasks.map((task, index) => {
+                  const taskStatus = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.notStarted;
+                  const TaskStatusIcon = taskStatus.icon;
+                  const steps = taskSteps[task.id] || [];
+                  const completedStepsCount = steps.filter(s => s.status === 'completed').length;
+                  const isSelected = selectedTaskId === task.id;
 
-                const taskBorderColor = {
-                  completed: 'border-s-emerald-500',
-                  inProgress: 'border-s-sky-500',
-                  overdue: 'border-s-rose-500',
-                  notStarted: 'border-s-gray-300 dark:border-s-gray-600',
-                  cancelled: 'border-s-gray-400',
-                }[task.status] || 'border-s-gray-300';
+                  const taskBorderColor = {
+                    completed: 'border-s-emerald-500',
+                    inProgress: 'border-s-sky-500',
+                    overdue: 'border-s-rose-500',
+                    notStarted: 'border-s-gray-300 dark:border-s-gray-600',
+                    cancelled: 'border-s-gray-400',
+                  }[task.status] || 'border-s-gray-300';
 
-                return (
-                  <Card
-                    key={task.id}
-                    className={`p-0 overflow-hidden border-s-4 ${taskBorderColor}`}
-                  >
-                    {/* Task Header */}
-                    <div className="p-4">
-                      <div className="flex items-start gap-3">
-                        <span className="shrink-0 w-8 h-8 rounded-lg bg-[var(--background-tertiary)] flex items-center justify-center text-sm font-bold text-[var(--foreground-secondary)]">
+                  return (
+                    <button
+                      key={task.id}
+                      onClick={() => {
+                        setSelectedTaskId(task.id);
+                        if (!expandedSteps[task.id]) toggleStepsExpanded(task.id);
+                        if (!expandedTasks[task.id]) toggleTaskExpanded(task.id);
+                      }}
+                      className={cn(
+                        'w-full text-start p-3 rounded-lg border-s-4 border border-[var(--border)] transition-all',
+                        taskBorderColor,
+                        isSelected
+                          ? 'bg-[#F39200]/5 border-[#F39200] ring-1 ring-[#F39200]/30'
+                          : 'bg-[var(--background)] hover:bg-[var(--background-secondary)]'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="shrink-0 w-7 h-7 rounded-lg bg-[var(--background-tertiary)] flex items-center justify-center text-xs font-bold text-[var(--foreground-secondary)]">
                           {index + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-0.5">
                             <h3 className="text-sm font-semibold text-[var(--foreground)] truncate">
                               {isAr ? task.titleAr : task.titleEn}
                             </h3>
-                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${taskStatus.bgClass} ${taskStatus.colorClass}`}>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${taskStatus.bgClass} ${taskStatus.colorClass}`}>
                               <TaskStatusIcon className="h-3 w-3" />
                               <span>{isAr ? taskStatus.labelAr : taskStatus.labelEn}</span>
                             </div>
-                          </div>
-                          {(task.descriptionAr || task.descriptionEn) && (
-                            <p className="text-xs text-[var(--foreground-secondary)] mb-2 line-clamp-2">{isAr ? task.descriptionAr : task.descriptionEn}</p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--foreground-secondary)]">
-                            {(task.actionOwner || task.assignedTo) && (
-                              <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{isAr ? (task.actionOwner?.fullName || task.assignedTo?.fullName) : (task.actionOwner?.fullNameEn || task.assignedTo?.fullNameEn || task.actionOwner?.fullName || task.assignedTo?.fullName)}</span>
-                            )}
-                            {task.dueDate && (
-                              <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
-                            )}
-                            {task.oneDriveUrl && (
-                              <a href={task.oneDriveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sky-600 hover:text-sky-700">
-                                <Paperclip className="h-3.5 w-3.5" />{isAr ? 'مرفق' : 'Attachment'}<ExternalLink className="h-3 w-3" />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expandable Sections */}
-                    <div className="border-t border-[var(--border)]">
-                      {/* Workflow Steps */}
-                      <div className="p-3">
-                        <button
-                          onClick={() => toggleStepsExpanded(task.id)}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--background-secondary)] transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <ListOrdered className="h-4 w-4 text-emerald-600" />
-                            <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{isAr ? 'خطوات سير العمل' : 'Workflow Steps'}</span>
                             {steps.length > 0 && (
-                              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">
-                                {completedSteps}/{steps.length}
+                              <span className="text-xs text-[var(--foreground-secondary)]">{completedStepsCount}/{steps.length}</span>
+                            )}
+                            {(task.actionOwner || task.assignedTo) && (
+                              <span className="text-xs text-[var(--foreground-secondary)] truncate">
+                                <User className="h-3 w-3 inline me-0.5" />
+                                {isAr ? (task.actionOwner?.fullName || task.assignedTo?.fullName) : (task.actionOwner?.fullNameEn || task.assignedTo?.fullNameEn || task.actionOwner?.fullName || task.assignedTo?.fullName)}
                               </span>
                             )}
                           </div>
-                          {expandedSteps[task.id] ? <ChevronUp className="h-4 w-4 text-[var(--foreground-secondary)]" /> : <ChevronDown className="h-4 w-4 text-[var(--foreground-secondary)]" />}
-                        </button>
+                        </div>
+                        <ChevronRight className={cn('h-4 w-4 text-[var(--foreground-secondary)] shrink-0 transition-transform', isAr && 'rotate-180')} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
 
-                        {expandedSteps[task.id] && (
-                          <div className="mt-2 space-y-2 px-3">
-                            {loadingSteps[task.id] ? (
-                              <div className="flex justify-center py-4">
-                                <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
-                              </div>
-                            ) : (
-                              <>
-                                {steps.map((step, stepIndex) => {
-                                  const stepConf = stepStatusConfig[step.status];
-                                  const StepIcon = stepConf.icon;
-                                  const isEditing = editingStepId === step.id;
-                                  return (
-                                    <div key={step.id} className={`p-4 rounded-xl ${stepConf.bg} border border-gray-200 dark:border-gray-600`}>
-                                      {isEditing ? (
-                                        /* وضع التعديل */
-                                        <div className="space-y-3">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-xs font-bold text-gray-500 w-6">{stepIndex + 1}</span>
-                                            <span className="text-sm font-medium text-emerald-700">{isAr ? 'تعديل الخطوة' : 'Edit Step'}</span>
-                                          </div>
-                                          <Input
-                                            value={editingStepTitle}
-                                            onChange={(e) => setEditingStepTitle(e.target.value)}
-                                            placeholder={isAr ? 'عنوان الخطوة...' : 'Step title...'}
-                                            className="w-full"
-                                            autoFocus
-                                            onKeyPress={(e) => e.key === 'Enter' && saveStepEdit(task.id, step.id)}
-                                          />
-                                          <OneDrivePicker
-                                            isAr={isAr}
-                                            onFileSelect={(file) => {
-                                              setEditingStepAttachmentUrl(file.url);
-                                              setEditingStepAttachmentName(file.name);
-                                            }}
-                                          />
-                                          {editingStepAttachmentUrl && (
-                                            <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg">
-                                              <Paperclip className="h-3.5 w-3.5" />
-                                              <a href={editingStepAttachmentUrl} target="_blank" rel="noopener noreferrer" className="truncate max-w-[300px] hover:underline">
-                                                {editingStepAttachmentName || (isAr ? 'مرفق' : 'Attachment')}
-                                              </a>
-                                              <button
-                                                onClick={() => { setEditingStepAttachmentUrl(''); setEditingStepAttachmentName(''); }}
-                                                className="text-red-400 hover:text-red-600 ms-auto"
-                                              >
-                                                <X className="h-3.5 w-3.5" />
-                                              </button>
-                                            </div>
-                                          )}
-                                          <div className="flex gap-2 justify-end">
-                                            <Button size="sm" variant="outline" onClick={cancelEditStep} className="text-xs">
-                                              {isAr ? 'إلغاء' : 'Cancel'}
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              onClick={() => saveStepEdit(task.id, step.id)}
-                                              disabled={savingStep || !editingStepTitle.trim()}
-                                              className="bg-emerald-500 hover:bg-emerald-600 text-xs"
-                                            >
-                                              {savingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Save className="h-3.5 w-3.5 me-1" />{isAr ? 'حفظ' : 'Save'}</>}
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        /* وضع العرض */
-                                        <div className="flex items-center gap-3">
-                                          <span className="text-xs font-bold text-gray-500 w-6">{stepIndex + 1}</span>
-                                          <button
-                                            onClick={() => updateStepStatus(task.id, step.id, step.status === 'completed' ? 'pending' : 'completed')}
-                                            className={`p-1.5 rounded-full ${step.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-gray-200 dark:bg-gray-600'}`}
-                                          >
-                                            <StepIcon className="h-4 w-4" />
-                                          </button>
-                                          <span className={`flex-1 text-sm ${step.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                            {step.title}
-                                          </span>
-                                          {step.attachmentUrl && (
-                                            <a
-                                              href={step.attachmentUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 shrink-0 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg"
-                                              title={step.attachmentName || (isAr ? 'مرفق' : 'Attachment')}
-                                            >
-                                              <Paperclip className="h-3 w-3" />
-                                              <span className="max-w-[150px] truncate">{step.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
-                                              <ExternalLink className="h-3 w-3" />
-                                            </a>
-                                          )}
-                                          <span className="text-xs text-gray-400 shrink-0">{formatTimeAgo(step.createdAt)}</span>
-                                          {/* أزرار التعديل والحذف */}
-                                          <div className="flex items-center gap-1 shrink-0">
-                                            <button
-                                              onClick={() => startEditStep(step)}
-                                              className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
-                                              title={isAr ? 'تعديل' : 'Edit'}
-                                            >
-                                              <Pencil className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                              onClick={() => deleteStep(task.id, step.id)}
-                                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                                              title={isAr ? 'حذف' : 'Delete'}
-                                            >
-                                              <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+              {/* Task Detail Panel (right side) */}
+              <div className="lg:col-span-3">
+                {selectedTaskId ? (() => {
+                  const task = treatment.tasks.find(t => t.id === selectedTaskId);
+                  if (!task) return null;
+                  const taskStatus = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.notStarted;
+                  const TaskStatusIcon = taskStatus.icon;
+                  const steps = taskSteps[task.id] || [];
+                  const updates = taskUpdates[task.id] || [];
+                  const completedStepsCount = steps.filter(s => s.status === 'completed').length;
+                  const taskIndex = treatment.tasks.findIndex(t => t.id === selectedTaskId);
 
-                                {/* Add Step */}
-                                <div className="space-y-3 p-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-xl border border-dashed border-emerald-200 dark:border-emerald-800">
-                                  <div className="flex gap-3">
-                                    <Input
-                                      value={newStepTitle[task.id] || ''}
-                                      onChange={(e) => setNewStepTitle(prev => ({ ...prev, [task.id]: e.target.value }))}
-                                      placeholder={isAr ? 'أضف خطوة جديدة...' : 'Add a new step...'}
-                                      className="flex-1"
-                                      onKeyPress={(e) => e.key === 'Enter' && submitTaskStep(task.id)}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      onClick={() => submitTaskStep(task.id)}
-                                      disabled={submittingStep === task.id || !newStepTitle[task.id]?.trim()}
-                                      className="bg-emerald-500 hover:bg-emerald-600 px-4"
-                                    >
-                                      {submittingStep === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 me-1" />{isAr ? 'إضافة' : 'Add'}</>}
-                                    </Button>
-                                  </div>
-                                  <OneDrivePicker
-                                    isAr={isAr}
-                                    onFileSelect={(file) => {
-                                      setNewStepAttachmentUrl(prev => ({ ...prev, [task.id]: file.url }));
-                                      setNewStepAttachmentName(prev => ({ ...prev, [task.id]: file.name }));
-                                    }}
-                                  />
-                                  {newStepAttachmentUrl[task.id] && (
-                                    <div className="flex items-center gap-2 text-xs text-emerald-600 bg-white dark:bg-gray-800 p-2 rounded-lg">
-                                      <Paperclip className="h-3.5 w-3.5" />
-                                      <span className="truncate max-w-[300px]">{newStepAttachmentName[task.id] || (isAr ? 'مرفق' : 'Attachment')}</span>
-                                      <button
-                                        onClick={() => {
-                                          setNewStepAttachmentUrl(prev => ({ ...prev, [task.id]: '' }));
-                                          setNewStepAttachmentName(prev => ({ ...prev, [task.id]: '' }));
-                                        }}
-                                        className="text-red-400 hover:text-red-600 ms-auto"
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              </>
+                  return (
+                    <Card className="p-0 overflow-hidden sticky top-[120px]">
+                      {/* Task detail header */}
+                      <div className="p-4 border-b border-[var(--border)] bg-[var(--background-secondary)]">
+                        <div className="flex items-center gap-3">
+                          <span className="shrink-0 w-8 h-8 rounded-lg bg-[#F39200]/10 flex items-center justify-center text-sm font-bold text-[#F39200]">
+                            {taskIndex + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-[var(--foreground)]">
+                              {isAr ? task.titleAr : task.titleEn}
+                            </h3>
+                            {(isAr ? task.titleEn : task.titleAr) && (
+                              <p className="text-xs text-[var(--foreground-secondary)]">{isAr ? task.titleEn : task.titleAr}</p>
                             )}
                           </div>
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${taskStatus.bgClass} ${taskStatus.colorClass}`}>
+                            <TaskStatusIcon className="h-3.5 w-3.5" />
+                            <span>{isAr ? taskStatus.labelAr : taskStatus.labelEn}</span>
+                          </div>
+                        </div>
+                        {/* Task metadata */}
+                        <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-[var(--foreground-secondary)]">
+                          {(task.actionOwner || task.assignedTo) && (
+                            <span className="flex items-center gap-1 bg-[var(--background)] px-2 py-1 rounded"><User className="h-3.5 w-3.5" />{isAr ? (task.actionOwner?.fullName || task.assignedTo?.fullName) : (task.actionOwner?.fullNameEn || task.assignedTo?.fullNameEn || task.actionOwner?.fullName || task.assignedTo?.fullName)}</span>
+                          )}
+                          {task.dueDate && (
+                            <span className="flex items-center gap-1 bg-[var(--background)] px-2 py-1 rounded"><Calendar className="h-3.5 w-3.5" />{new Date(task.dueDate).toLocaleDateString(isAr ? 'ar-SA-u-ca-gregory' : 'en-US')}</span>
+                          )}
+                          {task.oneDriveUrl && (
+                            <a href={task.oneDriveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sky-600 hover:text-sky-700 bg-sky-50 dark:bg-sky-900/20 px-2 py-1 rounded">
+                              <Paperclip className="h-3.5 w-3.5" />{isAr ? 'مرفق' : 'Attachment'}<ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                        {(task.descriptionAr || task.descriptionEn) && (
+                          <p className="text-xs text-[var(--foreground-secondary)] mt-2 p-2 bg-[var(--background)] rounded">{isAr ? task.descriptionAr : task.descriptionEn}</p>
                         )}
                       </div>
 
-                      {/* Updates */}
-                      <div className="p-3 border-t border-[var(--border)]">
-                        <button
-                          onClick={() => toggleTaskExpanded(task.id)}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--background-secondary)] transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
+                      {/* Scrollable content: Steps + Updates */}
+                      <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+                        {/* Workflow Steps */}
+                        <div className="p-4 border-b border-[var(--border)]">
+                          <div className="flex items-center gap-2 mb-3">
+                            <ListOrdered className="h-4 w-4 text-emerald-600" />
+                            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{isAr ? 'خطوات سير العمل' : 'Workflow Steps'}</span>
+                            {steps.length > 0 && (
+                              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">
+                                {completedStepsCount}/{steps.length}
+                              </span>
+                            )}
+                          </div>
+
+                          {loadingSteps[task.id] ? (
+                            <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-emerald-500" /></div>
+                          ) : (
+                            <div className="space-y-2">
+                              {steps.map((step, stepIndex) => {
+                                const stepConf = stepStatusConfig[step.status];
+                                const StepIcon = stepConf.icon;
+                                const isEditingStep = editingStepId === step.id;
+                                return (
+                                  <div key={step.id} className={`p-3 rounded-lg ${stepConf.bg} border border-gray-200 dark:border-gray-600`}>
+                                    {isEditingStep ? (
+                                      <div className="space-y-2">
+                                        <Input
+                                          value={editingStepTitle}
+                                          onChange={(e) => setEditingStepTitle(e.target.value)}
+                                          placeholder={isAr ? 'عنوان الخطوة...' : 'Step title...'}
+                                          autoFocus
+                                          onKeyPress={(e) => e.key === 'Enter' && saveStepEdit(task.id, step.id)}
+                                        />
+                                        <OneDrivePicker isAr={isAr} onFileSelect={(file) => { setEditingStepAttachmentUrl(file.url); setEditingStepAttachmentName(file.name); }} />
+                                        {editingStepAttachmentUrl && (
+                                          <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg">
+                                            <Paperclip className="h-3.5 w-3.5" />
+                                            <a href={editingStepAttachmentUrl} target="_blank" rel="noopener noreferrer" className="truncate max-w-[200px] hover:underline">{editingStepAttachmentName || (isAr ? 'مرفق' : 'Attachment')}</a>
+                                            <button onClick={() => { setEditingStepAttachmentUrl(''); setEditingStepAttachmentName(''); }} className="text-red-400 hover:text-red-600 ms-auto"><X className="h-3.5 w-3.5" /></button>
+                                          </div>
+                                        )}
+                                        <div className="flex gap-2 justify-end">
+                                          <Button size="sm" variant="outline" onClick={cancelEditStep} className="text-xs">{isAr ? 'إلغاء' : 'Cancel'}</Button>
+                                          <Button size="sm" onClick={() => saveStepEdit(task.id, step.id)} disabled={savingStep || !editingStepTitle.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-xs">
+                                            {savingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Save className="h-3.5 w-3.5 me-1" />{isAr ? 'حفظ' : 'Save'}</>}
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-500 w-5">{stepIndex + 1}</span>
+                                        <button
+                                          onClick={() => updateStepStatus(task.id, step.id, step.status === 'completed' ? 'pending' : 'completed')}
+                                          className={`p-1 rounded-full ${step.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-gray-200 dark:bg-gray-600'}`}
+                                        >
+                                          <StepIcon className="h-3.5 w-3.5" />
+                                        </button>
+                                        <span className={`flex-1 text-sm ${step.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>{step.title}</span>
+                                        {step.attachmentUrl && (
+                                          <a href={step.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 shrink-0" title={step.attachmentName || ''}><Paperclip className="h-3.5 w-3.5" /></a>
+                                        )}
+                                        <div className="flex items-center gap-0.5 shrink-0">
+                                          <button onClick={() => startEditStep(step)} className="p-1 rounded text-gray-400 hover:text-emerald-600 transition-colors" title={isAr ? 'تعديل' : 'Edit'}><Pencil className="h-3 w-3" /></button>
+                                          <button onClick={() => deleteStep(task.id, step.id)} className="p-1 rounded text-gray-400 hover:text-red-600 transition-colors" title={isAr ? 'حذف' : 'Delete'}><Trash2 className="h-3 w-3" /></button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {/* Add Step */}
+                              <div className="flex gap-2 mt-2">
+                                <Input
+                                  value={newStepTitle[task.id] || ''}
+                                  onChange={(e) => setNewStepTitle(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                  placeholder={isAr ? 'أضف خطوة جديدة...' : 'Add a new step...'}
+                                  className="flex-1 text-sm"
+                                  onKeyPress={(e) => e.key === 'Enter' && submitTaskStep(task.id)}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => submitTaskStep(task.id)}
+                                  disabled={submittingStep === task.id || !newStepTitle[task.id]?.trim()}
+                                  className="bg-emerald-500 hover:bg-emerald-600"
+                                >
+                                  {submittingStep === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Updates */}
+                        <div className="p-4">
+                          <div className="flex items-center gap-2 mb-3">
                             <MessageSquare className="h-4 w-4 text-sky-600" />
-                            <span className="text-sm font-medium text-sky-700 dark:text-sky-300">{isAr ? 'التحديثات' : 'Updates'}</span>
+                            <span className="text-sm font-semibold text-sky-700 dark:text-sky-300">{isAr ? 'التحديثات' : 'Updates'}</span>
                             {updates.length > 0 && (
                               <span className="text-xs bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded">{updates.length}</span>
                             )}
                           </div>
-                          {expandedTasks[task.id] ? <ChevronUp className="h-4 w-4 text-[var(--foreground-secondary)]" /> : <ChevronDown className="h-4 w-4 text-[var(--foreground-secondary)]" />}
-                        </button>
 
-                        {expandedTasks[task.id] && (
-                          <div className="mt-2 space-y-2 px-3">
-                            {loadingUpdates[task.id] ? (
-                              <div className="flex justify-center py-4">
-                                <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+                          {loadingUpdates[task.id] ? (
+                            <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-sky-500" /></div>
+                          ) : (
+                            <div className="space-y-2">
+                              {/* Add Update */}
+                              <div className="flex gap-2">
+                                <Input
+                                  value={newUpdateContent[task.id] || ''}
+                                  onChange={(e) => setNewUpdateContent(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                  placeholder={isAr ? 'أضف تحديث...' : 'Add an update...'}
+                                  className="flex-1 text-sm"
+                                  onKeyPress={(e) => e.key === 'Enter' && submitTaskUpdate(task.id)}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => submitTaskUpdate(task.id)}
+                                  disabled={submittingUpdate === task.id || !newUpdateContent[task.id]?.trim()}
+                                  className="bg-sky-500 hover:bg-sky-600"
+                                >
+                                  {submittingUpdate === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                </Button>
                               </div>
-                            ) : (
-                              <>
-                                {/* Add Update */}
-                                <div className="space-y-3 p-4 bg-sky-50/50 dark:bg-sky-900/10 rounded-xl border border-dashed border-sky-200 dark:border-sky-800">
-                                  <div className="flex gap-3">
-                                    <Input
-                                      value={newUpdateContent[task.id] || ''}
-                                      onChange={(e) => setNewUpdateContent(prev => ({ ...prev, [task.id]: e.target.value }))}
-                                      placeholder={isAr ? 'أضف تحديث...' : 'Add an update...'}
-                                      className="flex-1"
-                                      onKeyPress={(e) => e.key === 'Enter' && submitTaskUpdate(task.id)}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      onClick={() => submitTaskUpdate(task.id)}
-                                      disabled={submittingUpdate === task.id || !newUpdateContent[task.id]?.trim()}
-                                      className="bg-sky-500 hover:bg-sky-600 px-4"
-                                    >
-                                      {submittingUpdate === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="h-4 w-4 me-1" />{isAr ? 'إرسال' : 'Send'}</>}
-                                    </Button>
-                                  </div>
-                                  <OneDrivePicker
-                                    isAr={isAr}
-                                    onFileSelect={(file) => {
-                                      setNewUpdateAttachmentUrl(prev => ({ ...prev, [task.id]: file.url }));
-                                      setNewUpdateAttachmentName(prev => ({ ...prev, [task.id]: file.name }));
-                                    }}
-                                  />
-                                  {newUpdateAttachmentUrl[task.id] && (
-                                    <div className="flex items-center gap-2 text-xs text-sky-600 bg-white dark:bg-gray-800 p-2 rounded-lg">
-                                      <Paperclip className="h-3.5 w-3.5" />
-                                      <span className="truncate max-w-[300px]">{newUpdateAttachmentName[task.id] || (isAr ? 'مرفق' : 'Attachment')}</span>
-                                      <button
-                                        onClick={() => {
-                                          setNewUpdateAttachmentUrl(prev => ({ ...prev, [task.id]: '' }));
-                                          setNewUpdateAttachmentName(prev => ({ ...prev, [task.id]: '' }));
-                                        }}
-                                        className="text-red-400 hover:text-red-600 ms-auto"
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
 
-                                {updates.map((update) => (
-                                  <div key={update.id} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
-                                    <div className="flex items-start gap-3">
-                                      <div className="w-9 h-9 rounded-full bg-sky-100 dark:bg-sky-800 flex items-center justify-center text-sky-600 dark:text-sky-300 font-bold text-sm shrink-0">
-                                        {update.author.fullName.charAt(0)}
+                              {updates.map((update) => (
+                                <div key={update.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
+                                  <div className="flex items-start gap-2">
+                                    <div className="w-7 h-7 rounded-full bg-sky-100 dark:bg-sky-800 flex items-center justify-center text-sky-600 dark:text-sky-300 font-bold text-xs shrink-0">
+                                      {update.author.fullName.charAt(0)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-0.5">
+                                        <span className="font-medium text-xs">{isAr ? update.author.fullName : update.author.fullNameEn || update.author.fullName}</span>
+                                        <span className="text-xs text-gray-400">{formatTimeAgo(update.createdAt)}</span>
                                       </div>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <span className="font-medium text-sm">{isAr ? update.author.fullName : update.author.fullNameEn || update.author.fullName}</span>
-                                          <span className="text-xs text-gray-400">{formatTimeAgo(update.createdAt)}</span>
-                                        </div>
-                                        <p className="text-sm text-gray-700 dark:text-gray-300">{update.content}</p>
-                                        {update.attachmentUrl && (
-                                          <a
-                                            href={update.attachmentUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 text-xs text-sky-600 hover:text-sky-800 dark:text-sky-400 mt-2 bg-sky-50 dark:bg-sky-900/30 px-2.5 py-1 rounded-lg"
-                                          >
-                                            <Paperclip className="h-3 w-3" />
-                                            <span className="max-w-[250px] truncate">{update.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
-                                            <ExternalLink className="h-3 w-3" />
-                                          </a>
-                                        )}
-                                      </div>
+                                      <p className="text-sm text-gray-700 dark:text-gray-300">{update.content}</p>
+                                      {update.attachmentUrl && (
+                                        <a href={update.attachmentUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 dark:text-sky-400 mt-1">
+                                          <Paperclip className="h-3 w-3" /><span className="max-w-[200px] truncate">{update.attachmentName || (isAr ? 'مرفق' : 'Attachment')}</span>
+                                        </a>
+                                      )}
                                     </div>
                                   </div>
-                                ))}
-                              </>
-                            )}
-                          </div>
-                        )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                    </Card>
+                  );
+                })() : (
+                  <Card className="p-0">
+                    <div className="flex flex-col items-center justify-center py-16 text-[var(--foreground-secondary)]">
+                      <ListChecks className="h-10 w-10 mb-3 opacity-40" />
+                      <p className="text-sm">{isAr ? 'اختر مهمة لعرض تفاصيلها' : 'Select a task to view details'}</p>
                     </div>
                   </Card>
-                );
-              })}
+                )}
+              </div>
             </div>
           ) : (
             <div className="py-12 text-center">

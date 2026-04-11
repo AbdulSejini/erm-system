@@ -422,6 +422,9 @@ function TreatmentPageContent() {
   // Wizard states
   const [wizardStep, setWizardStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+  const [expandedTaskDetails, setExpandedTaskDetails] = useState<Set<number>>(new Set());
+  const [sendEmailToResponsible, setSendEmailToResponsible] = useState(true);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   // Form states - محسّن مع حقول إضافية للمهام وإعادة تقييم الخطر المتبقي
   const [formData, setFormData] = useState({
@@ -704,6 +707,9 @@ function TreatmentPageContent() {
     setOneDriveValidating({});
     setOneDriveError({});
     setOneDriveValid({});
+    // مسح حالة التفاصيل الإضافية
+    setExpandedTaskDetails(new Set());
+    setSendEmailToResponsible(true);
   }, []);
 
   const openAddModal = useCallback(() => {
@@ -932,8 +938,15 @@ Risk Management Team`;
         });
 
         closeAddModal();
-        // إظهار modal نسخ البريد
-        setShowEmailModal(true);
+
+        // إظهار modal البريد فقط إذا اختار المستخدم ذلك
+        if (sendEmailToResponsible) {
+          setShowEmailModal(true);
+        } else {
+          // عرض رسالة نجاح مؤقتة
+          setShowSuccessToast(true);
+          setTimeout(() => setShowSuccessToast(false), 3000);
+        }
 
         // Refresh data
         console.log('Refreshing risks data...');
@@ -1358,21 +1371,28 @@ Risk Management Team`;
         >
           <div className="space-y-6">
             {/* Wizard Steps Indicator */}
-            <div className="flex items-center justify-center gap-2">
-              {[1, 2, 3].map((step) => (
+            <div className="flex items-center justify-center gap-3">
+              {[1, 2].map((step) => (
                 <React.Fragment key={step}>
-                  <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all ${
-                      wizardStep === step
-                        ? 'bg-[var(--primary)] text-white scale-110'
-                        : wizardStep > step
-                        ? 'bg-green-500 text-white'
-                        : 'bg-[var(--background-secondary)] text-[var(--foreground-muted)]'
-                    }`}
-                  >
-                    {wizardStep > step ? <Check className="h-4 w-4" /> : step}
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all ${
+                        wizardStep === step
+                          ? 'bg-[var(--primary)] text-white scale-110'
+                          : wizardStep > step
+                          ? 'bg-green-500 text-white'
+                          : 'bg-[var(--background-secondary)] text-[var(--foreground-muted)]'
+                      }`}
+                    >
+                      {wizardStep > step ? <Check className="h-4 w-4" /> : step}
+                    </div>
+                    <span className={`text-xs font-medium ${
+                      wizardStep === step ? 'text-[var(--primary)]' : wizardStep > step ? 'text-green-600' : 'text-[var(--foreground-muted)]'
+                    }`}>
+                      {step === 1 ? (isAr ? 'بيانات الخطة' : 'Plan Info') : (isAr ? 'المهام' : 'Tasks')}
+                    </span>
                   </div>
-                  {step < 3 && (
+                  {step < 2 && (
                     <div
                       className={`w-12 h-1 rounded ${
                         wizardStep > step ? 'bg-green-500' : 'bg-[var(--background-secondary)]'
@@ -1383,18 +1403,11 @@ Risk Management Team`;
               ))}
             </div>
 
-            {/* Step Labels */}
-            <div className="flex justify-between text-xs text-[var(--foreground-secondary)]">
-              <span>{isAr ? 'اختيار الخطر' : 'Select Risk'}</span>
-              <span>{isAr ? 'تفاصيل الخطة' : 'Plan Details'}</span>
-              <span>{isAr ? 'المهام' : 'Tasks'}</span>
-            </div>
-
             {/* Step Content */}
             <div className="min-h-[300px]">
-              {/* Step 1: Select Risk & Responsible */}
+              {/* Step 1: Plan Info (merged Risk+Responsible+Strategy+Priority+Dates+Justification) */}
               {wizardStep === 1 && (
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[450px] overflow-y-auto pe-1">
                   {/* Risk Search */}
                   <div>
                     <label className="block text-sm font-medium mb-2">
@@ -1406,10 +1419,10 @@ Risk Management Team`;
                       value={riskSearchQuery}
                       onChange={(e) => setRiskSearchQuery(e.target.value)}
                     />
-                    <div className="max-h-[180px] overflow-y-auto space-y-2 mt-2">
+                    <div className="max-h-[140px] overflow-y-auto space-y-2 mt-2">
                       {availableRisks.length === 0 ? (
-                        <div className="text-center py-6 text-[var(--foreground-secondary)]">
-                          <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <div className="text-center py-4 text-[var(--foreground-secondary)]">
+                          <FileText className="h-6 w-6 mx-auto mb-1 opacity-50" />
                           <p className="text-sm">{isAr ? 'لا توجد مخاطر متاحة' : 'No available risks'}</p>
                         </div>
                       ) : (
@@ -1453,7 +1466,7 @@ Risk Management Team`;
                     </div>
                   </div>
 
-                  {/* Responsible - Required in Step 1 */}
+                  {/* Responsible */}
                   <div className="pt-3 border-t border-[var(--border)]">
                     <label htmlFor="treatment-responsible-step1" className="block text-sm font-medium mb-2">
                       {isAr ? 'المسؤول عن خطة المعالجة' : 'Responsible for Treatment Plan'} <span className="text-red-500">*</span>
@@ -1480,15 +1493,10 @@ Risk Management Team`;
                       </p>
                     )}
                   </div>
-                </div>
-              )}
 
-              {/* Step 2: Plan Details */}
-              {wizardStep === 2 && (
-                <div className="space-y-4">
                   {/* Strategy Selection */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">{isAr ? 'الاستراتيجية' : 'Strategy'}</label>
+                  <div className="pt-3 border-t border-[var(--border)]">
+                    <label className="block text-sm font-medium mb-2">{isAr ? 'الاستراتيجية' : 'Strategy'} <span className="text-red-500">*</span></label>
                     <div className="grid grid-cols-2 gap-2">
                       {(['avoid', 'reduce', 'transfer', 'accept'] as TreatmentStrategy[]).map((strategy) => {
                         const config = strategyConfig[strategy];
@@ -1563,19 +1571,14 @@ Risk Management Team`;
                     </div>
                   </div>
 
-                  {/* تعليق/تبرير خطة المعالجة - Justification */}
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  {/* Justification */}
+                  <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 mb-3">
                       <FileText className="h-4 w-4 text-blue-500" />
                       <label className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                         {isAr ? 'تعليق / مسببات التعديل' : 'Justification / Reason for Change'}
                       </label>
                     </div>
-                    <p className="text-xs text-gray-500 mb-3">
-                      {isAr
-                        ? 'اشرح أسباب إنشاء خطة المعالجة هذه وما هي الأهداف المرجوة منها'
-                        : 'Explain the reasons for creating this treatment plan and the expected outcomes'}
-                    </p>
                     <div className="space-y-3">
                       <div>
                         <label htmlFor="justification-ar" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
@@ -1589,7 +1592,7 @@ Risk Management Team`;
                             setFormData((prev) => ({ ...prev, justificationAr: e.target.value }));
                           }}
                           dir="rtl"
-                          rows={3}
+                          rows={2}
                           placeholder={isAr ? 'أدخل تبرير/تعليق خطة المعالجة...' : 'Enter treatment plan justification...'}
                           className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
                         />
@@ -1603,176 +1606,18 @@ Risk Management Team`;
                           value={formData.justificationEn}
                           onChange={(e) => setFormData((prev) => ({ ...prev, justificationEn: e.target.value }))}
                           dir="ltr"
-                          rows={3}
+                          rows={2}
                           placeholder="Enter treatment plan justification..."
                           className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
                         />
                       </div>
                     </div>
                   </div>
-
-                  {/* إعادة تقييم الخطر المتبقي - Residual Risk Re-assessment */}
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-3 mb-3">
-                      <label htmlFor="treatment-update-residual" className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          id="treatment-update-residual"
-                          name="updateResidualRisk"
-                          type="checkbox"
-                          checked={formData.updateResidualRisk}
-                          onChange={(e) => setFormData((prev) => ({
-                            ...prev,
-                            updateResidualRisk: e.target.checked,
-                            residualLikelihood: e.target.checked ? (selectedRisk?.residualLikelihood || selectedRisk?.inherentLikelihood || 3) : null,
-                            residualImpact: e.target.checked ? (selectedRisk?.residualImpact || selectedRisk?.inherentImpact || 3) : null,
-                          }))}
-                          className="w-4 h-4 rounded border-gray-300 text-[#F39200] focus:ring-[#F39200]"
-                        />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {isAr ? 'إعادة تقييم الخطر المتبقي' : 'Re-assess Residual Risk'}
-                        </span>
-                      </label>
-                      <span className="text-xs text-gray-500">
-                        {isAr ? '(اختياري)' : '(Optional)'}
-                      </span>
-                    </div>
-
-                    {formData.updateResidualRisk && selectedRisk && (
-                      <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-700/50">
-                        {/* عرض التقييم الكامن الحالي للمرجعية */}
-                        <div className="mb-4 p-3 rounded-lg bg-white/80 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-600">
-                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                            {isAr ? 'التقييم الكامن الحالي (للمرجعية)' : 'Current Inherent Assessment (Reference)'}
-                          </p>
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-600 dark:text-gray-400">{isAr ? 'الاحتمالية:' : 'Likelihood:'}</span>
-                              <span className="font-bold text-gray-800 dark:text-gray-200">{selectedRisk.inherentLikelihood}</span>
-                            </div>
-                            <span className="text-gray-400">×</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-600 dark:text-gray-400">{isAr ? 'التأثير:' : 'Impact:'}</span>
-                              <span className="font-bold text-gray-800 dark:text-gray-200">{selectedRisk.inherentImpact}</span>
-                            </div>
-                            <span className="text-gray-400">=</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-600 dark:text-gray-400">{isAr ? 'الدرجة:' : 'Score:'}</span>
-                              <span className={`font-bold px-2 py-0.5 rounded text-sm ${
-                                selectedRisk.inherentScore >= 20 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                selectedRisk.inherentScore >= 12 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                                selectedRisk.inherentScore >= 6 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              }`}>
-                                {selectedRisk.inherentScore}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-2">
-                          <TrendingDown className="h-4 w-4" />
-                          {isAr ? 'التقييم المتبقي بعد المعالجة' : 'Residual Assessment After Treatment'}
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* الاحتمالية المتبقية */}
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
-                              {isAr ? 'الاحتمالية المتبقية' : 'Residual Likelihood'}
-                            </label>
-                            <div className="flex gap-1">
-                              {[1, 2, 3, 4, 5].map((val) => (
-                                <button
-                                  key={val}
-                                  onClick={() => setFormData((prev) => ({ ...prev, residualLikelihood: val }))}
-                                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                                    formData.residualLikelihood === val
-                                      ? val >= 4 ? 'bg-red-500 text-white' :
-                                        val === 3 ? 'bg-amber-500 text-white' :
-                                        'bg-green-500 text-white'
-                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                                  }`}
-                                >
-                                  {val}
-                                </button>
-                              ))}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1 text-center">
-                              {formData.residualLikelihood === 1 ? (isAr ? 'نادر' : 'Rare') :
-                               formData.residualLikelihood === 2 ? (isAr ? 'غير محتمل' : 'Unlikely') :
-                               formData.residualLikelihood === 3 ? (isAr ? 'ممكن' : 'Possible') :
-                               formData.residualLikelihood === 4 ? (isAr ? 'محتمل' : 'Likely') :
-                               formData.residualLikelihood === 5 ? (isAr ? 'شبه مؤكد' : 'Almost Certain') : ''}
-                            </p>
-                          </div>
-
-                          {/* التأثير المتبقي */}
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
-                              {isAr ? 'التأثير المتبقي' : 'Residual Impact'}
-                            </label>
-                            <div className="flex gap-1">
-                              {[1, 2, 3, 4, 5].map((val) => (
-                                <button
-                                  key={val}
-                                  onClick={() => setFormData((prev) => ({ ...prev, residualImpact: val }))}
-                                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                                    formData.residualImpact === val
-                                      ? val >= 4 ? 'bg-red-500 text-white' :
-                                        val === 3 ? 'bg-amber-500 text-white' :
-                                        'bg-green-500 text-white'
-                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                                  }`}
-                                >
-                                  {val}
-                                </button>
-                              ))}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1 text-center">
-                              {formData.residualImpact === 1 ? (isAr ? 'ضئيل' : 'Negligible') :
-                               formData.residualImpact === 2 ? (isAr ? 'طفيف' : 'Minor') :
-                               formData.residualImpact === 3 ? (isAr ? 'متوسط' : 'Moderate') :
-                               formData.residualImpact === 4 ? (isAr ? 'كبير' : 'Major') :
-                               formData.residualImpact === 5 ? (isAr ? 'كارثي' : 'Catastrophic') : ''}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* عرض الدرجة المتبقية المحسوبة */}
-                        {formData.residualLikelihood && formData.residualImpact && (
-                          <div className="mt-4 p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                {isAr ? 'درجة الخطر المتبقي:' : 'Residual Risk Score:'}
-                              </span>
-                              <div className="flex items-center gap-3">
-                                <span className={`text-2xl font-bold px-3 py-1 rounded-lg ${
-                                  (formData.residualLikelihood * formData.residualImpact) >= 20 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                  (formData.residualLikelihood * formData.residualImpact) >= 12 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                                  (formData.residualLikelihood * formData.residualImpact) >= 6 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                }`}>
-                                  {formData.residualLikelihood * formData.residualImpact}
-                                </span>
-                                {selectedRisk.inherentScore > (formData.residualLikelihood * formData.residualImpact) && (
-                                  <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                                    <TrendingDown className="h-3 w-3" />
-                                    {isAr ? `تخفيض ${Math.round((1 - (formData.residualLikelihood * formData.residualImpact) / selectedRisk.inherentScore) * 100)}%` :
-                                     `${Math.round((1 - (formData.residualLikelihood * formData.residualImpact) / selectedRisk.inherentScore) * 100)}% Reduction`}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
 
-              {/* Step 3: Tasks - محسّن مع حقول إضافية */}
-              {wizardStep === 3 && (
+              {/* Step 2: Tasks - simplified with expandable details */}
+              {wizardStep === 2 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1796,7 +1641,7 @@ Risk Management Team`;
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-h-[350px] overflow-y-auto pe-2">
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pe-2">
                       {formData.tasks.map((task, index) => (
                         <div key={task.id} className="p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow">
                           {/* Task Header */}
@@ -1814,8 +1659,9 @@ Risk Management Team`;
                             </button>
                           </div>
 
-                          {/* Task Title - At least one required */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                          {/* Primary Fields (always visible): Title Arabic, Assigned To, Due Date */}
+                          <div className="space-y-3">
+                            {/* Title Arabic */}
                             <div>
                               <label htmlFor={`task-title-ar-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                                 {isAr ? 'العنوان (عربي)' : 'Title (Arabic)'} {!task.titleEn && <span className="text-red-500">*</span>}
@@ -1828,76 +1674,12 @@ Risk Management Team`;
                                 onChange={(e) => updateTask(index, 'titleAr', e.target.value)}
                                 className={`text-sm ${!task.titleAr && !task.titleEn ? 'border-red-300' : ''}`}
                               />
-                            </div>
-                            <div>
-                              <label htmlFor={`task-title-en-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                {isAr ? 'العنوان (إنجليزي)' : 'Title (English)'} {!task.titleAr && <span className="text-red-500">*</span>}
-                              </label>
-                              <Input
-                                id={`task-title-en-${index}`}
-                                name={`task-title-en-${index}`}
-                                placeholder={isAr ? 'مثال: Review internal policies' : 'e.g., Review internal policies'}
-                                value={task.titleEn}
-                                onChange={(e) => updateTask(index, 'titleEn', e.target.value)}
-                                className={`text-sm ${!task.titleAr && !task.titleEn ? 'border-red-300' : ''}`}
-                              />
-                            </div>
-                          </div>
-                          {!task.titleAr && !task.titleEn && (
-                            <p className="text-xs text-red-500 mb-2">{isAr ? 'يرجى إدخال العنوان بالعربي أو الإنجليزي على الأقل' : 'Please enter title in Arabic or English at least'}</p>
-                          )}
-
-                          {/* Task Details Row 1: Priority, Due Date, Status */}
-                          <div className="grid grid-cols-3 gap-3 mb-3">
-                            {/* Priority */}
-                            <div>
-                              <label htmlFor={`task-priority-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الأولوية' : 'Priority'}</label>
-                              <select
-                                id={`task-priority-${index}`}
-                                name={`task-priority-${index}`}
-                                value={task.priority || 'medium'}
-                                onChange={(e) => updateTask(index, 'priority', e.target.value)}
-                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200]"
-                              >
-                                <option value="high">{isAr ? '🔴 عالية' : '🔴 High'}</option>
-                                <option value="medium">{isAr ? '🟡 متوسطة' : '🟡 Medium'}</option>
-                                <option value="low">{isAr ? '🟢 منخفضة' : '🟢 Low'}</option>
-                              </select>
+                              {!task.titleAr && !task.titleEn && (
+                                <p className="text-xs text-red-500 mt-1">{isAr ? 'يرجى إدخال العنوان بالعربي أو الإنجليزي على الأقل' : 'Please enter title in Arabic or English at least'}</p>
+                              )}
                             </div>
 
-                            {/* Due Date */}
-                            <div>
-                              <label htmlFor={`task-due-date-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
-                              <Input
-                                id={`task-due-date-${index}`}
-                                name={`task-due-date-${index}`}
-                                type="date"
-                                value={task.dueDate}
-                                onChange={(e) => updateTask(index, 'dueDate', e.target.value)}
-                                className="text-sm"
-                              />
-                            </div>
-
-                            {/* Status */}
-                            <div>
-                              <label htmlFor={`task-status-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الحالة' : 'Status'}</label>
-                              <select
-                                id={`task-status-${index}`}
-                                name={`task-status-${index}`}
-                                value={task.status || 'notStarted'}
-                                onChange={(e) => updateTask(index, 'status', e.target.value)}
-                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200]"
-                              >
-                                <option value="notStarted">{isAr ? '⏳ لم يبدأ' : '⏳ Not Started'}</option>
-                                <option value="inProgress">{isAr ? '🔄 قيد التنفيذ' : '🔄 In Progress'}</option>
-                                <option value="completed">{isAr ? '✅ مكتمل' : '✅ Completed'}</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          {/* Task Details Row 2: Assigned To & Followed By with Autocomplete */}
-                          <div className="grid grid-cols-2 gap-3">
-                            {/* Assigned To - المكلف (إجباري) */}
+                            {/* Assigned To - المكلف (required) */}
                             <div className="relative">
                               <label htmlFor={`task-assigned-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                                 {isAr ? 'المكلف' : 'Assigned To'} <span className="text-red-500">*</span>
@@ -1948,186 +1730,267 @@ Risk Management Team`;
                               )}
                             </div>
 
-                            {/* Followed By - المتابعة */}
-                            <div className="relative">
-                              <label htmlFor={`task-followed-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المتابعة' : 'Followed By'}</label>
-                              <input
-                                id={`task-followed-${index}`}
-                                name={`task-followed-${index}`}
-                                type="text"
-                                value={followedBySearch[index] !== undefined ? followedBySearch[index] : (riskOwnersList.find(o => o.id === task.followedBy)?.[isAr ? 'nameAr' : 'nameEn'] || '')}
-                                onChange={(e) => {
-                                  setFollowedBySearch({ ...followedBySearch, [index]: e.target.value });
-                                  setShowFollowedDropdown({ ...showFollowedDropdown, [index]: true });
-                                }}
-                                onFocus={() => setShowFollowedDropdown({ ...showFollowedDropdown, [index]: true })}
-                                placeholder={isAr ? 'ابدأ بكتابة الاسم...' : 'Start typing name...'}
-                                className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200] focus:border-[#F39200]"
+                            {/* Due Date */}
+                            <div>
+                              <label htmlFor={`task-due-date-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
+                              <Input
+                                id={`task-due-date-${index}`}
+                                name={`task-due-date-${index}`}
+                                type="date"
+                                value={task.dueDate}
+                                onChange={(e) => updateTask(index, 'dueDate', e.target.value)}
+                                className="text-sm"
                               />
-                              {showFollowedDropdown[index] && (
-                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                                  {riskOwnersList
-                                    .filter(owner => {
-                                      const searchVal = (followedBySearch[index] || '').toLowerCase();
-                                      return !searchVal || (owner.nameAr || '').toLowerCase().includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
-                                    })
-                                    .slice(0, 10)
-                                    .map(owner => (
-                                      <button
-                                        key={owner.id}
-                                        type="button"
-                                        onClick={() => {
-                                          updateTask(index, 'followedBy', owner.id);
-                                          setFollowedBySearch({ ...followedBySearch, [index]: isAr ? owner.nameAr : owner.nameEn });
-                                          setShowFollowedDropdown({ ...showFollowedDropdown, [index]: false });
-                                        }}
-                                        className="w-full px-3 py-2 text-start text-sm hover:bg-[#F39200]/10 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0"
-                                      >
-                                        <span className="font-medium">{isAr ? owner.nameAr : owner.nameEn}</span>
-                                      </button>
-                                    ))
-                                  }
-                                  {riskOwnersList.filter(owner => {
-                                    const searchVal = (followedBySearch[index] || '').toLowerCase();
-                                    return !searchVal || (owner.nameAr || '').toLowerCase().includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
-                                  }).length === 0 && (
-                                    <div className="px-3 py-2 text-sm text-gray-500">{isAr ? 'لا توجد نتائج' : 'No results'}</div>
-                                  )}
-                                </div>
-                              )}
                             </div>
                           </div>
 
-                          {/* Description - Required */}
-                          <div className="mt-3">
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              {isAr ? 'وصف المهمة' : 'Task Description'} <span className="text-red-500">*</span>
-                            </label>
-                            <textarea
-                              value={task.description || ''}
-                              onChange={(e) => updateTask(index, 'description', e.target.value)}
-                              placeholder={isAr ? 'أضف تفاصيل المهمة...' : 'Add task details...'}
-                              className={`w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 resize-none ${!task.description ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
-                              rows={2}
-                            />
-                            {!task.description && (
-                              <p className="text-xs text-red-500 mt-1">{isAr ? 'يرجى إدخال وصف المهمة' : 'Please enter task description'}</p>
+                          {/* Expand/Collapse toggle for secondary fields */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpandedTaskDetails(prev => {
+                                const next = new Set(prev);
+                                if (next.has(index)) {
+                                  next.delete(index);
+                                } else {
+                                  next.add(index);
+                                }
+                                return next;
+                              });
+                            }}
+                            className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[#F39200] hover:text-[#e08600] transition-colors"
+                          >
+                            {expandedTaskDetails.has(index) ? (
+                              <>
+                                <ChevronRight className="h-3.5 w-3.5 rotate-90 transition-transform" />
+                                {isAr ? 'إخفاء التفاصيل' : 'Hide Details'}
+                              </>
+                            ) : (
+                              <>
+                                <ChevronRight className="h-3.5 w-3.5 transition-transform" />
+                                {isAr ? 'تفاصيل إضافية' : 'More Details'}
+                              </>
                             )}
-                          </div>
+                          </button>
 
-                          {/* OneDrive Attachment */}
-                          <div className="mt-3">
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1">
-                              <Cloud className="h-3.5 w-3.5 text-blue-500" />
-                              {isAr ? 'مرفق OneDrive (اختياري)' : 'OneDrive Attachment (Optional)'}
-                            </label>
-                            <div className="relative">
-                              {/* خيارات الرفع */}
-                              <div className="flex flex-wrap gap-2 mb-2">
-                                {/* زر اختيار من OneDrive */}
-                                <OneDrivePicker
-                                  isAr={isAr}
-                                  onFileSelect={(file) => {
-                                    updateTask(index, 'oneDriveUrl', file.url);
-                                    updateTask(index, 'oneDriveFileName', file.name);
-                                    setOneDriveValid(prev => ({ ...prev, [index]: true }));
-                                    setOneDriveError(prev => ({ ...prev, [index]: '' }));
-                                  }}
+                          {/* Expanded secondary fields */}
+                          {expandedTaskDetails.has(index) && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                              {/* Title English */}
+                              <div>
+                                <label htmlFor={`task-title-en-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                  {isAr ? 'العنوان (إنجليزي)' : 'Title (English)'}
+                                </label>
+                                <Input
+                                  id={`task-title-en-${index}`}
+                                  name={`task-title-en-${index}`}
+                                  placeholder={isAr ? 'مثال: Review internal policies' : 'e.g., Review internal policies'}
+                                  value={task.titleEn}
+                                  onChange={(e) => updateTask(index, 'titleEn', e.target.value)}
+                                  className="text-sm"
                                 />
-
-                                {/* أو لصق الرابط يدوياً */}
-                                <span className="text-xs text-gray-400 self-center">
-                                  {isAr ? 'أو الصق الرابط:' : 'or paste link:'}
-                                </span>
                               </div>
 
-                              {/* حقل الرابط اليدوي */}
-                              <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                  <input
-                                    type="url"
-                                    value={task.oneDriveUrl || ''}
-                                    onChange={(e) => {
-                                      updateTask(index, 'oneDriveUrl', e.target.value);
-                                      updateTask(index, 'oneDriveFileName', extractFileName(e.target.value));
-                                    }}
-                                    onBlur={(e) => validateOneDriveUrl(index, e.target.value)}
-                                    placeholder={isAr ? 'الصق رابط OneDrive أو SharePoint هنا...' : 'Paste OneDrive or SharePoint link here...'}
-                                    className={`w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 ${
-                                      oneDriveError[index]
-                                        ? 'border-red-400 dark:border-red-500'
-                                        : oneDriveValid[index]
-                                        ? 'border-green-400 dark:border-green-500'
-                                        : 'border-gray-300 dark:border-gray-600'
-                                    }`}
-                                    dir="ltr"
-                                  />
-                                  {task.oneDriveUrl && (
-                                    <div className="absolute left-2 top-1/2 -translate-y-1/2">
-                                      {oneDriveValidating[index] ? (
-                                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                                      ) : oneDriveValid[index] ? (
-                                        <CheckIcon className="h-4 w-4 text-green-500" />
-                                      ) : oneDriveError[index] ? (
-                                        <AlertCircle className="h-4 w-4 text-red-500" />
-                                      ) : null}
+                              {/* Description */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                  {isAr ? 'وصف المهمة' : 'Task Description'}
+                                </label>
+                                <textarea
+                                  value={task.description || ''}
+                                  onChange={(e) => updateTask(index, 'description', e.target.value)}
+                                  placeholder={isAr ? 'أضف تفاصيل المهمة...' : 'Add task details...'}
+                                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 resize-none"
+                                  rows={2}
+                                />
+                              </div>
+
+                              {/* Priority & Status */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label htmlFor={`task-priority-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الأولوية' : 'Priority'}</label>
+                                  <select
+                                    id={`task-priority-${index}`}
+                                    name={`task-priority-${index}`}
+                                    value={task.priority || 'medium'}
+                                    onChange={(e) => updateTask(index, 'priority', e.target.value)}
+                                    className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200]"
+                                  >
+                                    <option value="high">{isAr ? 'عالية' : 'High'}</option>
+                                    <option value="medium">{isAr ? 'متوسطة' : 'Medium'}</option>
+                                    <option value="low">{isAr ? 'منخفضة' : 'Low'}</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label htmlFor={`task-status-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'الحالة' : 'Status'}</label>
+                                  <select
+                                    id={`task-status-${index}`}
+                                    name={`task-status-${index}`}
+                                    value={task.status || 'notStarted'}
+                                    onChange={(e) => updateTask(index, 'status', e.target.value)}
+                                    className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200]"
+                                  >
+                                    <option value="notStarted">{isAr ? 'لم يبدأ' : 'Not Started'}</option>
+                                    <option value="inProgress">{isAr ? 'قيد التنفيذ' : 'In Progress'}</option>
+                                    <option value="completed">{isAr ? 'مكتمل' : 'Completed'}</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Followed By - المتابعة */}
+                              <div className="relative">
+                                <label htmlFor={`task-followed-${index}`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{isAr ? 'المتابعة' : 'Followed By'}</label>
+                                <input
+                                  id={`task-followed-${index}`}
+                                  name={`task-followed-${index}`}
+                                  type="text"
+                                  value={followedBySearch[index] !== undefined ? followedBySearch[index] : (riskOwnersList.find(o => o.id === task.followedBy)?.[isAr ? 'nameAr' : 'nameEn'] || '')}
+                                  onChange={(e) => {
+                                    setFollowedBySearch({ ...followedBySearch, [index]: e.target.value });
+                                    setShowFollowedDropdown({ ...showFollowedDropdown, [index]: true });
+                                  }}
+                                  onFocus={() => setShowFollowedDropdown({ ...showFollowedDropdown, [index]: true })}
+                                  placeholder={isAr ? 'ابدأ بكتابة الاسم...' : 'Start typing name...'}
+                                  className="w-full px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-[#F39200] focus:border-[#F39200]"
+                                />
+                                {showFollowedDropdown[index] && (
+                                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                    {riskOwnersList
+                                      .filter(owner => {
+                                        const searchVal = (followedBySearch[index] || '').toLowerCase();
+                                        return !searchVal || (owner.nameAr || '').toLowerCase().includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                      })
+                                      .slice(0, 10)
+                                      .map(owner => (
+                                        <button
+                                          key={owner.id}
+                                          type="button"
+                                          onClick={() => {
+                                            updateTask(index, 'followedBy', owner.id);
+                                            setFollowedBySearch({ ...followedBySearch, [index]: isAr ? owner.nameAr : owner.nameEn });
+                                            setShowFollowedDropdown({ ...showFollowedDropdown, [index]: false });
+                                          }}
+                                          className="w-full px-3 py-2 text-start text-sm hover:bg-[#F39200]/10 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                        >
+                                          <span className="font-medium">{isAr ? owner.nameAr : owner.nameEn}</span>
+                                        </button>
+                                      ))
+                                    }
+                                    {riskOwnersList.filter(owner => {
+                                      const searchVal = (followedBySearch[index] || '').toLowerCase();
+                                      return !searchVal || (owner.nameAr || '').toLowerCase().includes(searchVal) || (owner.nameEn || '').toLowerCase().includes(searchVal);
+                                    }).length === 0 && (
+                                      <div className="px-3 py-2 text-sm text-gray-500">{isAr ? 'لا توجد نتائج' : 'No results'}</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* OneDrive Attachment */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1">
+                                  <Cloud className="h-3.5 w-3.5 text-blue-500" />
+                                  {isAr ? 'مرفق OneDrive (اختياري)' : 'OneDrive Attachment (Optional)'}
+                                </label>
+                                <div className="relative">
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    <OneDrivePicker
+                                      isAr={isAr}
+                                      onFileSelect={(file) => {
+                                        updateTask(index, 'oneDriveUrl', file.url);
+                                        updateTask(index, 'oneDriveFileName', file.name);
+                                        setOneDriveValid(prev => ({ ...prev, [index]: true }));
+                                        setOneDriveError(prev => ({ ...prev, [index]: '' }));
+                                      }}
+                                    />
+                                    <span className="text-xs text-gray-400 self-center">
+                                      {isAr ? 'أو الصق الرابط:' : 'or paste link:'}
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                      <input
+                                        type="url"
+                                        value={task.oneDriveUrl || ''}
+                                        onChange={(e) => {
+                                          updateTask(index, 'oneDriveUrl', e.target.value);
+                                          updateTask(index, 'oneDriveFileName', extractFileName(e.target.value));
+                                        }}
+                                        onBlur={(e) => validateOneDriveUrl(index, e.target.value)}
+                                        placeholder={isAr ? 'الصق رابط OneDrive أو SharePoint هنا...' : 'Paste OneDrive or SharePoint link here...'}
+                                        className={`w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 ${
+                                          oneDriveError[index]
+                                            ? 'border-red-400 dark:border-red-500'
+                                            : oneDriveValid[index]
+                                            ? 'border-green-400 dark:border-green-500'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                        }`}
+                                        dir="ltr"
+                                      />
+                                      {task.oneDriveUrl && (
+                                        <div className="absolute left-2 top-1/2 -translate-y-1/2">
+                                          {oneDriveValidating[index] ? (
+                                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                                          ) : oneDriveValid[index] ? (
+                                            <CheckIcon className="h-4 w-4 text-green-500" />
+                                          ) : oneDriveError[index] ? (
+                                            <AlertCircle className="h-4 w-4 text-red-500" />
+                                          ) : null}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {task.oneDriveUrl && oneDriveValid[index] && (
+                                      <a
+                                        href={task.oneDriveUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                        {isAr ? 'فتح' : 'Open'}
+                                      </a>
+                                    )}
+                                    {task.oneDriveUrl && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          updateTask(index, 'oneDriveUrl', '');
+                                          updateTask(index, 'oneDriveFileName', '');
+                                          setOneDriveValid(prev => ({ ...prev, [index]: false }));
+                                          setOneDriveError(prev => ({ ...prev, [index]: '' }));
+                                        }}
+                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                        title={isAr ? 'إزالة الملف' : 'Remove file'}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {oneDriveError[index] && (
+                                    <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                                      <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                                        {oneDriveError[index]}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {task.oneDriveUrl && oneDriveValid[index] && (
+                                    <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                                      <CheckIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                      <p className="text-xs text-green-700 dark:text-green-400">
+                                        {isAr ? `الملف مرفق: ${task.oneDriveFileName || 'ملف مرفق'}` : `File attached: ${task.oneDriveFileName || 'Attached file'}`}
+                                      </p>
                                     </div>
                                   )}
                                 </div>
-                                {task.oneDriveUrl && oneDriveValid[index] && (
-                                  <a
-                                    href={task.oneDriveUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1 px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                    {isAr ? 'فتح' : 'Open'}
-                                  </a>
-                                )}
-                                {task.oneDriveUrl && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      updateTask(index, 'oneDriveUrl', '');
-                                      updateTask(index, 'oneDriveFileName', '');
-                                      setOneDriveValid(prev => ({ ...prev, [index]: false }));
-                                      setOneDriveError(prev => ({ ...prev, [index]: '' }));
-                                    }}
-                                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                    title={isAr ? 'إزالة الملف' : 'Remove file'}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                )}
                               </div>
-
-                              {/* رسالة الخطأ/التوجيه */}
-                              {oneDriveError[index] && (
-                                <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                                  <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                                    {oneDriveError[index]}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* رسالة النجاح */}
-                              {task.oneDriveUrl && oneDriveValid[index] && (
-                                <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                                  <CheckIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                  <p className="text-xs text-green-700 dark:text-green-400">
-                                    {isAr ? `✓ الملف مرفق: ${task.oneDriveFileName || 'ملف مرفق'}` : `✓ File attached: ${task.oneDriveFileName || 'Attached file'}`}
-                                  </p>
-                                </div>
-                              )}
                             </div>
-                          </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* Tasks Summary */}
+                  {/* Tasks count */}
                   {formData.tasks.length > 0 && (
                     <div className="flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
                       <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
@@ -2137,6 +2000,38 @@ Risk Management Team`;
                         <Plus className="h-3 w-3 me-1" />
                         {isAr ? 'إضافة المزيد' : 'Add More'}
                       </Button>
+                    </div>
+                  )}
+
+                  {/* Pre-save Summary */}
+                  {selectedRisk && (
+                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 space-y-2">
+                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                        {isAr ? 'ملخص الخطة' : 'Plan Summary'}
+                      </h4>
+                      <p className="text-sm text-gray-800 dark:text-gray-200">
+                        <span className="font-mono text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded me-2">{selectedRisk.riskNumber}</span>
+                        {isAr ? selectedRisk.titleAr : selectedRisk.titleEn}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {formData.strategy && (isAr ? strategyConfig[formData.strategy as TreatmentStrategy]?.labelAr : strategyConfig[formData.strategy as TreatmentStrategy]?.labelEn)}
+                        {formData.priority && ` | ${formData.priority === 'high' ? (isAr ? 'عالية' : 'High') : formData.priority === 'medium' ? (isAr ? 'متوسطة' : 'Medium') : (isAr ? 'منخفضة' : 'Low')}`}
+                        {formData.startDate && formData.dueDate && ` | ${formData.startDate} - ${formData.dueDate}`}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {isAr ? `عدد المهام: ${formData.tasks.length}` : `Tasks: ${formData.tasks.length}`}
+                      </p>
+                      <label className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sendEmailToResponsible}
+                          onChange={(e) => setSendEmailToResponsible(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-[#F39200] focus:ring-[#F39200]"
+                        />
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {isAr ? 'أرسل بريد للمسؤول' : 'Email responsible'}
+                        </span>
+                      </label>
                     </div>
                   )}
                 </div>
@@ -2155,13 +2050,10 @@ Risk Management Team`;
                   {isAr ? 'السابق' : 'Previous'}
                 </Button>
               )}
-              {wizardStep < 3 ? (
+              {wizardStep < 2 ? (
                 <Button
                   onClick={() => startTransition(() => setWizardStep(wizardStep + 1))}
-                  disabled={
-                    (wizardStep === 1 && (!formData.riskId || !formData.responsibleId)) ||
-                    (wizardStep === 2 && !formData.strategy)
-                  }
+                  disabled={!formData.riskId || !formData.responsibleId || !formData.strategy}
                 >
                   {isAr ? 'التالي' : 'Next'}
                   <ArrowRight className="h-4 w-4 ms-1" />
@@ -2175,8 +2067,7 @@ Risk Management Team`;
                     !formData.responsibleId ||
                     (formData.tasks.length > 0 && formData.tasks.some(t =>
                       !t.assignedTo ||
-                      (!t.titleAr && !t.titleEn) ||
-                      !t.description
+                      (!t.titleAr && !t.titleEn)
                     ))
                   }>
                   {isSaving ? (
@@ -2311,6 +2202,18 @@ Risk Management Team`;
             </Button>
           </ModalFooter>
         </Modal>
+      )}
+
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-green-600 text-white shadow-xl">
+            <Check className="h-5 w-5" />
+            <span className="text-sm font-medium">
+              {isAr ? 'تم حفظ خطة المعالجة بنجاح' : 'Treatment plan saved successfully'}
+            </span>
+          </div>
+        </div>
       )}
 
       {/* Email Copy Modal - نافذة نسخ البريد الإلكتروني */}
