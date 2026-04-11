@@ -1005,22 +1005,27 @@ export default function TreatmentDetailPage() {
             </div>
           </div>
           {/* Row 2: Tab Navigation */}
-          <div className="flex gap-0 -mb-px overflow-x-auto">
+          <div className="flex gap-1.5 py-2 overflow-x-auto">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap',
                   activeTab === tab.id
-                    ? 'border-[#F39200] text-[#F39200]'
-                    : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
+                    ? 'bg-[#F39200] text-white shadow-md shadow-[#F39200]/25'
+                    : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)] hover:text-[var(--foreground)]'
                 )}
               >
                 <tab.icon className="h-4 w-4" />
                 {isAr ? tab.labelAr : tab.labelEn}
                 {tab.count > 0 && (
-                  <span className="text-xs bg-[var(--background-tertiary)] px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                  <span className={cn(
+                    'text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center font-bold',
+                    activeTab === tab.id
+                      ? 'bg-white/25 text-white'
+                      : 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)]'
+                  )}>
                     {tab.count}
                   </span>
                 )}
