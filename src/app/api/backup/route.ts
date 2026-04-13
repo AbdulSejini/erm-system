@@ -68,6 +68,9 @@ async function createBackupData() {
     complianceRiskLinks,
     complianceAssessments,
     complianceChangeLogs,
+    auditReports,
+    auditFindings,
+    auditActions,
   ] = await Promise.all([
     // المستخدمين (بدون كلمات المرور)
     prisma.user.findMany({
@@ -166,6 +169,10 @@ async function createBackupData() {
       take: 10000,
       orderBy: { createdAt: 'desc' },
     }),
+    // المراجعة الداخلية
+    prisma.auditReport.findMany(),
+    prisma.auditFinding.findMany(),
+    prisma.auditAction.findMany(),
   ]);
 
   const stats = {
@@ -203,6 +210,9 @@ async function createBackupData() {
     complianceRiskLinks: complianceRiskLinks.length,
     complianceAssessments: complianceAssessments.length,
     complianceChangeLogs: complianceChangeLogs.length,
+    auditReports: auditReports.length,
+    auditFindings: auditFindings.length,
+    auditActions: auditActions.length,
   };
 
   const backup = {
@@ -253,6 +263,10 @@ async function createBackupData() {
       complianceRiskLinks,
       complianceAssessments,
       complianceChangeLogs,
+      // المراجعة الداخلية
+      auditReports,
+      auditFindings,
+      auditActions,
     },
     stats,
   };

@@ -27,6 +27,7 @@ import {
   CheckSquare,
   ShieldCheck,
   CalendarDays,
+  FileSearch,
 } from 'lucide-react';
 
 interface OnlineUser {
@@ -47,6 +48,7 @@ interface NavItem {
   labelKey: string;
   icon: React.ElementType;
   badge?: number;
+  roles?: string[];
 }
 
 interface NavGroup {
@@ -83,6 +85,7 @@ const navGroups: NavGroup[] = [
       { href: '/compliance', labelKey: 'navigation.compliance', icon: ShieldCheck },
       { href: '/compliance/calendar', labelKey: 'navigation.complianceCalendar', icon: CalendarDays },
       { href: '/incidents', labelKey: 'navigation.incidents', icon: AlertCircle },
+      { href: '/audit', labelKey: 'navigation.audit', icon: FileSearch, roles: ['admin', 'riskManager'] },
     ],
   },
   {
@@ -280,7 +283,7 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
 
                 {/* Group Items */}
                 <ul className="space-y-1">
-                  {group.items.map((item) => {
+                  {group.items.filter((item) => !item.roles || (effectiveRole && item.roles.includes(effectiveRole))).map((item) => {
                     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
                     const Icon = item.icon;
 

@@ -83,6 +83,7 @@
     "groupRiskManagement": "Risk Management",
     "groupTreatment": "Treatment",
     "groupComplianceIncidents": "Compliance & Incidents",
+    "audit": "Internal Audit",
     "groupCollaboration": "Collaboration",
     "groupSystem": "System"
   },

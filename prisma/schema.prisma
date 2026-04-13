@@ -62,6 +62,12 @@ model User {
   complianceAssessments      ComplianceAssessment[]   @relation("ComplianceAssessor")
   complianceRiskLinks        ComplianceRiskLink[]     @relation("ComplianceRiskLinker")
   createdObligations         ComplianceObligation[]   @relation("ComplianceObligationCreator")
+  createdAuditReports        AuditReport[]            @relation("AuditReportCreator")
+  auditFindings              AuditFinding[]           @relation("AuditFindingAssignee")
+  createdAuditFindings       AuditFinding[]           @relation("AuditFindingCreator")
+  auditActions               AuditAction[]            @relation("AuditActionAssignee")
+  createdAuditActions        AuditAction[]            @relation("AuditActionCreator")
+  completedAuditActions      AuditAction[]            @relation("AuditActionCompleter")
 
   @@index([status, lastLogin])
 }
@@ -107,6 +113,8 @@ model Department {
   processes      Process[]
   riskOwners     RiskOwner[]            @relation("RiskOwnerDepartment")
   directMessages DirectMessage[]        @relation("DirectMessageDepartment")
+  auditReports   AuditReport[]          @relation("AuditReportDepartment")
+  auditFindings  AuditFinding[]         @relation("AuditFindingDepartment")
 }
 
 // العمليات (Processes)
@@ -233,6 +241,7 @@ model Risk {
   residualRiskChangeRequests ResidualRiskChangeRequest[] // طلبات تغيير الخطر المتبقي
   approvalRequest RiskApprovalRequest? // طلب اعتماد الخطر الجديد
   complianceLinks ComplianceRiskLink[] // ربط الالتزامات المرتبطة بالخطر
+  auditFindings   AuditFinding[]       // ملاحظات المراجعة المرتبطة بالخطر
 
   @@index([categoryId])
   @@index([departmentId])
@@ -1042,4 +1051,111 @@ model ComplianceChangeLog {
   @@index([userId])
   @@index([changeType])
   @@index([createdAt])
+}
+
+// =============================================================================
+// متابعة المراجعة الداخلية (Internal Audit Follow-up)
+// =============================================================================
+
+// تقرير المراجعة الداخلية
+model AuditReport {
+  id              String    @id @default(cuid())
+  reportNumber    String    @unique // مثل AUD-2026-001
+  titleAr         String    // عنوان التقرير بالعربي
+  titleEn         String?   // عنوان التقرير بالإنجليزي
+  departmentId    String?   // الإدارة المُراجَعة
+  auditorName     String?   // اسم المراجع / جهة المراجعة
+  auditDateFrom   DateTime? // تاريخ بدء المراجعة
+  auditDateTo     DateTime? // تاريخ نهاية المراجعة
+  reportDate      DateTime? // تاريخ التقرير
+  summaryAr       String?   // ملخص التقرير بالعربي
+  summaryEn       String?   // ملخص التقرير بالإنجليزي
+  status          String    @default("open") // open, inProgress, closed
+  attachmentUrl   String?   // رابط المرفق
+  attachmentName  String?   // اسم المرفق
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // العلاقات
+  department  Department?    @relation("AuditReportDepartment", fields: [departmentId], references: [id])
+  createdBy   User           @relation("AuditReportCreator", fields: [createdById], references: [id])
+  findings    AuditFinding[]
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([reportDate])
+}
+
+// ملاحظة / توصية المراجعة
+model AuditFinding {
+  id              String    @id @default(cuid())
+  reportId        String
+  findingNumber   String    // مثل AUD-2026-001-F01
+  titleAr         String    // عنوان الملاحظة بالعربي
+  titleEn         String?   // عنوان الملاحظة بالإنجليزي
+  descriptionAr   String?   // وصف الملاحظة بالعربي
+  descriptionEn   String?   // وصف الملاحظة بالإنجليزي
+  type            String    @default("observation") // observation, recommendation, nonConformity
+  severity        String    @default("medium") // critical, major, medium, low
+  departmentId    String?   // الإدارة المعنية
+  assigneeId      String?   // المسؤول عن المتابعة
+  riskId          String?   // ربط بالخطر (اختياري)
+  status          String    @default("open") // open, inProgress, pendingVerification, closed
+  dueDate         DateTime? // تاريخ الاستحقاق
+  closedAt        DateTime? // تاريخ الإغلاق
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // العلاقات
+  report      AuditReport    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  department  Department?    @relation("AuditFindingDepartment", fields: [departmentId], references: [id])
+  assignee    User?          @relation("AuditFindingAssignee", fields: [assigneeId], references: [id])
+  risk        Risk?          @relation(fields: [riskId], references: [id])
+  createdBy   User           @relation("AuditFindingCreator", fields: [createdById], references: [id])
+  actions     AuditAction[]
+
+  @@index([reportId])
+  @@index([status])
+  @@index([severity])
+  @@index([departmentId])
+  @@index([assigneeId])
+  @@index([riskId])
+  @@index([dueDate])
+}
+
+// إجراء تصحيحي / خطة عمل
+model AuditAction {
+  id              String    @id @default(cuid())
+  findingId       String
+  titleAr         String    // عنوان الإجراء بالعربي
+  titleEn         String?   // عنوان الإجراء بالإنجليزي
+  descriptionAr   String?   // وصف الإجراء بالعربي
+  descriptionEn   String?   // وصف الإجراء بالإنجليزي
+  assigneeId      String?   // المكلف بالتنفيذ
+  status          String    @default("pending") // pending, inProgress, completed, cancelled
+  priority        String    @default("medium") // high, medium, low
+  dueDate         DateTime? // تاريخ الاستحقاق
+  completedAt     DateTime? // تاريخ الإنجاز
+  completedById   String?   // من أنجزه
+  attachmentUrl   String?   // رابط المرفق
+  attachmentName  String?   // اسم المرفق
+  notesAr         String?   // ملاحظات بالعربي
+  notesEn         String?   // ملاحظات بالإنجليزي
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // العلاقات
+  finding     AuditFinding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  assignee    User?          @relation("AuditActionAssignee", fields: [assigneeId], references: [id])
+  completedBy User?          @relation("AuditActionCompleter", fields: [completedById], references: [id])
+  createdBy   User           @relation("AuditActionCreator", fields: [createdById], references: [id])
+
+  @@index([findingId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([dueDate])
 }
