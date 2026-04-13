@@ -4,497 +4,218 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from '@/contexts/LanguageContext';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import {
   ClipboardCheck,
   Plus,
-  Search,
-  FileText,
+  Loader2,
+  FileSearch,
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Loader2,
-  Building2,
-  Calendar,
-  Eye,
-  Trash2,
-  Filter,
-  BarChart3,
-  ChevronDown,
-  ChevronUp,
   XCircle,
+  Trash2,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 
-interface AuditReport {
+const PHASES = ['kickoff', 'dataRequest', 'fieldwork', 'draftReport', 'managementReview', 'ceoReview', 'auditCommittee'] as const;
+
+interface Engagement {
   id: string;
-  reportNumber: string;
+  engagementNumber: string;
   titleAr: string;
   titleEn: string | null;
-  departmentId: string | null;
   auditorName: string | null;
-  auditDateFrom: string | null;
-  auditDateTo: string | null;
-  reportDate: string | null;
-  summaryAr: string | null;
-  summaryEn: string | null;
+  currentPhase: string;
   status: string;
-  attachmentUrl: string | null;
-  attachmentName: string | null;
+  kickoffDate: string | null;
   createdAt: string;
-  department: { id: string; nameAr: string; nameEn: string } | null;
-  createdBy: { id: string; fullName: string; fullNameEn: string | null };
+  createdBy: { fullName: string; fullNameEn: string | null };
+  dataRequests: Array<{ id: string; status: string }>;
   findings: Array<{
-    id: string;
-    status: string;
-    severity: string;
+    id: string; status: string; severity: string;
     actions: Array<{ id: string; status: string }>;
   }>;
 }
 
-interface Stats {
-  totalReports: number;
-  openReports: number;
-  inProgressReports: number;
-  closedReports: number;
-  totalFindings: number;
-  openFindings: number;
-  criticalFindings: number;
-  totalActions: number;
-  completedActions: number;
-}
-
-interface Department {
-  id: string;
-  nameAr: string;
-  nameEn: string;
-}
-
-export default function AuditPage() {
-  const { t, language } = useTranslation();
+export default function AuditListPage() {
+  const { language } = useTranslation();
   const isAr = language === 'ar';
   const { data: session } = useSession();
   const router = useRouter();
 
-  const [reports, setReports] = useState<AuditReport[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [departmentFilter, setDepartmentFilter] = useState('all');
-
-  // New report form
-  const [newReport, setNewReport] = useState({
-    titleAr: '',
-    titleEn: '',
-    departmentId: '',
-    auditorName: '',
-    auditDateFrom: '',
-    auditDateTo: '',
-    reportDate: '',
-    summaryAr: '',
-    summaryEn: '',
-  });
+  const [form, setForm] = useState({ titleAr: '', titleEn: '', auditorName: '', scopeAr: '' });
 
   const userRole = (session?.user as any)?.role || '';
   const canAccess = userRole === 'admin' || userRole === 'riskManager';
 
-  const fetchReports = useCallback(async () => {
+  const phaseLabel = (p: string) => {
+    const labels: Record<string, [string, string]> = {
+      kickoff: ['الاجتماع الافتتاحي', 'Kick-off'],
+      dataRequest: ['طلب البيانات', 'Data Request'],
+      fieldwork: ['العمل الميداني', 'Fieldwork'],
+      draftReport: ['التقرير المبدئي', 'Draft Report'],
+      managementReview: ['مناقشة الإدارة', 'Management Review'],
+      ceoReview: ['الرئيس التنفيذي', 'CEO Review'],
+      auditCommittee: ['لجنة المراجعة', 'Audit Committee'],
+    };
+    return labels[p]?.[isAr ? 0 : 1] || p;
+  };
+
+  const fetch_ = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/audit-reports');
+      const res = await fetch('/api/audit-engagements');
       const data = await res.json();
-      if (data.success) {
-        setReports(data.data);
-        setStats(data.stats);
-      }
-    } catch (error) {
-      console.error('Error fetching audit reports:', error);
-    } finally {
-      setLoading(false);
-    }
+      if (data.success) setEngagements(data.data);
+    } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
 
-  const fetchDepartments = useCallback(async () => {
-    try {
-      const res = await fetch('/api/departments');
-      const data = await res.json();
-      if (data.success) {
-        setDepartments(data.data);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    if (canAccess) {
-      fetchReports();
-      fetchDepartments();
-    }
-  }, [canAccess, fetchReports, fetchDepartments]);
+  useEffect(() => { if (canAccess) fetch_(); }, [canAccess, fetch_]);
 
   const handleCreate = async () => {
-    if (!newReport.titleAr.trim()) return;
+    if (!form.titleAr.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch('/api/audit-reports', {
+      const res = await fetch('/api/audit-engagements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newReport,
-          departmentId: newReport.departmentId || null,
-        }),
+        body: JSON.stringify(form),
       });
       const data = await res.json();
       if (data.success) {
-        setShowCreateModal(false);
-        setNewReport({
-          titleAr: '',
-          titleEn: '',
-          departmentId: '',
-          auditorName: '',
-          auditDateFrom: '',
-          auditDateTo: '',
-          reportDate: '',
-          summaryAr: '',
-          summaryEn: '',
-        });
-        fetchReports();
+        setShowCreate(false);
+        setForm({ titleAr: '', titleEn: '', auditorName: '', scopeAr: '' });
+        router.push(`/audit/${data.data.id}`);
       }
-    } catch (error) {
-      console.error('Error creating report:', error);
-    } finally {
-      setCreating(false);
-    }
+    } catch { /* ignore */ } finally { setCreating(false); }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!deleteId) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/audit-reports/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/audit-engagements/${deleteId}`, { method: 'DELETE' });
       const data = await res.json();
-      if (data.success) {
-        setShowDeleteModal(null);
-        fetchReports();
-      }
-    } catch (error) {
-      console.error('Error deleting report:', error);
-    } finally {
-      setDeleting(false);
-    }
+      if (data.success) { setDeleteId(null); fetch_(); }
+    } catch { /* ignore */ } finally { setDeleting(false); }
   };
-
-  // Filter reports
-  const filteredReports = reports.filter((r) => {
-    const matchesSearch =
-      !searchQuery ||
-      r.titleAr.includes(searchQuery) ||
-      r.titleEn?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.reportNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.auditorName?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
-    const matchesDept = departmentFilter === 'all' || r.departmentId === departmentFilter;
-    return matchesSearch && matchesStatus && matchesDept;
-  });
 
   if (!canAccess) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="p-8 text-center max-w-md">
           <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">
-            {isAr ? 'غير مصرح بالوصول' : 'Access Denied'}
-          </h2>
-          <p className="text-[var(--foreground-secondary)]">
-            {isAr
-              ? 'هذا القسم متاح فقط لمدير النظام ومدير المخاطر'
-              : 'This section is accessible only to System Admin and Risk Manager'}
-          </p>
+          <h2 className="text-xl font-bold mb-2">{isAr ? 'غير مصرح بالوصول' : 'Access Denied'}</h2>
         </Card>
       </div>
     );
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'open':
-        return (
-          <Badge variant="warning">
-            <Clock className="w-3 h-3" />
-            {isAr ? 'مفتوح' : 'Open'}
-          </Badge>
-        );
-      case 'inProgress':
-        return (
-          <Badge variant="info">
-            <Loader2 className="w-3 h-3" />
-            {isAr ? 'قيد المتابعة' : 'In Progress'}
-          </Badge>
-        );
-      case 'closed':
-        return (
-          <Badge variant="success">
-            <CheckCircle2 className="w-3 h-3" />
-            {isAr ? 'مغلق' : 'Closed'}
-          </Badge>
-        );
-      default:
-        return <Badge>{status}</Badge>;
-    }
-  };
-
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <ClipboardCheck className="w-7 h-7 text-[#F39200]" />
             {isAr ? 'متابعة المراجعة الداخلية' : 'Internal Audit Follow-up'}
           </h1>
           <p className="text-sm text-[var(--foreground-secondary)] mt-1">
-            {isAr
-              ? 'متابعة تقارير المراجعة الداخلية والملاحظات والإجراءات التصحيحية'
-              : 'Track internal audit reports, findings, and corrective actions'}
+            {isAr ? 'تتبع دورة حياة المراجعة من الافتتاح إلى الاعتماد' : 'Track audit lifecycle from kick-off to approval'}
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
+        <Button onClick={() => setShowCreate(true)}>
           <Plus className="w-4 h-4" />
-          {isAr ? 'تقرير جديد' : 'New Report'}
+          {isAr ? 'مراجعة جديدة' : 'New Audit'}
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-                <FileText className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.totalReports}</p>
-                <p className="text-xs text-[var(--foreground-secondary)]">
-                  {isAr ? 'إجمالي التقارير' : 'Total Reports'}
-                </p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.openFindings}</p>
-                <p className="text-xs text-[var(--foreground-secondary)]">
-                  {isAr ? 'ملاحظات مفتوحة' : 'Open Findings'}
-                </p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-red-50 dark:bg-red-900/20">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.criticalFindings}</p>
-                <p className="text-xs text-[var(--foreground-secondary)]">
-                  {isAr ? 'ملاحظات حرجة' : 'Critical Findings'}
-                </p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-                <BarChart3 className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {stats.totalActions > 0
-                    ? Math.round((stats.completedActions / stats.totalActions) * 100)
-                    : 0}%
-                </p>
-                <p className="text-xs text-[var(--foreground-secondary)]">
-                  {isAr ? 'نسبة إنجاز الإجراءات' : 'Actions Completion'}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Search & Filters */}
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground-secondary)]" />
-            <input
-              type="text"
-              placeholder={isAr ? 'بحث في التقارير...' : 'Search reports...'}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full ps-10 pe-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-[#F39200]/50"
-            />
-          </div>
-          <div className="flex gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-            >
-              <option value="all">{isAr ? 'جميع الحالات' : 'All Statuses'}</option>
-              <option value="open">{isAr ? 'مفتوح' : 'Open'}</option>
-              <option value="inProgress">{isAr ? 'قيد المتابعة' : 'In Progress'}</option>
-              <option value="closed">{isAr ? 'مغلق' : 'Closed'}</option>
-            </select>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="px-3 py-2 rounded-lg border border-[var(--border)] hover:bg-[var(--background-secondary)] transition-colors"
-            >
-              <Filter className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        {showFilters && (
-          <div className="mt-3 pt-3 border-t border-[var(--border)]">
-            <select
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-            >
-              <option value="all">{isAr ? 'جميع الإدارات' : 'All Departments'}</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {isAr ? d.nameAr : d.nameEn}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </Card>
-
-      {/* Reports List */}
+      {/* List */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
+        <div className="flex justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-[#F39200]" />
         </div>
-      ) : filteredReports.length === 0 ? (
+      ) : engagements.length === 0 ? (
         <Card className="p-12 text-center">
-          <FileText className="w-12 h-12 text-[var(--foreground-secondary)] mx-auto mb-3 opacity-40" />
+          <FileSearch className="w-12 h-12 text-[var(--foreground-secondary)] mx-auto mb-3 opacity-40" />
           <p className="text-[var(--foreground-secondary)]">
-            {isAr ? 'لا توجد تقارير مراجعة' : 'No audit reports found'}
+            {isAr ? 'لا توجد مراجعات بعد' : 'No audits yet'}
           </p>
         </Card>
       ) : (
         <div className="space-y-3">
-          {filteredReports.map((report) => {
-            const openFindings = report.findings.filter((f) => f.status !== 'closed').length;
-            const totalFindings = report.findings.length;
-            const totalActions = report.findings.flatMap((f) => f.actions).length;
-            const completedActions = report.findings
-              .flatMap((f) => f.actions)
-              .filter((a) => a.status === 'completed').length;
+          {engagements.map((eng) => {
+            const phaseIdx = PHASES.indexOf(eng.currentPhase as any);
+            const delivered = eng.dataRequests.filter(d => d.status === 'delivered').length;
+            const totalDR = eng.dataRequests.length;
+            const openFindings = eng.findings.filter(f => f.status !== 'closed').length;
 
             return (
               <Card
-                key={report.id}
-                className="p-4 hover:shadow-md transition-shadow cursor-pointer group"
-                onClick={() => router.push(`/audit/${report.id}`)}
+                key={eng.id}
+                className="p-5 hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => router.push(`/audit/${eng.id}`)}
               >
-                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-[#F39200] font-semibold">
-                        {report.reportNumber}
-                      </span>
-                      {getStatusBadge(report.status)}
+                <div className="flex flex-col gap-3">
+                  {/* Title row */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-mono text-[#F39200] font-bold">{eng.engagementNumber}</span>
+                        {eng.status === 'completed' ? (
+                          <Badge variant="success"><CheckCircle2 className="w-3 h-3" />{isAr ? 'مكتمل' : 'Completed'}</Badge>
+                        ) : (
+                          <Badge variant="info"><Clock className="w-3 h-3" />{phaseLabel(eng.currentPhase)}</Badge>
+                        )}
+                      </div>
+                      <h3 className="font-semibold">{isAr ? eng.titleAr : eng.titleEn || eng.titleAr}</h3>
+                      {eng.auditorName && <p className="text-xs text-[var(--foreground-secondary)] mt-0.5">{eng.auditorName}</p>}
                     </div>
-                    <h3 className="font-semibold text-[var(--foreground)] truncate">
-                      {isAr ? report.titleAr : report.titleEn || report.titleAr}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-[var(--foreground-secondary)]">
-                      {report.department && (
-                        <span className="flex items-center gap-1">
-                          <Building2 className="w-3 h-3" />
-                          {isAr ? report.department.nameAr : report.department.nameEn}
-                        </span>
-                      )}
-                      {report.auditorName && (
-                        <span className="flex items-center gap-1">
-                          <ClipboardCheck className="w-3 h-3" />
-                          {report.auditorName}
-                        </span>
-                      )}
-                      {report.reportDate && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(report.reportDate).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
-                        </span>
-                      )}
-                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeleteId(eng.id); }}
+                      className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  <div className="flex items-center gap-4 shrink-0">
-                    {/* Finding counts */}
-                    <div className="text-center">
-                      <p className="text-lg font-bold">{totalFindings}</p>
-                      <p className="text-[10px] text-[var(--foreground-secondary)]">
-                        {isAr ? 'ملاحظات' : 'Findings'}
-                      </p>
-                    </div>
-                    {openFindings > 0 && (
-                      <div className="text-center">
-                        <p className="text-lg font-bold text-amber-600">{openFindings}</p>
-                        <p className="text-[10px] text-[var(--foreground-secondary)]">
-                          {isAr ? 'مفتوحة' : 'Open'}
-                        </p>
-                      </div>
-                    )}
-                    {totalActions > 0 && (
-                      <div className="text-center">
-                        <p className="text-lg font-bold text-green-600">
-                          {completedActions}/{totalActions}
-                        </p>
-                        <p className="text-[10px] text-[var(--foreground-secondary)]">
-                          {isAr ? 'إجراءات' : 'Actions'}
-                        </p>
-                      </div>
-                    )}
+                  {/* Phase progress mini bar */}
+                  <div className="flex items-center gap-1">
+                    {PHASES.map((p, i) => (
+                      <React.Fragment key={p}>
+                        <div className={`w-3 h-3 rounded-full shrink-0 ${
+                          i < phaseIdx ? 'bg-green-500' :
+                          i === phaseIdx ? 'bg-[#F39200]' :
+                          'bg-[var(--border)]'
+                        }`} />
+                        {i < PHASES.length - 1 && (
+                          <div className={`flex-1 h-0.5 ${i < phaseIdx ? 'bg-green-500' : 'bg-[var(--border)]'}`} />
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
 
-                    <div className="flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/audit/${report.id}`);
-                        }}
-                        className="p-2 rounded-lg hover:bg-[var(--background-secondary)] transition-colors"
-                        title={isAr ? 'عرض' : 'View'}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowDeleteModal(report.id);
-                        }}
-                        className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
-                        title={isAr ? 'حذف' : 'Delete'}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  {/* Stats row */}
+                  <div className="flex gap-4 text-xs text-[var(--foreground-secondary)]">
+                    {totalDR > 0 && (
+                      <span>{isAr ? `طلبات البيانات: ${delivered}/${totalDR}` : `Data Requests: ${delivered}/${totalDR}`}</span>
+                    )}
+                    {eng.findings.length > 0 && (
+                      <span>{isAr ? `ملاحظات: ${eng.findings.length}` : `Findings: ${eng.findings.length}`}
+                        {openFindings > 0 && <span className="text-amber-600"> ({openFindings} {isAr ? 'مفتوحة' : 'open'})</span>}
+                      </span>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -504,145 +225,48 @@ export default function AuditPage() {
       )}
 
       {/* Create Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title={isAr ? 'تقرير مراجعة جديد' : 'New Audit Report'}
-        size="lg"
-      >
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto p-1">
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title={isAr ? 'مراجعة داخلية جديدة' : 'New Audit Engagement'}>
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {isAr ? 'عنوان التقرير (عربي) *' : 'Report Title (Arabic) *'}
-            </label>
-            <input
-              type="text"
-              value={newReport.titleAr}
-              onChange={(e) => setNewReport({ ...newReport, titleAr: e.target.value })}
+            <label className="block text-sm font-medium mb-1">{isAr ? 'عنوان المراجعة (عربي) *' : 'Audit Title (Arabic) *'}</label>
+            <input value={form.titleAr} onChange={e => setForm({ ...form, titleAr: e.target.value })}
               className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-              placeholder={isAr ? 'عنوان التقرير...' : 'Report title...'}
-            />
+              placeholder={isAr ? 'مثال: Order to Cash & Procure to Pay' : 'e.g. Order to Cash & Procure to Pay'} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {isAr ? 'عنوان التقرير (إنجليزي)' : 'Report Title (English)'}
-            </label>
-            <input
-              type="text"
-              value={newReport.titleEn}
-              onChange={(e) => setNewReport({ ...newReport, titleEn: e.target.value })}
+            <label className="block text-sm font-medium mb-1">{isAr ? 'عنوان المراجعة (إنجليزي)' : 'Audit Title (English)'}</label>
+            <input value={form.titleEn} onChange={e => setForm({ ...form, titleEn: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm" dir="ltr" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{isAr ? 'جهة المراجعة' : 'Auditor'}</label>
+            <input value={form.auditorName} onChange={e => setForm({ ...form, auditorName: e.target.value })}
               className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-              dir="ltr"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {isAr ? 'الإدارة المُراجَعة' : 'Audited Department'}
-              </label>
-              <select
-                value={newReport.departmentId}
-                onChange={(e) => setNewReport({ ...newReport, departmentId: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-              >
-                <option value="">{isAr ? 'اختر الإدارة' : 'Select department'}</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {isAr ? d.nameAr : d.nameEn}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {isAr ? 'المراجع / جهة المراجعة' : 'Auditor'}
-              </label>
-              <input
-                type="text"
-                value={newReport.auditorName}
-                onChange={(e) => setNewReport({ ...newReport, auditorName: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {isAr ? 'بدء المراجعة' : 'Audit Start'}
-              </label>
-              <input
-                type="date"
-                value={newReport.auditDateFrom}
-                onChange={(e) => setNewReport({ ...newReport, auditDateFrom: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {isAr ? 'نهاية المراجعة' : 'Audit End'}
-              </label>
-              <input
-                type="date"
-                value={newReport.auditDateTo}
-                onChange={(e) => setNewReport({ ...newReport, auditDateTo: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {isAr ? 'تاريخ التقرير' : 'Report Date'}
-              </label>
-              <input
-                type="date"
-                value={newReport.reportDate}
-                onChange={(e) => setNewReport({ ...newReport, reportDate: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm"
-              />
-            </div>
+              placeholder={isAr ? 'مثال: KPMG' : 'e.g. KPMG'} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {isAr ? 'ملخص التقرير (عربي)' : 'Report Summary (Arabic)'}
-            </label>
-            <textarea
-              value={newReport.summaryAr}
-              onChange={(e) => setNewReport({ ...newReport, summaryAr: e.target.value })}
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm resize-none"
-            />
+            <label className="block text-sm font-medium mb-1">{isAr ? 'النطاق' : 'Scope'}</label>
+            <textarea value={form.scopeAr} onChange={e => setForm({ ...form, scopeAr: e.target.value })} rows={2}
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm resize-none" />
           </div>
         </div>
         <ModalFooter>
-          <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-            {isAr ? 'إلغاء' : 'Cancel'}
-          </Button>
-          <Button onClick={handleCreate} disabled={creating || !newReport.titleAr.trim()}>
+          <Button variant="outline" onClick={() => setShowCreate(false)}>{isAr ? 'إلغاء' : 'Cancel'}</Button>
+          <Button onClick={handleCreate} disabled={creating || !form.titleAr.trim()}>
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isAr ? 'إنشاء التقرير' : 'Create Report'}
+            {isAr ? 'إنشاء' : 'Create'}
           </Button>
         </ModalFooter>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={!!showDeleteModal}
-        onClose={() => setShowDeleteModal(null)}
-        title={isAr ? 'حذف التقرير' : 'Delete Report'}
-      >
+      {/* Delete Modal */}
+      <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title={isAr ? 'حذف المراجعة' : 'Delete Audit'}>
         <p className="text-[var(--foreground-secondary)]">
-          {isAr
-            ? 'هل أنت متأكد من حذف هذا التقرير؟ سيتم حذف جميع الملاحظات والإجراءات المرتبطة به.'
-            : 'Are you sure you want to delete this report? All related findings and actions will be deleted.'}
+          {isAr ? 'هل أنت متأكد؟ سيتم حذف جميع البيانات المرتبطة.' : 'Are you sure? All related data will be deleted.'}
         </p>
         <ModalFooter>
-          <Button variant="outline" onClick={() => setShowDeleteModal(null)}>
-            {isAr ? 'إلغاء' : 'Cancel'}
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => showDeleteModal && handleDelete(showDeleteModal)}
-            disabled={deleting}
-          >
+          <Button variant="outline" onClick={() => setDeleteId(null)}>{isAr ? 'إلغاء' : 'Cancel'}</Button>
+          <Button variant="danger" onClick={handleDelete} disabled={deleting}>
             {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
             {isAr ? 'حذف' : 'Delete'}
           </Button>

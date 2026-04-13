@@ -68,7 +68,8 @@ async function createBackupData() {
     complianceRiskLinks,
     complianceAssessments,
     complianceChangeLogs,
-    auditReports,
+    auditEngagements,
+    auditDataRequests,
     auditFindings,
     auditActions,
   ] = await Promise.all([
@@ -170,7 +171,8 @@ async function createBackupData() {
       orderBy: { createdAt: 'desc' },
     }),
     // المراجعة الداخلية
-    prisma.auditReport.findMany(),
+    prisma.auditEngagement.findMany(),
+    prisma.auditDataRequest.findMany(),
     prisma.auditFinding.findMany(),
     prisma.auditAction.findMany(),
   ]);
@@ -210,7 +212,8 @@ async function createBackupData() {
     complianceRiskLinks: complianceRiskLinks.length,
     complianceAssessments: complianceAssessments.length,
     complianceChangeLogs: complianceChangeLogs.length,
-    auditReports: auditReports.length,
+    auditEngagements: auditEngagements.length,
+    auditDataRequests: auditDataRequests.length,
     auditFindings: auditFindings.length,
     auditActions: auditActions.length,
   };
@@ -264,7 +267,8 @@ async function createBackupData() {
       complianceAssessments,
       complianceChangeLogs,
       // المراجعة الداخلية
-      auditReports,
+      auditEngagements,
+      auditDataRequests,
       auditFindings,
       auditActions,
     },
