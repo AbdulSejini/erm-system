@@ -51,12 +51,14 @@ import {
 import { hrRisks, hrRisksSummary } from '@/data/hrRisks';
 import RiskEditor from '@/components/RiskEditor';
 import AuditLogTab from '@/components/AuditLogTab';
+import PermissionsTab from '@/components/PermissionsTab';
 
 // Define all settings tabs
 const allSettingsTabs = [
   { id: 'profile', icon: UserCheck },
   { id: 'changePassword', icon: Key },
   { id: 'users', icon: Users },
+  { id: 'permissions', icon: Lock },
   { id: 'departments', icon: Building2 },
   { id: 'categories', icon: Tag },
   { id: 'sources', icon: FileText },
@@ -77,8 +79,8 @@ const allSettingsTabs = [
 // executive: only notifications
 // employee: only notifications
 const roleTabAccess: Record<string, string[]> = {
-  admin: ['profile', 'changePassword', 'users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
-  riskManager: ['profile', 'changePassword', 'users', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
+  admin: ['profile', 'changePassword', 'users', 'permissions', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
+  riskManager: ['profile', 'changePassword', 'users', 'permissions', 'departments', 'categories', 'sources', 'riskStatuses', 'riskOwners', 'notifications', 'dataManagement', 'backup', 'auditLog', 'riskEditor'],
   riskAnalyst: ['profile', 'changePassword', 'sources', 'riskOwners', 'notifications'],
   riskChampion: ['profile', 'changePassword', 'notifications'],
   executive: ['profile', 'changePassword', 'notifications'],
@@ -2928,6 +2930,7 @@ function SettingsPageContent() {
       {activeTab === 'dataManagement' && canAccessTab('dataManagement') && renderDataManagementTab()}
       {activeTab === 'backup' && canAccessTab('backup') && renderBackupTab()}
       {activeTab === 'auditLog' && canAccessTab('auditLog') && <AuditLogTab />}
+      {activeTab === 'permissions' && canAccessTab('permissions') && <PermissionsTab />}
       {activeTab === 'riskEditor' && canAccessTab('riskEditor') && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">

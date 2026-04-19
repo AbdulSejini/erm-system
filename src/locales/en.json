@@ -485,6 +485,7 @@
     "auditLog": "Activity Log",
     "riskAppetite": "Risk Appetite",
     "riskEditor": "Risk Editor",
+    "permissions": "Permissions",
     "currentPassword": "Current Password",
     "newPassword": "New Password",
     "confirmNewPassword": "Confirm New Password",

@@ -49,6 +49,7 @@ interface NavItem {
   icon: React.ElementType;
   badge?: number;
   roles?: string[];
+  module?: string;
 }
 
 interface NavGroup {
@@ -60,45 +61,45 @@ const navGroups: NavGroup[] = [
   {
     labelKey: 'navigation.groupMain',
     items: [
-      { href: '/dashboard', labelKey: 'navigation.dashboard', icon: LayoutDashboard },
+      { href: '/dashboard', labelKey: 'navigation.dashboard', icon: LayoutDashboard, module: 'dashboard' },
     ],
   },
   {
     labelKey: 'navigation.groupRiskManagement',
     items: [
-      { href: '/risks', labelKey: 'navigation.risks', icon: AlertTriangle },
-      { href: '/risk-approvals', labelKey: 'navigation.riskApprovals', icon: CheckSquare },
-      { href: '/assessment', labelKey: 'navigation.assessment', icon: ClipboardCheck },
-      { href: '/tracking', labelKey: 'navigation.tracking', icon: Target },
+      { href: '/risks', labelKey: 'navigation.risks', icon: AlertTriangle, module: 'risks' },
+      { href: '/risk-approvals', labelKey: 'navigation.riskApprovals', icon: CheckSquare, module: 'riskApprovals' },
+      { href: '/assessment', labelKey: 'navigation.assessment', icon: ClipboardCheck, module: 'assessment' },
+      { href: '/tracking', labelKey: 'navigation.tracking', icon: Target, module: 'tracking' },
     ],
   },
   {
     labelKey: 'navigation.groupTreatment',
     items: [
-      { href: '/treatment', labelKey: 'navigation.treatment', icon: Wrench },
-      { href: '/treatment-monitoring', labelKey: 'navigation.treatmentMonitoring', icon: Activity },
+      { href: '/treatment', labelKey: 'navigation.treatment', icon: Wrench, module: 'treatments' },
+      { href: '/treatment-monitoring', labelKey: 'navigation.treatmentMonitoring', icon: Activity, module: 'treatmentMonitoring' },
     ],
   },
   {
     labelKey: 'navigation.groupComplianceIncidents',
     items: [
-      { href: '/compliance', labelKey: 'navigation.compliance', icon: ShieldCheck },
-      { href: '/compliance/calendar', labelKey: 'navigation.complianceCalendar', icon: CalendarDays },
-      { href: '/incidents', labelKey: 'navigation.incidents', icon: AlertCircle },
-      { href: '/audit', labelKey: 'navigation.audit', icon: FileSearch, roles: ['admin', 'riskManager'] },
+      { href: '/compliance', labelKey: 'navigation.compliance', icon: ShieldCheck, module: 'compliance' },
+      { href: '/compliance/calendar', labelKey: 'navigation.complianceCalendar', icon: CalendarDays, module: 'compliance' },
+      { href: '/incidents', labelKey: 'navigation.incidents', icon: AlertCircle, module: 'incidents' },
+      { href: '/audit', labelKey: 'navigation.audit', icon: FileSearch, module: 'audit', roles: ['admin', 'riskManager'] },
     ],
   },
   {
     labelKey: 'navigation.groupCollaboration',
     items: [
-      { href: '/champions', labelKey: 'navigation.champions', icon: Users },
-      { href: '/discussions', labelKey: 'navigation.discussions', icon: MessageSquare },
+      { href: '/champions', labelKey: 'navigation.champions', icon: Users, module: 'champions' },
+      { href: '/discussions', labelKey: 'navigation.discussions', icon: MessageSquare, module: 'discussions' },
     ],
   },
   {
     labelKey: 'navigation.groupSystem',
     items: [
-      { href: '/reports', labelKey: 'navigation.reports', icon: FileBarChart },
+      { href: '/reports', labelKey: 'navigation.reports', icon: FileBarChart, module: 'reports' },
       { href: '/settings', labelKey: 'navigation.settings', icon: Settings },
     ],
   },
@@ -118,14 +119,36 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
   const { isImpersonating, impersonatedUser } = useImpersonation();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [showOnlineUsers, setShowOnlineUsers] = useState(true);
+  const [moduleAccess, setModuleAccess] = useState<Record<string, boolean> | null>(null);
 
   // Get effective user role (impersonated user's role if impersonating)
   const effectiveRole = (isImpersonating && impersonatedUser?.role)
     ? impersonatedUser.role
     : session?.user?.role;
 
+  const effectiveUserId = (isImpersonating && impersonatedUser?.id)
+    ? impersonatedUser.id
+    : (session?.user as any)?.id;
+
   // Check if user has permission to see online users (based on effective role)
   const canSeeOnlineUsers = effectiveRole && ['admin', 'riskManager'].includes(effectiveRole);
+
+  // Fetch user's effective module permissions
+  useEffect(() => {
+    if (!effectiveUserId) return;
+    fetch(`/api/users/${effectiveUserId}/permissions`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          const access: Record<string, boolean> = {};
+          for (const [k, v] of Object.entries(d.data.permissions)) {
+            access[k] = (v as any).access;
+          }
+          setModuleAccess(access);
+        }
+      })
+      .catch(() => { /* */ });
+  }, [effectiveUserId]);
 
   // Fetch online users (pauses when tab is hidden)
   useEffect(() => {
@@ -283,7 +306,13 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
 
                 {/* Group Items */}
                 <ul className="space-y-1">
-                  {group.items.filter((item) => !item.roles || (effectiveRole && item.roles.includes(effectiveRole))).map((item) => {
+                  {group.items.filter((item) => {
+                    // Role-based restriction (hard guard)
+                    if (item.roles && (!effectiveRole || !item.roles.includes(effectiveRole))) return false;
+                    // Module-level permission check
+                    if (item.module && moduleAccess && moduleAccess[item.module] === false) return false;
+                    return true;
+                  }).map((item) => {
                     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
                     const Icon = item.icon;
 
