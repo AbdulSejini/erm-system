@@ -159,8 +159,9 @@ export function isAuthError(
 //
 // Rules (must mirror between the helper and any inline filter logic):
 //
-//   1. All members of the Risk Management department (nameEn contains "risk"
-//      or nameAr contains "مخاطر") can see every treatment plan.
+//   1. Privileged roles (admin, riskManager, riskAnalyst) OR members of the
+//      Risk Management department (nameEn contains "risk" or nameAr contains
+//      "مخاطر") can see every treatment plan.
 //   2. The plan's responsible person (responsibleId).
 //   3. Any user from the SAME DEPARTMENT as the risk that the plan treats.
 //      "Same department" includes both the user's primary departmentId and
@@ -168,6 +169,8 @@ export function isAuthError(
 //   4. Anyone assigned to a task (actionOwnerId) or step participant
 //      (createdById / completedById) under the plan.
 // -----------------------------------------------------------------------------
+
+const PRIVILEGED_TREATMENT_ROLES = new Set(['admin', 'riskManager', 'riskAnalyst']);
 
 /**
  * Minimum shape a TreatmentPlan record must have to be evaluated for access.
@@ -211,12 +214,17 @@ export type TreatmentAccessContext =
  */
 export async function getUserTreatmentAccessContext(
   userId: string,
-  _userRole: string,
+  userRole: string,
   userEmail: string
 ): Promise<TreatmentAccessContext> {
   const { default: prisma } = await import('@/lib/prisma');
 
-  // Rule 1: members of Risk Management department see everything
+  // Rule 1a: privileged roles see everything
+  if (PRIVILEGED_TREATMENT_ROLES.has(userRole)) {
+    return { isPrivileged: true };
+  }
+
+  // Rule 1b: members of Risk Management department see everything
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
